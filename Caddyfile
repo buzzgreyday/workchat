@@ -1,0 +1,60 @@
+{
+	# Global options.
+	email micbr@protonmail.com
+}
+
+chat.mringdal.com {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+	}
+
+	# Cheap abuse/cost protection: each /chat call bills OpenAI, and
+	# /admin/issue-token mints credentials. Limit both per client IP.
+	rate_limit {
+		zone chat_zone {
+			match {
+				path /api/chat*
+			}
+			key {remote_host}
+			events 20
+			window 1m
+		}
+		zone admin_zone {
+			match {
+				path /api/admin*
+			}
+			key {remote_host}
+			events 5
+			window 1m
+		}
+	}
+
+	# Backend API — strip /api prefix before proxying.
+	handle_path /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else goes to the Next.js frontend.
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	log {
+		output stdout
+		# Access tokens travel as a URL query param on first load
+		# (?token=...) — strip it before it ever hits the logs.
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete token
+				}
+			}
+		}
+	}
+}

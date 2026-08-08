@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "json": {
+      "format": "%(asctime)s %(name)s %(levelname)s %(message)s"
+    }
+  },
+  "handlers": {
+    "console": {
+      "class": "logging.StreamHandler",
+      "formatter": "json",
+      "stream": "ext://sys.stdout"
+    }
+  },
+  "loggers": {
+    "uvicorn": {
+      "handlers": ["console"],
+      "level": "ERROR",
+      "propagate": false
+    }
+  },
+  "root": {
+    "level": "DEBUG",
+    "handlers": ["console"]
+  }
+}

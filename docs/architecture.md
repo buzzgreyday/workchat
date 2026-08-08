@@ -1,0 +1,3 @@
+# Architecture
+
+Frontend -> Backend -> PostgreSQL

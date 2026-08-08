@@ -1,0 +1,48 @@
+export interface ChatHistoryMessage {
+  role:
+    | "system"
+    | "user"
+    | "assistant"
+    | "tool";
+
+  content: string;
+
+  tool_call_id?: string;
+}
+
+
+export interface ChatRequest {
+  message: string;
+  history: ChatHistoryMessage[];
+}
+
+
+export interface ChatResponse {
+  reply: string;
+  history: ChatHistoryMessage[];
+  usage: Usage;
+}
+
+
+export interface Message {
+  id: string;
+
+  role:
+    | "user"
+    | "assistant";
+
+  content: string;
+
+  createdAt: Date;
+
+  status:
+    | "streaming"
+    | "complete"
+    | "error";
+}
+
+export interface Usage {
+    used: number,
+    remaining: number,
+    max: number
+}

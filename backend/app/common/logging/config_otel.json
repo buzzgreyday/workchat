@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "json": {
+      "()": "src.otel_setup.TraceContextFormatter",
+      "format": "%(asctime)s %(name)s %(levelname)s %(message)s %(trace_id)s %(span_id)s"
+    }
+  },
+  "handlers": {
+    "console": {
+      "class": "logging.StreamHandler",
+      "formatter": "json",
+      "stream": "ext://sys.stdout"
+    },
+    "otel": {
+      "class": "opentelemetry.sdk._logs.LoggingHandler"
+    }
+  },
+  "loggers": {
+    "uvicorn": {
+      "handlers": ["console"],
+      "level": "ERROR",
+      "propagate": false
+    }
+  },
+  "root": {
+    "level": "INFO",
+    "handlers": ["console", "otel"]
+  }
+}

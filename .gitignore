@@ -1,0 +1,31 @@
+# Environments
+.env
+.env.*
+!.env.example
+!.env.*.example
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
+frontend/next-env.d.ts
+
+# Editors
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Private CV content (kept locally / on the server, not in the public repo)
+backend/resources/contact.md
+backend/resources/system-prompt.md
+backend/resources/index.json
