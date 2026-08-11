@@ -502,6 +502,10 @@ in the backend entrypoint.
 
 Possible future enhancements include:
 
+* Keep chat history in database (server-side)
+* First request either takes history or the system-prompt (system-prompt should be added server-side only). Also, server-side history in Postgres only.
+* Handle max_queries, invalid token, etc. in frontend
+* Token persistence
 * CI/CD pipeline
 * Automated testing
 * Redis caching
