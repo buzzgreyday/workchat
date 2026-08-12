@@ -1,6 +1,5 @@
 export interface ChatHistoryMessage {
   role:
-    | "system"
     | "user"
     | "assistant"
     | "tool";

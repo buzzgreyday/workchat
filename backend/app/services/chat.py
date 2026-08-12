@@ -103,13 +103,19 @@ class Chat:
     async def json_response(self) -> ChatResponse:
         reply = await self._get_full_reply() or ""
         usage = self.usage.model_dump()
+        # Strip the system prompt before chat resp to user
+        history = self._strip_system(self.messages)
         logger.info("Sending chat response to user", extra={"usage": usage})
-        logger.debug("Chat response content", extra={"reply": reply, "history": self.messages})
-        return ChatResponse(type="done", reply=reply, history=self.messages, usage=usage)
+        logger.debug("Chat response content", extra={"reply": reply, "history": history})
+        return ChatResponse(type="done", reply=reply, history=history, usage=usage)
 
     def _final_history(self, reply: str) -> list[ChatCompletionMessageParam]:
+        """
+        Method used with last server-sent svent in streaming resp (status: "done").
+        System prompt stripped from final streaming resp to user
+        """
         assistant_message: ChatCompletionAssistantMessageParam = {"role": "assistant", "content": reply}
-        return self.messages + [assistant_message]
+        return [*self._strip_system(self.messages), assistant_message]
 
     async def _run_tool_calls(self, tool_calls) -> None:
         for tool_call in tool_calls:
@@ -142,7 +148,14 @@ class Chat:
                 return choice.message.content
 
     def _new_messages(self, req: ChatRequest) -> list[ChatCompletionMessageParam]:
-        self.messages = req.history or [{"role": "system", "content": SYSTEM_PROMPT}]
+        system_message: ChatCompletionMessageParam | dict = {"role": "system", "content": SYSTEM_PROMPT}
+        self.messages = [system_message, *self._strip_system(req.history)]
         user_message: ChatCompletionMessageParam | dict = {"role": "user", "content": req.message}
         self.messages.append(user_message)
         return self.messages
+
+    @staticmethod
+    def _strip_system(messages: list[ChatCompletionMessageParam] | None) -> list[ChatCompletionMessageParam]:
+        """The system prompt is backend-only: it never leaves the API and is re-added on every request."""
+        # If role is not == "system" the message is added in the comprehension list (whether dict or obj)
+        return [m for m in (messages or []) if (m.get("role") if isinstance(m, dict) else getattr(m, "role", None)) != "system"]

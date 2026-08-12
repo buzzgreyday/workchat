@@ -7,17 +7,26 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.1.1] - 2026-08-12
+
+### Security
+
+- The system prompt is now added backend-side only and stripped from both the
+  JSON and streaming chat responses, so it is no longer part of the history
+  returned to clients. A `system` message present in an incoming request is
+  dropped rather than forwarded to the model.
+
 ## [0.1.0] - 2026-08-11
 
 ### Added
 
 - Initial
 
-### Changed (planned)
+### Changed
 
 - Initial
 
-### Fixed (planned)
+### Fixed
 
 - Initial
 
