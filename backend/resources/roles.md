@@ -23,7 +23,8 @@ and CI/CD pipelines (see "Software Developer @ iEDI" for the exact scale).
 His freelance work for
 Constellation Network — an encryption/signing/transaction SDK, plus
 adding Python language support — is backend/systems work in a different
-domain, cryptography and blockchain (see "Freelance Software Developer @
+domain, cryptography and blockchain. That SDK is public and installable
+today: `pip install pypergraph-dag` (see "Freelance Software Developer @
 Constellation Network").
 
 ## Full-Stack Developer
@@ -37,7 +38,8 @@ capability, not years of production frontend experience.
 ## API Developer
 A recurring theme across his work: REST APIs at iEDI (business document
 exchange, ERP/e-invoicing integration), a small REST API in .NET/C# (see
-".NET API"), and the streaming chat API behind this application.
+".NET API" — a local learning exercise, never deployed), and the streaming
+chat API behind this application.
 
 ## Seniority
 Professional tenure since January 2025 — junior by the calendar. But the

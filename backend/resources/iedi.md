@@ -3,7 +3,7 @@ title: Software Developer @ iEDI
 type: experience
 tags: [backend, backend-developer, backend-engineer, software-developer, software-engineer, api-development, rest-api, erp, e-invoicing, databases, sql, ci-cd, docker, kubernetes, nomad, testing, github, integrations, cron, production-support, solution-ownership, system-design]
 dates: "September 2025 - present"
-summary: Software Developer / Backend Engineer at iEDI (Denmark, on-premise) - owns and troubleshoots production integrations and services (partner APIs, cron jobs, price-catalogue/invoice/despatch advice/document flows), makes independent design decisions, and helps shape team development practices.
+summary: "Software Developer / Backend Engineer at iEDI (Denmark, on-premise) - owns and troubleshoots production integrations and services (partner APIs, cron jobs, price-catalogue/invoice/despatch advice/document flows), makes independent design decisions, and helps shape team development practices. IN PRODUCTION BUT INTERNAL: proprietary employer code, not publicly viewable or installable."
 skill_notes:
   kubernetes: "Created and managed services, ingress, and deployments through a cluster management UI; did not author raw manifests/Helm charts or design cluster architecture from scratch."
 ---
@@ -11,6 +11,9 @@ skill_notes:
 ## Role
 Software Developer, iEDI — Denmark, on-premise
 **September 2025 - present**
+
+## Status
+Running in production at iEDI, but internal: this is proprietary employer code, so there is no public repository, package, or URL to point a hiring manager at.
 
 ## What I did
 - Own and troubleshoot a number of distinct production integrations and services — partner API integrations, scheduled cron jobs, and services handling price catalogues, invoices, despatch advices, and other business documents.
