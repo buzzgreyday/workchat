@@ -1,6 +1,6 @@
 """
 Scans /data for .md files, parses YAML frontmatter, and writes index.json.
-Run this whenever you add/edit a CV file: `python build_index.py`
+Run this whenever you add/edit a CV file: `python -m app.build_index` (from backend/)
 """
 import json
 import re
@@ -16,7 +16,7 @@ SKILLS_PATH = RESOURCES_DIR / "skills.md"
 # Experience counts more than side/hobby projects.
 TYPE_WEIGHT = {"experience": 3, "project": 1}
 
-START_MARKER = "<!-- AUTO-GENERATED-SKILLS-START: do not hand-edit below this line, run `python build_index.py` instead -->"
+START_MARKER = "<!-- AUTO-GENERATED-SKILLS-START: do not hand-edit below this line, run `python -m app.build_index` (from backend/) instead -->"
 END_MARKER = "<!-- AUTO-GENERATED-SKILLS-END -->"
 
 

@@ -22,7 +22,9 @@ services:
     env_file:
       - ./backend/.env
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # python, not curl: the python:3.13-slim base image ships no curl, so the
+      # previous probe could only ever fail with "executable file not found".
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3

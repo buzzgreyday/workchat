@@ -5,7 +5,7 @@ tags: []
 summary: Technical skills derived from experience and projects, plus spoken languages and interests.
 ---
 
-<!-- AUTO-GENERATED-SKILLS-START: do not hand-edit below this line, run `python build_index.py` instead -->
+<!-- AUTO-GENERATED-SKILLS-START: do not hand-edit below this line, run `python -m app.build_index` (from backend/) instead -->
 
 ## Technical Skills
 
