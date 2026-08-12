@@ -137,8 +137,25 @@ For local Python development outside Docker:
 Clone the repository:
 
 ```bash
-git clone <repository-url>
-cd <repository-name>
+git clone https://github.com/buzzgreyday/workchat.git
+cd workchat
+```
+
+Create the environment file. Both compose files read `backend/.env` **and**
+interpolate `${POSTGRES_USER}` and friends from a `.env` beside the compose
+file, so the symlink is required in development too — without it every
+`docker compose` command aborts before starting anything:
+
+```bash
+cp backend/.env.example backend/.env
+ln -s backend/.env .env
+```
+
+Add your `OPENAI_API_KEY` to `backend/.env`, then create the system prompt —
+the backend raises at import if it is missing or empty:
+
+```bash
+cp backend/resources/system-prompt.md.example backend/resources/system-prompt.md
 ```
 
 Build the containers:
@@ -278,7 +295,9 @@ The project uses PostgreSQL with Alembic for schema migrations.
 
 ## Generate a Migration
 
-Whenever SQLAlchemy models change or new deployment:
+Whenever SQLAlchemy models change. **Not** on a new deployment — the migrations
+are committed and `backend/entrypoint.sh` already runs `alembic upgrade head` at
+startup, so a fresh deploy needs nothing here:
 
 ```bash
 docker compose exec backend alembic revision --autogenerate -m "migration description"
@@ -438,10 +457,12 @@ Typical development workflow:
 
 # Testing
 
-When a test suite is available:
+Run on the host, not in the container — the image is built with
+`uv sync --frozen --no-dev` and `pytest` is in the `dev` dependency group, so it
+is not installed inside either the dev or prod image:
 
 ```bash
-docker compose exec backend pytest
+cd backend && uv sync && uv run pytest
 ```
 
 Lint the frontend:
@@ -509,14 +530,22 @@ docker compose build --no-cache frontend
 # Production Deployment
 
 See [`docs/deployment.md`](docs/deployment.md) for the full guide to running
-this on `chat.mringdal.com`.
+this on your own domain.
 
 Short version:
 
 ```bash
-cp backend/.env.production.example backend/.env   # fill in real secrets
+cp backend/.env.production.example backend/.env   # secrets + SITE_DOMAIN/ACME_EMAIL
+ln -s backend/.env .env                           # compose interpolation
+cp backend/resources/system-prompt.md.example backend/resources/system-prompt.md
+sudo chown -R 1000:1000 backend/resources         # container runs as UID 1000
+docker compose -f docker-compose.prod.yaml run --rm backend python -m app.build_index
 docker compose -f docker-compose.prod.yaml up -d --build
 ```
+
+Replace the CV markdown in `backend/resources/` with your own first — it ships
+with the author's. See [docs/deployment.md](docs/deployment.md) for the full
+sequence and the reasoning behind each step.
 
 Caddy handles TLS via Let's Encrypt and proxies `/api/*` to the backend,
 everything else to the Next.js frontend. Alembic migrations run automatically
