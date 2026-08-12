@@ -118,8 +118,34 @@ curl    https://chat.example.com/api/health
 
 ```bash
 git pull
+sudo chown -R 1000:1000 backend/resources
 docker compose -f docker-compose.prod.yaml up -d --build
+docker compose -f docker-compose.prod.yaml run --rm backend python -m app.build_index
 ```
+
+The order matters, and none of the four steps is optional:
+
+- **The ownership step is not a one-off from first deployment.** `git pull`
+  writes the files it updates as whichever user runs it, and the container needs
+  `backend/resources` owned by UID/GID 1000 (see step 6). Otherwise
+  `build_index` fails part-way with a permission error on `skills.md`, after it
+  has already rewritten `index.json` — leaving a fresh index beside a stale
+  skills list.
+- **Rebuild the image before building the index.** Only `backend/resources` is
+  bind-mounted; the application code, `build_index.py` included, is baked into
+  the image. Running the index build first would run the *previous* release's
+  indexer over the new content.
+- **`build_index` does not run itself.** `index.json` is gitignored and read per
+  request, so a release that changes any CV record leaves the site answering
+  from the old index until this runs — `/health` keeps passing throughout, so
+  nothing surfaces the staleness for you.
+
+Afterwards `git status` should be clean. `skills.md` is tracked but rewritten by
+`build_index`; since ranking ties break on the tag name, regenerating it on the
+server reproduces the committed file byte for byte. If it shows as modified, the
+committed copy was generated from different content — regenerate it locally and
+commit that, rather than leaving the working tree dirty for the next `git pull`
+to collide with.
 
 ## Issue an access token
 
