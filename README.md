@@ -189,9 +189,36 @@ cd backend && uv run --env-file .env -m app.build_index
 
 # Environment Variables
 
-The application uses environment variables for configuration.
+The application uses environment variables for configuration. Secrets are never
+committed — `.env` files are gitignored, and only `.env.example` files are tracked.
 
-Store sensitive values in a local `.env` files on server.
+In production the only real env file is `backend/.env`, read by three different
+consumers:
+
+| Consumer | How it reads the file |
+| --- | --- |
+| Backend outside Docker (local dev) | `load_dotenv(BACKEND_DIR / ".env")` in `app/common/config.py` |
+| The `backend` and `db` containers | `env_file: ./backend/.env` in both compose files |
+| Compose itself, for `${POSTGRES_USER}` etc. in `docker-compose.prod.yaml` | only ever reads a `.env` sitting next to the compose file |
+
+The third consumer is why a repo-root `.env` also has to exist. Rather than
+duplicating the values, symlink it so there is a single source of truth:
+
+```bash
+ln -s backend/.env .env
+```
+
+Without that symlink every `docker compose` command fails with
+`required variable POSTGRES_DB is missing a value`, unless you pass
+`--env-file backend/.env` by hand each time.
+
+To set up a new deployment, copy `backend/.env.production.example` to
+`backend/.env`, fill in real secrets, then create the symlink.
+
+For local development, `docker-compose.yaml` additionally expects a
+`frontend/.env` (`env_file: ./frontend/.env`). No example is tracked for it,
+so create an empty one if the dev stack complains — `NEXT_PUBLIC_API_URL` is
+already set via `environment:` in the compose file.
 
 ---
 
