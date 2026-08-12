@@ -3,7 +3,7 @@ title: AI CV Chat Application
 type: project
 tags: [python, fastapi, typescript, nextjs, react, postgresql, sqlalchemy, alembic, docker, full-stack, full-stack-developer, backend, frontend, rest-api, jwt, openai, tailwind, tool-calling, llm, software-engineer]
 dates: "2026-"
-summary: "This chat application itself — a full-stack AI-powered CV assistant (FastAPI/PostgreSQL backend, Next.js/TypeScript frontend, Dockerized) that lets hiring managers query Michael's CV through a tool-calling LLM agent instead of a static resume. LIVE: deployed and serving this conversation."
+summary: "This chat application itself — a full-stack AI-powered CV assistant (FastAPI/PostgreSQL backend, Next.js/TypeScript frontend, Dockerized) that lets hiring managers query Michael's CV through a tool-calling LLM agent instead of a static resume. BUILT BY MICHAEL: his own project, not a third-party product - the tool the hirer is using is itself one of his work samples. LIVE: deployed and serving this conversation."
 ---
 
 ## Technologies
@@ -16,6 +16,14 @@ Infrastructure: Docker Compose, Caddy reverse proxy with automatic HTTPS.
 - Backend: FastAPI serving a streaming chat endpoint, async PostgreSQL access via SQLAlchemy, Alembic-managed schema migrations, and per-hirer JWT access tokens scoped by expiry and query count.
 - Frontend: Next.js/TypeScript chat UI with streamed responses, built with Tailwind CSS.
 - Infrastructure: containerized with Docker Compose; Caddy handles TLS and reverse proxying in production.
+
+## Authorship
+Michael built this application. It is one of his projects, not a third-party
+product, a hosted service, or a template he filled in — he designed and wrote
+it end to end, from the database schema through the frontend to the deployment
+that is serving this conversation. If a hiring manager asks who made this chat
+bot, the answer is Michael, and the thing they are using is itself a work
+sample.
 
 ## Status
 Live. This is the application serving this conversation — deployed and publicly reachable.
