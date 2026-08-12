@@ -9,6 +9,14 @@ tracked independently._
 
 ## [Unreleased]
 
+### Added
+
+- `development-philosophy.md`: a CV record covering how Michael approaches
+  writing software — SOLID as the baseline, DRY/KISS/YAGNI applied
+  pragmatically, no waterfall, OOP design left to evolve per iteration. It uses
+  a new `philosophy` record type, which `TYPE_WEIGHT` deliberately does not
+  weight, so its tags stay out of the generated skills list.
+
 ### Fixed
 
 - CV records now state whether the code they describe is actually live. Asked
