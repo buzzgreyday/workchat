@@ -14,8 +14,8 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **api-development** — .NET API, Freelance Software Developer @ Constellation Network, Software Developer @ iEDI
 - **software-developer** — Blockchain Wallet Modification, Freelance Software Developer @ Constellation Network, Software Developer @ iEDI
 - **backend-developer** — Freelance Software Developer @ Constellation Network, Software Developer @ iEDI
+- **github** — Blockchain Wallet Modification, Custom iPodLinux Bootloader, Software Developer @ iEDI, Tracing and Distributed Logging
 - **docker** — AI CV Chat Application, Software Developer @ iEDI, Tracing and Distributed Logging
-- **github** — Blockchain Wallet Modification, Custom iPodLinux Bootloader, Software Developer @ iEDI
 - **python** — AI CV Chat Application, Freelance Software Developer @ Constellation Network, Tracing and Distributed Logging
 - **rest-api** — .NET API, AI CV Chat Application, Software Developer @ iEDI
 - **blockchain** — Blockchain Wallet Modification, Freelance Software Developer @ Constellation Network
