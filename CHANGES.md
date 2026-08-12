@@ -7,36 +7,6 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
-## [Unreleased]
-
-### Added
-
-- `development-philosophy.md`: a CV record covering how Michael approaches
-  writing software — SOLID as the baseline, DRY/KISS/YAGNI applied
-  pragmatically, no waterfall, OOP design left to evolve per iteration. It uses
-  a new `philosophy` record type, which `TYPE_WEIGHT` deliberately does not
-  weight, so its tags stay out of the generated skills list.
-
-### Fixed
-
-- CV records now state whether the code they describe is actually live. Asked
-  whether anything besides this chat app was running, the agent offered the
-  .NET API — a local learning exercise that was never deployed — while missing
-  the Constellation SDK, which is published on PyPI as `pypergraph-dag`.
-  `search_cv` returns only the index summaries, so liveness is recorded in each
-  record's frontmatter `summary` as well as in a `## Status` section in the
-  body, and every experience/project record now carries one.
-
-- `build_index` now breaks ranking ties on the tag name. Equal-scoring tags
-  previously fell back to `rglob()` insertion order, i.e. filesystem order, so
-  regenerating `skills.md` on another machine reshuffled the file without any
-  tag actually changing.
-
-### Changed
-
-- Regenerated the auto-generated skills section in `skills.md`, which was stale
-  and missing the `grafana`, `loki` and `tempo` tags.
-
 ## [0.1.1] - 2026-08-12
 
 ### Security
