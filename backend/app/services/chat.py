@@ -7,7 +7,7 @@ from openai.types.chat.chat_completion import Choice
 
 from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 
-from app.common.config import OPENAI_MODEL, SYSTEM_PROMPT
+from app.common.config import MAX_TOOL_ROUNDS, OPENAI_MODEL, SYSTEM_PROMPT
 from app.common.models import ChatRequest, ChatResponse, TokenContext, Usage
 from app.services.sse import sse_event
 from app.services.tools import ChatToolService, ToolCall, ToolCallFunction
@@ -37,7 +37,7 @@ class Chat:
         self._new_messages(request)
         self.usage = Usage(used=token.used_queries, remaining=token.remaining_queries, max=token.max_queries)
 
-    async def stream_response(self, reply: str = "", max_rounds: int = 5):
+    async def stream_response(self, reply: str = "", max_rounds: int = MAX_TOOL_ROUNDS):
         for _ in range(max_rounds):
             response = await self.client.chat.completions.create(
                 model=OPENAI_MODEL,
@@ -143,11 +143,14 @@ class Chat:
 
         return choice
 
-    async def _get_full_reply(self) -> str | None:
-        while True:
+    async def _get_full_reply(self, max_rounds: int = MAX_TOOL_ROUNDS) -> str | None:
+        for _ in range(max_rounds):
             choice = await self._resolve_tool_calls()
             if choice.finish_reason != "tool_calls":
                 return choice.message.content
+
+        logger.warning("Tool-call rounds exhausted without a final reply", extra={"max_rounds": max_rounds})
+        return None
 
     def _new_messages(self, req: ChatRequest) -> list[ChatCompletionMessageParam]:
         system_message: ChatCompletionMessageParam | dict = {"role": "system", "content": SYSTEM_PROMPT}

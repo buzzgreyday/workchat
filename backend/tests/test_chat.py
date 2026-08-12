@@ -59,6 +59,29 @@ async def test_chat_stream_history_has_one_assistant_reply(client, issued_token,
     assert done["history"][-1]["content"] == "hi from mock"
 
 
+async def test_chat_tool_call_loop_is_bounded(client, issued_token, openai_mock):
+    """A model that never stops asking for tools must terminate, not spin on paid API calls."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.common.config import MAX_TOOL_ROUNDS
+
+    tool_call = MagicMock(id="call_1")
+    tool_call.function = MagicMock(name="search", arguments="{}")
+    message = MagicMock(content=None, tool_calls=[tool_call])
+    message.model_dump = MagicMock(return_value={"role": "assistant", "content": None})
+    completion = MagicMock(choices=[MagicMock(finish_reason="tool_calls", message=message)])
+    openai_mock.chat.completions.create = AsyncMock(return_value=completion)
+
+    resp = await client.post(
+        "/chat",
+        headers={"Authorization": f"Bearer {issued_token}"},
+        json={"message": "hi"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["reply"] == ""
+    assert openai_mock.chat.completions.create.await_count == MAX_TOOL_ROUNDS
+
+
 async def test_chat_quota_exhausted(client):
     # Mint a token with a tiny budget and burn through it.
     import os

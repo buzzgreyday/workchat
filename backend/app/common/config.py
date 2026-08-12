@@ -51,6 +51,9 @@ ALGORITHM = "HS256"
 
 ## LLM
 OPENAI_MODEL = "gpt-4.1-nano"
+# Cap on tool-call round trips per user message. Each round is a paid API call, so an
+# unbounded loop on a model that keeps requesting tools would burn quota indefinitely.
+MAX_TOOL_ROUNDS = 5
 try:
     SYSTEM_PROMPT = SYSTEM_PROMPT_PATH.read_text()
 except FileNotFoundError:

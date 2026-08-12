@@ -15,6 +15,9 @@ tracked independently._
   JSON and streaming chat responses, so it is no longer part of the history
   returned to clients. A `system` message present in an incoming request is
   dropped rather than forwarded to the model.
+- The non-streaming chat path now bounds tool-call rounds with
+  `MAX_TOOL_ROUNDS`, shared with the streaming path, instead of looping without
+  an upper limit.
 
 ### Fixed
 
