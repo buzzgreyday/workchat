@@ -31,8 +31,7 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 * SQLAlchemy 2.x (Async)
 * Alembic
 * PostgreSQL
-* asyncpg
-* psycopg (binary)
+* psycopg 3 (binary) — the driver, via `postgresql+psycopg://`
 * OpenAI SDK
 * uv package manager
 
