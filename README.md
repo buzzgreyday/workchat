@@ -215,10 +215,9 @@ Without that symlink every `docker compose` command fails with
 To set up a new deployment, copy `backend/.env.production.example` to
 `backend/.env`, fill in real secrets, then create the symlink.
 
-For local development, `docker-compose.yaml` additionally expects a
-`frontend/.env` (`env_file: ./frontend/.env`). No example is tracked for it,
-so create an empty one if the dev stack complains — `NEXT_PUBLIC_API_URL` is
-already set via `environment:` in the compose file.
+The frontend needs no env file of its own: the only variable it reads is
+`NEXT_PUBLIC_API_URL`, supplied by `environment:` in `docker-compose.yaml` for
+dev and baked in as a build arg in `docker-compose.prod.yaml` for production.
 
 ---
 
