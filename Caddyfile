@@ -1,9 +1,10 @@
 {
 	# Global options.
-	email micbr@protonmail.com
+	# ACME_EMAIL and SITE_DOMAIN come from backend/.env via docker-compose.prod.yaml.
+	email {$ACME_EMAIL}
 }
 
-chat.mringdal.com {
+{$SITE_DOMAIN} {
 	encode zstd gzip
 
 	header {

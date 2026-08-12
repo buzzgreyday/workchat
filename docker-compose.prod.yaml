@@ -10,6 +10,9 @@ services:
     build:
       context: ./caddy
     restart: unless-stopped
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?SITE_DOMAIN must be set}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL must be set}
     ports:
       - "80:80"
       - "443:443"
