@@ -21,6 +21,11 @@ services:
     restart: unless-stopped
     env_file:
       - ./backend/.env
+    # Dev only. entrypoint.sh runs `alembic upgrade head` and then execs "$@",
+    # so this replaces its default uvicorn invocation. --reload-dir keeps the
+    # watcher on the application package instead of the whole bind mount, which
+    # would otherwise include /app/.venv and alembic/.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
     healthcheck:
       # python, not curl: the python:3.13-slim base image ships no curl, so the
       # previous probe could only ever fail with "executable file not found".

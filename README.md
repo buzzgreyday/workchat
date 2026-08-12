@@ -447,10 +447,11 @@ docker compose logs -f
 
 Typical development workflow:
 
-1. Update application code. Both trees are bind-mounted in the dev stack, so no
-   rebuild is needed for source edits — but only the frontend live-reloads
-   (`npm run dev`). The backend runs plain `uvicorn` with no `--reload`, so
-   Python changes need `docker compose restart backend` to take effect.
+1. Update application code. Both trees are bind-mounted and both live-reload —
+   the frontend via `npm run dev`, the backend via `uvicorn --reload` (dev
+   compose only). No rebuild is needed for source edits. The backend watcher is
+   scoped to `backend/app/`, so changes under `backend/alembic/` need a
+   `docker compose restart backend`.
 2. If SQLAlchemy models changed:
    1. Generate a migration — `docker compose exec backend alembic revision
       --autogenerate -m "…"`.
