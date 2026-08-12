@@ -11,69 +11,72 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 
 - **backend** — .NET API, AI CV Chat Application, Freelance Software Developer @ Constellation Network, Software Developer @ iEDI, Tracing and Distributed Logging
 - **software-engineer** — AI CV Chat Application, Freelance Software Developer @ Constellation Network, Software Developer @ iEDI, Tracing and Distributed Logging
-- **software-developer** — Blockchain Wallet Modification, Freelance Software Developer @ Constellation Network, Software Developer @ iEDI
 - **api-development** — .NET API, Freelance Software Developer @ Constellation Network, Software Developer @ iEDI
+- **software-developer** — Blockchain Wallet Modification, Freelance Software Developer @ Constellation Network, Software Developer @ iEDI
 - **backend-developer** — Freelance Software Developer @ Constellation Network, Software Developer @ iEDI
+- **docker** — AI CV Chat Application, Software Developer @ iEDI, Tracing and Distributed Logging
 - **github** — Blockchain Wallet Modification, Custom iPodLinux Bootloader, Software Developer @ iEDI
 - **python** — AI CV Chat Application, Freelance Software Developer @ Constellation Network, Tracing and Distributed Logging
 - **rest-api** — .NET API, AI CV Chat Application, Software Developer @ iEDI
-- **docker** — AI CV Chat Application, Software Developer @ iEDI, Tracing and Distributed Logging
 - **blockchain** — Blockchain Wallet Modification, Freelance Software Developer @ Constellation Network
-- **cryptography** — Freelance Software Developer @ Constellation Network
-- **encryption** — Freelance Software Developer @ Constellation Network
-- **sdk** — Freelance Software Developer @ Constellation Network
-- **remote** — Freelance Software Developer @ Constellation Network
-- **freelance** — Freelance Software Developer @ Constellation Network
 - **backend-engineer** — Software Developer @ iEDI
-- **erp** — Software Developer @ iEDI
-- **e-invoicing** — Software Developer @ iEDI
-- **databases** — Software Developer @ iEDI
-- **sql** — Software Developer @ iEDI
 - **ci-cd** — Software Developer @ iEDI
+- **cron** — Software Developer @ iEDI
+- **cryptography** — Freelance Software Developer @ Constellation Network
+- **databases** — Software Developer @ iEDI
+- **e-invoicing** — Software Developer @ iEDI
+- **encryption** — Freelance Software Developer @ Constellation Network
+- **erp** — Software Developer @ iEDI
+- **freelance** — Freelance Software Developer @ Constellation Network
+- **integrations** — Software Developer @ iEDI
 - **kubernetes** — Software Developer @ iEDI
   - Scope: Created and managed services, ingress, and deployments through a cluster management UI; did not author raw manifests/Helm charts or design cluster architecture from scratch.
 - **nomad** — Software Developer @ iEDI
-- **testing** — Software Developer @ iEDI
-- **integrations** — Software Developer @ iEDI
-- **cron** — Software Developer @ iEDI
 - **production-support** — Software Developer @ iEDI
+- **remote** — Freelance Software Developer @ Constellation Network
+- **sdk** — Freelance Software Developer @ Constellation Network
 - **solution-ownership** — Software Developer @ iEDI
+- **sql** — Software Developer @ iEDI
 - **system-design** — Software Developer @ iEDI
+- **testing** — Software Developer @ iEDI
 - **typescript** — AI CV Chat Application, Blockchain Wallet Modification
-- **javascript** — Blockchain Wallet Modification
-- **web3** — Blockchain Wallet Modification
-- **crypto** — Blockchain Wallet Modification
-- **constellation-network** — Blockchain Wallet Modification
-- **hardware-wallet** — Blockchain Wallet Modification
 - **.NET** — .NET API
-- **dotnet** — .NET API
+- **alembic** — AI CV Chat Application
+- **bootloader** — Custom iPodLinux Bootloader
 - **C#** — .NET API
-- **csharp** — .NET API
-- **web-api** — .NET API
 - **c++** — Custom iPodLinux Bootloader
   - Scope: I haven't used C++ since c. 2005; thus, I don't remember any C++.
-- **linux** — Custom iPodLinux Bootloader
-- **bootloader** — Custom iPodLinux Bootloader
-- **hobby-programming** — Custom iPodLinux Bootloader
-- **self-taught** — Custom iPodLinux Bootloader
-- **systems-programming** — Custom iPodLinux Bootloader
-- **opentelemetry** — Tracing and Distributed Logging
-- **observability** — Tracing and Distributed Logging
-- **monitoring** — Tracing and Distributed Logging
+- **constellation-network** — Blockchain Wallet Modification
+- **crypto** — Blockchain Wallet Modification
+- **csharp** — .NET API
+- **dotnet** — .NET API
 - **fastapi** — AI CV Chat Application
-- **nextjs** — AI CV Chat Application
-- **react** — AI CV Chat Application
-- **postgresql** — AI CV Chat Application
-- **sqlalchemy** — AI CV Chat Application
-- **alembic** — AI CV Chat Application
+- **frontend** — AI CV Chat Application
 - **full-stack** — AI CV Chat Application
 - **full-stack-developer** — AI CV Chat Application
-- **frontend** — AI CV Chat Application
+- **grafana** — Tracing and Distributed Logging
+- **hardware-wallet** — Blockchain Wallet Modification
+- **hobby-programming** — Custom iPodLinux Bootloader
+- **javascript** — Blockchain Wallet Modification
 - **jwt** — AI CV Chat Application
-- **openai** — AI CV Chat Application
-- **tailwind** — AI CV Chat Application
-- **tool-calling** — AI CV Chat Application
+- **linux** — Custom iPodLinux Bootloader
 - **llm** — AI CV Chat Application
+- **loki** — Tracing and Distributed Logging
+- **monitoring** — Tracing and Distributed Logging
+- **nextjs** — AI CV Chat Application
+- **observability** — Tracing and Distributed Logging
+- **openai** — AI CV Chat Application
+- **opentelemetry** — Tracing and Distributed Logging
+- **postgresql** — AI CV Chat Application
+- **react** — AI CV Chat Application
+- **self-taught** — Custom iPodLinux Bootloader
+- **sqlalchemy** — AI CV Chat Application
+- **systems-programming** — Custom iPodLinux Bootloader
+- **tailwind** — AI CV Chat Application
+- **tempo** — Tracing and Distributed Logging
+- **tool-calling** — AI CV Chat Application
+- **web-api** — .NET API
+- **web3** — Blockchain Wallet Modification
 
 <!-- AUTO-GENERATED-SKILLS-END -->
 

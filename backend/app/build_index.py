@@ -62,7 +62,11 @@ def update_skills_section(records):
             if tag not in notes and note:
                 notes[tag] = note
 
-    ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+    # Score descending, then tag name, so equal-scoring tags keep a stable
+    # order. Without the tiebreak the order falls back to rglob() insertion
+    # order, i.e. filesystem order, and regenerating on another machine
+    # reshuffles skills.md for no reason.
+    ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0].lower()))
 
     lines = ["## Technical Skills", ""]
     for tag, _score in ranked:
