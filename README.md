@@ -59,37 +59,39 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 ```text
 .
 ├── backend
-│   ├── alembic
-│   ├── alembic.ini
-│   ├── app
-│   ├── Dockerfile
-│   ├── entrypoint.sh
-│   ├── __init__.py
-│   ├── pyproject.toml
-│   ├── README.md
-│   ├── resources
-│   └── uv.lock
-├── Caddyfile
-├── docker-compose.yaml           # dev
-├── docker-compose.prod.yaml      # production (Caddy + services)
+│   ├── alembic
+│   ├── alembic.ini
+│   ├── app
+│   ├── Dockerfile
+│   ├── entrypoint.sh
+│   ├── __init__.py
+│   ├── pyproject.toml
+│   ├── README.md
+│   ├── resources             # CV markdown; system-prompt.md + contact.md gitignored
+│   └── uv.lock
+├── caddy
+│   └── Dockerfile            # Caddy + rate-limit module, built via xcaddy
+├── Caddyfile                 # prod only; site address comes from $SITE_DOMAIN
+├── docker-compose.yaml       # dev
+├── docker-compose.prod.yaml  # production (Caddy + services)
 ├── docs
-│   ├── architecture.md
-│   ├── database.md
-│   ├── deployment.md
-│   └── development.md
+│   ├── architecture.md
+│   ├── database.md
+│   ├── deployment.md
+│   └── development.md
 ├── frontend
-│   ├── components.json
-│   ├── Dockerfile
-│   ├── eslint.config.mjs
-│   ├── next.config.ts
-│   ├── node_modules
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── postcss.config.mjs
-│   ├── public
-│   ├── README.md
-│   ├── src
-│   └── tsconfig.json
+│   ├── components.json
+│   ├── Dockerfile
+│   ├── eslint.config.mjs
+│   ├── next.config.ts
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── postcss.config.mjs
+│   ├── public
+│   ├── README.md
+│   ├── src
+│   └── tsconfig.json
+├── CHANGES.md
 └── README.md
 ```
 
@@ -445,13 +447,23 @@ docker compose logs -f
 
 Typical development workflow:
 
-1. Update application code.
-2. Modify SQLAlchemy models if required.
-3. Generate an Alembic migration.
-4. Review the generated migration.
-5. Apply the migration.
-6. Test the application.
-7. Commit both code and migration files.
+1. Update application code. Both trees are bind-mounted in the dev stack, so no
+   rebuild is needed for source edits — but only the frontend live-reloads
+   (`npm run dev`). The backend runs plain `uvicorn` with no `--reload`, so
+   Python changes need `docker compose restart backend` to take effect.
+2. If SQLAlchemy models changed:
+   1. Generate a migration — `docker compose exec backend alembic revision
+      --autogenerate -m "…"`.
+   2. Review it. Autogenerate misses things like server defaults and renames.
+   3. Apply it — `docker compose exec backend alembic upgrade head`.
+3. If you edited anything in `backend/resources/`, rebuild the search index, or
+   `/chat` will keep answering from the old one:
+   `docker compose run --rm backend python -m app.build_index`
+4. Run the tests on the host — `cd backend && uv run pytest` (see [Testing](#testing)).
+5. Rebuild only when dependencies change — `docker compose build backend`
+   after `pyproject.toml`/`uv.lock`, or `frontend` after `package.json`.
+6. Commit code and migration files together, so a checkout never has models and
+   schema out of step.
 
 ---
 
@@ -477,11 +489,21 @@ docker compose exec frontend npm run lint
 
 ## Backend fails to start
 
-Check the backend logs:
-
 ```bash
 docker compose logs backend
 ```
+
+The two most common causes are configuration, not code:
+
+- **`system prompt not found` / `is empty`** — `backend/resources/system-prompt.md`
+  is gitignored and read at import, so the process exits before serving.
+  `cp backend/resources/system-prompt.md.example backend/resources/system-prompt.md`
+- **`<VAR> not found or empty in environment variables`** — `backend/.env` is
+  missing a required key. Compare it against `backend/.env.example`.
+
+If `docker compose` itself aborts with `required variable POSTGRES_DB is
+missing a value` before any container starts, the root `.env` symlink is
+missing: `ln -s backend/.env .env`.
 
 ---
 
@@ -529,27 +551,13 @@ docker compose build --no-cache frontend
 
 # Production Deployment
 
-See [`docs/deployment.md`](docs/deployment.md) for the full guide to running
-this on your own domain.
-
-Short version:
-
-```bash
-cp backend/.env.production.example backend/.env   # secrets + SITE_DOMAIN/ACME_EMAIL
-ln -s backend/.env .env                           # compose interpolation
-cp backend/resources/system-prompt.md.example backend/resources/system-prompt.md
-sudo chown -R 1000:1000 backend/resources         # container runs as UID 1000
-docker compose -f docker-compose.prod.yaml run --rm backend python -m app.build_index
-docker compose -f docker-compose.prod.yaml up -d --build
-```
-
-Replace the CV markdown in `backend/resources/` with your own first — it ships
-with the author's. See [docs/deployment.md](docs/deployment.md) for the full
-sequence and the reasoning behind each step.
-
 Caddy handles TLS via Let's Encrypt and proxies `/api/*` to the backend,
 everything else to the Next.js frontend. Alembic migrations run automatically
-in the backend entrypoint.
+in the backend entrypoint, so a fresh database needs no manual step.
+
+**→ [`docs/deployment.md`](docs/deployment.md)** is the single source of truth
+for deploying: prerequisites, the ordered first-deployment checklist, issuing
+access tokens, logs and backups.
 
 ---
 
