@@ -70,14 +70,16 @@ Internet ──▶ Caddy (443/80) ──┬─▶ frontend:3000 (Next.js)
 ## First-time setup
 
 ```bash
-git clone <repository-url> chat && cd chat
+git clone https://github.com/buzzgreyday/workchat.git && cd workchat
 
 # Fill in real secrets — see file header for how to generate them.
 cp backend/.env.production.example backend/.env
 $EDITOR backend/.env
 
 # Compose needs this next to the compose file too, to interpolate
-# ${POSTGRES_USER} etc. in docker-compose.prod.yaml itself.
+# ${POSTGRES_USER} etc. in docker-compose.prod.yaml itself. Without it every
+# compose command fails with "required variable POSTGRES_DB is missing a
+# value" unless you pass --env-file backend/.env by hand.
 ln -s backend/.env .env
 
 # Provide the CV content files (system-prompt.md, bio.md, etc.).

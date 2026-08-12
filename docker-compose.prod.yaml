@@ -1,3 +1,9 @@
+# Pinned so the project name never depends on the directory name. Volumes are
+# named <project>_<volume>, so a rename of the checkout directory would
+# otherwise point Compose at fresh, empty volumes -- silently orphaning the
+# Postgres data. Must stay "ai-cv": that is what the live volumes are called.
+name: ai-cv
+
 services:
 
   caddy:
