@@ -1,6 +1,11 @@
 {
 	# Global options.
 	# ACME_EMAIL and SITE_DOMAIN come from backend/.env via docker-compose.prod.yaml.
+	# Caddy does NOT reject an empty value here -- `caddy validate` reports a blank
+	# site address as valid, and it would then serve as a catch-all with no
+	# certificate. The guard is compose-side: `${SITE_DOMAIN:?}` fails the whole
+	# command when the variable is unset *or* empty, so the stack never starts
+	# misconfigured.
 	email {$ACME_EMAIL}
 }
 
