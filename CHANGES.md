@@ -16,6 +16,11 @@ tracked independently._
   returned to clients. A `system` message present in an incoming request is
   dropped rather than forwarded to the model.
 
+### Fixed
+
+- Streaming `done` event repeated the assistant reply: the message was appended
+  once by the streaming loop and again when building the final history.
+
 ## [0.1.0] - 2026-08-11
 
 ### Added

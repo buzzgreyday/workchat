@@ -86,7 +86,7 @@ class Chat:
 
         yield sse_event(
             event="done",
-            data={"reply": reply, "history": self._final_history(reply), "usage": self.usage},
+            data={"reply": reply, "history": self._final_history(), "usage": self.usage},
         )
 
     @staticmethod
@@ -109,13 +109,15 @@ class Chat:
         logger.debug("Chat response content", extra={"reply": reply, "history": history})
         return ChatResponse(type="done", reply=reply, history=history, usage=usage)
 
-    def _final_history(self, reply: str) -> list[ChatCompletionMessageParam]:
+    def _final_history(self) -> list[ChatCompletionMessageParam]:
         """
         Method used with last server-sent svent in streaming resp (status: "done").
-        System prompt stripped from final streaming resp to user
+        System prompt stripped from final streaming resp to user.
+
+        stream_response() already appended the assistant reply to self.messages, so
+        this only strips — appending the reply again would duplicate it.
         """
-        assistant_message: ChatCompletionAssistantMessageParam = {"role": "assistant", "content": reply}
-        return [*self._strip_system(self.messages), assistant_message]
+        return self._strip_system(self.messages)
 
     async def _run_tool_calls(self, tool_calls) -> None:
         for tool_call in tool_calls:

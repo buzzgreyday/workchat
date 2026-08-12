@@ -27,6 +27,38 @@ async def test_chat_response_history_omits_system_prompt(client, issued_token):
     assert all(m["role"] != "system" for m in resp.json()["history"])
 
 
+async def test_chat_stream_history_has_one_assistant_reply(client, issued_token, openai_mock):
+    """The streaming loop appends the assistant reply itself; the done event must not repeat it."""
+    import json
+    from unittest.mock import AsyncMock, MagicMock
+
+    async def _chunks():
+        for token in ("hi ", "from ", "mock"):
+            delta = MagicMock(content=token, tool_calls=None)
+            yield MagicMock(choices=[MagicMock(delta=delta, finish_reason=None)])
+        delta = MagicMock(content=None, tool_calls=None)
+        yield MagicMock(choices=[MagicMock(delta=delta, finish_reason="stop")])
+
+    # `create` is awaited and *then* iterated, so the mock must return the generator.
+    openai_mock.chat.completions.create = AsyncMock(return_value=_chunks())
+
+    resp = await client.post(
+        "/chat/stream",
+        headers={"Authorization": f"Bearer {issued_token}"},
+        json={"message": "hi"},
+    )
+    assert resp.status_code == 200
+
+    done = next(
+        json.loads(line.removeprefix("data: "))
+        for line in resp.text.splitlines()
+        if line.startswith("data: ") and '"reply"' in line
+    )
+    assert done["reply"] == "hi from mock"
+    assert [m["role"] for m in done["history"]] == ["user", "assistant"]
+    assert done["history"][-1]["content"] == "hi from mock"
+
+
 async def test_chat_quota_exhausted(client):
     # Mint a token with a tiny budget and burn through it.
     import os
