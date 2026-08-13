@@ -565,19 +565,15 @@ access tokens, logs and backups.
 
 Possible future enhancements include:
 
-* Keep chat history in database (server-side)
-* First request either takes history or the system-prompt (system-prompt should be added server-side only). Also, server-side history in Postgres only.
-* Handle max_queries, invalid token, etc. in frontend
+* Keep chat history in database and cache (server-side)
+* Handle max queries reached, invalid/expired token, etc. in frontend
 * Token persistence
 * CI/CD pipeline
 * Automated testing
-* Redis caching
 * Background workers
-* Rate limiting
 * Monitoring and metrics
 * Centralized logging
 * Backup automation
-* Multi-environment configuration
 * API versioning
 * Chat client polymorph and factory (YAGNI)
 
