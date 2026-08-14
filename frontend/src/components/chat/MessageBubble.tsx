@@ -34,7 +34,7 @@ export default function MessageBubble({
       )}
 
       <div
-        className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
+        className={`min-w-0 max-w-[80%] wrap-anywhere rounded-2xl px-4 py-3 shadow-sm ${
           isUser
             ? "chat-bubble-user rounded-br-sm"
             : "chat-bubble-assistant rounded-bl-sm"
