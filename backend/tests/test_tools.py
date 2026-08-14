@@ -58,6 +58,35 @@ async def test_no_match_reports_zero_instead_of_everything(cv):
     assert "no cv record mentions this" in out["note"].lower()
 
 
+async def test_matches_are_ranked_by_how_much_of_the_query_they_carry(cv):
+    """
+    Unranked, every hit looked equally good: the record carrying all three words
+    sat below one that merely shares a common term, and the model read the list
+    as noise and answered from the wrong summary.
+    """
+    out = json.loads(await cv.search_cv(query="monolith microservices philosophy"))
+    assert [m["file"] for m in out["matches"]] == ["iedi.md", "bio.md"]
+    assert out["matches"][0]["matched_words"] == "2/3"
+    assert out["matches"][1]["matched_words"] == "1/3"
+
+
+async def test_common_words_do_not_decide_the_result(cv):
+    """
+    Matching is OR'd and substring-based, so "at" alone used to match every
+    record — it is inside "integrations". One function word dragged the whole CV
+    into any query containing it.
+    """
+    out = json.loads(await cv.search_cv(query="the monolith at work"))
+    assert out["count"] == 1
+    assert out["matches"][0]["file"] == "iedi.md"
+
+
+async def test_query_of_only_common_words_is_a_miss_not_a_browse(cv):
+    """Dropping every word of a query leaves no query — that is a miss to retry, not the whole CV."""
+    out = json.loads(await cv.search_cv(query="what about that"))
+    assert out["count"] == 0
+
+
 async def test_unmatched_tag_also_reports_zero(cv):
     out = json.loads(await cv.search_cv(tag="kubernetes"))
     assert out["count"] == 0

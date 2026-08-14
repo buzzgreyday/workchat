@@ -9,6 +9,18 @@ from dataclasses import dataclass
 from app.common.config import INDEX_PATH, RESOURCES_DIR
 from app.common.logging.logging import logger
 
+# Matching is OR'd and substring-based, so a single function word decides the
+# whole result: "at" alone matches every record in the CV, because it sits inside
+# "integrations", "database" and "creating". Filtering by an explicit list rather
+# than by length, since go, ci, ai, qa and js are short and meaningful.
+STOPWORDS = frozenset(
+    """a about all also an and any are as at be been but by can did do does doing done
+    for from had has have he her him his how i if in into is it its me more most much my
+    no not of on or our she so some that the their them then there these they this those
+    to too us was we were what when where which who whom whose why will with would you
+    your ever""".split()
+)
+
 
 @dataclass
 class ToolCallFunction:
@@ -57,6 +69,9 @@ class ChatToolService:
                             "not just title/summary. Returns {count, matches}, where each match is a "
                             "lightweight summary (file, title, tags, dates, summary), not full content — "
                             "call get_full_entry for the detail behind a promising summary. "
+                            "Matches are ordered best first, and 'matched_words' says how many of the "
+                            "query's words that record contains: trust a 3/3 far more than a 1/3, which "
+                            "is often just a common word. Very common words are ignored in the query. "
                             "A count of 0 means nothing in the CV mentions it: say so rather than inferring."
                         ),
                         "parameters": {
@@ -88,12 +103,19 @@ class ChatToolService:
         logger.info("AI called tool to search for relevant markdowns", extra={"query": query, "tag": tag})
 
         records = await self._load_index()
-        query_words = [w for w in query.lower().split() if w]
+        raw_query = query.strip()
+        query_words = [w for w in raw_query.lower().split() if w and w not in STOPWORDS]
         tag_lower = tag.lower()
+        # A query of nothing but function words is not a browse — it is a query
+        # whose signal we just dropped. Skip the loop so it reports a miss and the
+        # model searches again, rather than handing back the entire CV.
+        degenerate = bool(raw_query) and not query_words
         logger.debug("Parsed search_cv query", extra={"query_words": query_words, "tag": tag_lower})
 
         results = []
         for r in records:
+            if degenerate:
+                break
             if tag and tag_lower not in [t.lower() for t in r["tags"]]:
                 continue
             if not query_words:
@@ -106,10 +128,17 @@ class ChatToolService:
             haystack = " ".join(
                 [r["title"].lower(), (r.get("summary") or "").lower(), " ".join(r["tags"]).lower(), full_text]
             )
-            if any(word in haystack for word in query_words):
-                results.append(r)
+            matched = sum(1 for word in query_words if word in haystack)
+            if matched:
+                results.append({**r, "matched_words": f"{matched}/{len(query_words)}"})
 
-        if (query_words or tag) and not results:
+        # Best first. Unranked, every hit looked equally good: a record carrying
+        # all three words of "despatch advices iEDI" was indistinguishable from
+        # one that merely mentions iEDI, and the model read the list as noise.
+        # Stable sort, so records matching equally keep their index order.
+        results.sort(key=lambda r: -int(str(r.get("matched_words", "0/1")).split("/")[0]))
+
+        if (raw_query or tag) and not results:
             # Previously this returned every record, which is indistinguishable
             # from a precise hit: the model got the whole CV, assumed the search
             # had worked, and inferred an answer rather than saying nothing was
