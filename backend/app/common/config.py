@@ -60,7 +60,13 @@ ADMIN_KEY = require_env("ADMIN_KEY")
 ALGORITHM = "HS256"
 
 ## LLM
-OPENAI_MODEL = "gpt-4.1-nano"
+# Measured, not assumed: on 26 eval questions x 3 runs, nano scored 22-24 and
+# mini 25-26, taking every depth question in every run. nano also never once
+# worked out how long a role has run, answering "since September 2025" to "how
+# long" in every arm tried; mini gets it right most runs. Roughly 4x nano's
+# input price and about a second slower per answer, which at a 20-query token
+# per hiring manager is a latency decision rather than a cost one.
+OPENAI_MODEL = "gpt-4.1-mini"
 # Cap on tool-call round trips per user message. Each round is a paid API call, so an
 # unbounded loop on a model that keeps requesting tools would burn quota indefinitely.
 MAX_TOOL_ROUNDS = 5
