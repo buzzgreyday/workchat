@@ -1,14 +1,13 @@
 ---
 title: Software Developer @ iEDI
 type: experience
-tags: [backend, backend-developer, backend-engineer, software-developer, software-engineer, python, fastapi, pyramid, pydantic, pika, rabbitmq, message-queues, lxml, xml, pandas, mongodb, nosql, javascript, api-development, rest-api, erp, e-invoicing, databases, sql, ci-cd, github-actions, code-review, docker, kubernetes, rancher, nomad, testing, github, integrations, cron, monolith, microservices, distributed-systems, architecture, service-integration, refactoring, technical-debt, legacy-code, troubleshooting, production-support, solution-ownership, system-design]
+tags: [backend, backend-developer, backend-engineer, software-developer, software-engineer, python, fastapi, pyramid, pydantic, pika, rabbitmq, message-queues, lxml, xml, pandas, mongodb, nosql, javascript, api-development, rest-api, erp, e-invoicing, databases, sql, ci-cd, github-actions, code-review, docker, kubernetes, rancher, nomad, testing, github, integrations, cron, monolith, distributed-systems, architecture, service-integration, refactoring, technical-debt, legacy-code, troubleshooting, production-support, solution-ownership, system-design]
 dates: "September 2025 - present"
 summary: "Software Developer / Backend Engineer at iEDI (Denmark, on-premise) - owns and troubleshoots production integrations and services (partner APIs, cron jobs, price-catalogue/invoice/despatch advice/document flows), makes independent design decisions, and helps shape team development practices. Daily stack is Python with FastAPI and Pyramid, Pydantic, Pika/RabbitMQ, lxml, Pandas, MongoDB and SQL, shipped via GitHub Actions and peer-reviewed pull requests onto Kubernetes (Rancher), now migrating to HashiCorp Nomad. ARCHITECTURE: not microservices — the main engine is a monolith, surrounded by a large set of customer-tailored RESTful APIs and services that the team is working to consolidate. IN PRODUCTION BUT INTERNAL: proprietary employer code, not publicly viewable or installable."
 skill_notes:
   kubernetes: "Created and managed services, ingress, and deployments through Rancher; did not author raw manifests/Helm charts or design cluster architecture from scratch."
   rancher: "The cluster management UI through which he works with Kubernetes at iEDI."
   javascript: "A small part of the work at iEDI; his professional focus there is backend Python."
-  microservices: "Not the architecture at iEDI, and not a claimed skill — the main engine is a monolith surrounded by customer-tailored services. Tagged so the question is answerable honestly rather than inferred."
   distributed-systems: "Many RESTful APIs deployed in Kubernetes and now migrating to Nomad, around a monolithic central engine. Some of those services use RabbitMQ; it is not the backbone of the estate."
   monolith: "iEDI's main engine is a monolith, surrounded by customer-tailored REST APIs the team is working to consolidate."
 ---

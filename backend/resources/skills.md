@@ -42,8 +42,6 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **legacy-code** — Software Developer @ iEDI
 - **lxml** — Software Developer @ iEDI
 - **message-queues** — Software Developer @ iEDI
-- **microservices** — Software Developer @ iEDI
-  - Scope: Not the architecture at iEDI, and not a claimed skill — the main engine is a monolith surrounded by customer-tailored services. Tagged so the question is answerable honestly rather than inferred.
 - **mongodb** — Software Developer @ iEDI
 - **monolith** — Software Developer @ iEDI
   - Scope: iEDI's main engine is a monolith, surrounded by customer-tailored REST APIs the team is working to consolidate.
