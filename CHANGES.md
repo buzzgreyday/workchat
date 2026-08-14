@@ -7,6 +7,14 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.1.11] - 2026-08-14
+
+### Fixed
+
+- No gender is hardcoded in application code. The date instruction appended to
+  the system prompt referred to the subject as "he"; identity belongs in the CV
+  records, and a test now keeps it out of the code.
+
 ## [0.1.10] - 2026-08-14
 
 ### Fixed
