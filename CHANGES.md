@@ -7,6 +7,39 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.1.13] - 2026-08-14
+
+### Changed
+
+- The agent runs on gpt-4.1-mini. Retrieval had stopped being the limiting
+  factor: over 26 questions x 3 runs the previous model scored 22-24 against
+  mini's 25-26, and its remaining failures were all cases where it fetched the
+  right record and could not pull the fact out of it. It also never once worked
+  out how long a role has run — "how long has he been at iEDI" got "since
+  September 2025" in every arm ever measured — where mini answers it. Costs
+  about a second more per reply.
+
+### Fixed
+
+- Asked to elaborate, the agent reads the record instead of paraphrasing its
+  summary. Search results now say which records carried every word of the query
+  and ask for those to be opened, and say plainly that "tell me more", "why" and
+  "elaborate" cannot be answered from a summary. Questions whose answers appear
+  only in a record body went from 2 of 6 to 6 of 6, and the agent now opens a
+  record for 22 of 26 questions rather than roughly 1 in 20 — while still not
+  bothering when nothing matched.
+
+- A record is found whatever the case of its filename. The model retypes the
+  name out of the search result and sometimes alters it — asking for "iEDI.md"
+  when the file is "iedi.md" — which returned "no such file" and, being
+  indistinguishable from the record not existing, sent it back to the summary.
+
+### Added
+
+- Eval probes for depth: six questions whose answers exist only inside a record
+  body, since every earlier question could be answered from a summary and so
+  could not measure whether the agent ever opens anything.
+
 ## [0.1.12] - 2026-08-14
 
 ### Fixed
