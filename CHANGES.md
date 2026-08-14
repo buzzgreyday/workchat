@@ -7,7 +7,7 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
-## [Unreleased]
+## [0.1.7] - 2026-08-14
 
 ### Added
 
@@ -20,6 +20,14 @@ tracked independently._
 - Logs are structured JSON and carry a request id. `extra={...}` fields were
   previously discarded by the format string; message content stays out of logs
   and lives only in the database.
+
+### Fixed
+
+- `search_cv` reports when nothing matched instead of returning the whole CV,
+  which the model could not tell apart from a precise hit and answered from by
+  inference.
+- The iEDI record now states its architecture — a monolith surrounded by
+  customer-tailored APIs — and describes RabbitMQ's actual, partial role.
 
 ## [0.1.6] - 2026-08-14
 
