@@ -267,6 +267,12 @@ def main() -> int:
     print("-" * 78)
     print("  ".join(f"{verdict}: {n}" for verdict, n in sorted(tally.items())))
 
+    # How often the second hop actually happens. Answering from summaries alone
+    # is what the failures had in common, so this is worth watching directly and
+    # not only when something has already gone wrong.
+    fetched = sum(1 for r in results if r["trace"]["fetches"])
+    print(f"fetched a full entry: {fetched}/{len(results)}")
+
     failures = [r for r in results if r["verdict"] != "ok"]
     if failures:
         paths: dict[str, int] = {}

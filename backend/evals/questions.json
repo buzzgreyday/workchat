@@ -197,6 +197,54 @@
         "no record"
       ],
       "note": "iedi.md: 'He does not work an on-call rotation.'"
+    },
+    {
+      "id": 21,
+      "probes": "depth",
+      "question": "Tell me more about the pypergraph SDK - what licence is it published under?",
+      "expect": "covered",
+      "must_include_any": ["mit license", "mit licence", "mit licensed", "mit-licensed"],
+      "note": "Body-only. The index mentions MIT exactly once, inside the word 'limits'."
+    },
+    {
+      "id": 22,
+      "probes": "depth",
+      "question": "What existing library was the Constellation SDK modelled on?",
+      "expect": "covered",
+      "must_include_any": ["dag4"],
+      "note": "Body-only: constellation-network.md says it was inspired by DAG4.js."
+    },
+    {
+      "id": 23,
+      "probes": "depth",
+      "question": "Go into detail on his Redis experience.",
+      "expect": "covered",
+      "must_include_any": ["lightly"],
+      "note": "Body-only: frameworks.md caps it as 'touched only lightly at iEDI'."
+    },
+    {
+      "id": 24,
+      "probes": "depth",
+      "question": "How deep is his Pyramid experience?",
+      "expect": "covered",
+      "must_include_any": ["worked in", "regularly"],
+      "note": "Body-only: frameworks.md grades depth as built with / worked in / used. 'regularly' accepted because the record reads 'worked in, regularly at iEDI' and a reply carrying the substance in other words is not a miss."
+    },
+    {
+      "id": 25,
+      "probes": "depth",
+      "question": "Elaborate on his view of DRY - when would he accept duplication?",
+      "expect": "covered",
+      "must_include_any": ["indirection"],
+      "note": "Body-only: duplication wins when removing it costs more in indirection."
+    },
+    {
+      "id": 26,
+      "probes": "depth",
+      "question": "Why were warehouse picks the wrong source of data for despatch advices?",
+      "expect": "covered",
+      "must_include_any": ["assembling", "left the building"],
+      "note": "Body-only: the case summary names the fix, not why picks were wrong."
     }
   ]
 }
