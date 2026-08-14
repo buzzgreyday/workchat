@@ -107,3 +107,32 @@ async def test_chat_bad_token(client):
         json={"message": "hi"},
     )
     assert resp.status_code == 401
+
+async def test_system_prompt_carries_todays_date(client, issued_token, openai_mock):
+    """
+    Without this the model reasons from its training cutoff — it told a hirer
+    "today is in early 2025" and miscalculated tenure at iEDI.
+    """
+    from datetime import datetime, timezone
+
+    await client.post(
+        "/chat",
+        headers={"Authorization": f"Bearer {issued_token}"},
+        json={"message": "how long has he been at iEDI?"},
+    )
+
+    sent = openai_mock.chat.completions.create.call_args.kwargs["messages"]
+    system = next(m for m in sent if m["role"] == "system")
+    assert str(datetime.now(timezone.utc).year) in system["content"]
+    assert "Today's date is" in system["content"]
+
+
+async def test_injected_date_is_not_returned_to_the_client(client, issued_token):
+    """The system message is backend-only, date included."""
+    resp = await client.post(
+        "/chat",
+        headers={"Authorization": f"Bearer {issued_token}"},
+        json={"message": "hi"},
+    )
+    assert all(m["role"] != "system" for m in resp.json()["history"])
+    assert "Today's date is" not in resp.text

@@ -3,6 +3,7 @@ import json
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -270,8 +271,27 @@ class Chat:
         logger.warning("Tool-call rounds exhausted without a final reply", extra={"max_rounds": max_rounds})
         return None
 
+    @staticmethod
+    def _system_content() -> str:
+        """
+        The system prompt plus today's date.
+
+        Without it the model falls back on its training cutoff — it was telling
+        hirers "today is in early 2025" and miscalculating how long Michael had
+        been at iEDI. Added here rather than in system-prompt.md because that
+        file is gitignored and a hardcoded date would go stale the next day.
+        """
+        today = datetime.now(timezone.utc)
+        return (
+            f"{SYSTEM_PROMPT}\n\n"
+            f"Today's date is {today.strftime('%A, %d %B %Y')}. Use it whenever a "
+            f"question depends on the current date — how long he has held a role, "
+            f"how recent something is, or whether a date is past or future. Never "
+            f"assume the date from your training data."
+        )
+
     def _new_messages(self, req: ChatRequest) -> list[ChatCompletionMessageParam]:
-        system_message: ChatCompletionMessageParam | dict = {"role": "system", "content": SYSTEM_PROMPT}
+        system_message: ChatCompletionMessageParam | dict = {"role": "system", "content": self._system_content()}
         self.messages = [system_message, *self._strip_system(req.history)]
         user_message: ChatCompletionMessageParam | dict = {"role": "user", "content": req.message}
         self.messages.append(user_message)
