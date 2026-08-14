@@ -11,9 +11,9 @@ tracked independently._
 
 ### Fixed
 
-- No gender is hardcoded in application code. The date instruction appended to
-  the system prompt referred to the subject as "he"; identity belongs in the CV
-  records, and a test now keeps it out of the code.
+- No gender is hardcoded in application code (frontend has my name harcoded though). 
+  The frontend however needs some additional tweeks, so we're saving this for later.
+  This was more work than expected, but this is a good place to leave it for now and iterate.
 
 ## [0.1.10] - 2026-08-14
 
