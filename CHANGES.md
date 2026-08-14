@@ -7,6 +7,17 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.1.9] - 2026-08-14
+
+### Added
+
+- The conversation list now shows the agent's latest reply beside the question,
+  so a wrong answer is visible without opening each conversation.
+
+### Removed
+
+- The "questions are stored" notice in the chat UI.
+
 ## [0.1.8] - 2026-08-14
 
 ### Fixed
