@@ -7,6 +7,43 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.1.12] - 2026-08-14
+
+### Fixed
+
+- The agent no longer denies things the CV plainly contains. Asked whether
+  Michael had ever simplified despatch advices, it replied that there was no
+  record — while iedi.md describes the redesign outright. Two causes, both now
+  addressed: search results were unranked, so the record matching every word of
+  a query sat among records that merely share one common word; and the cases
+  themselves lived inside large role records whose summaries could not represent
+  them. Measured over 20 questions x 3 runs, wrong answers fell from 6-7 to 1.
+
+- Search results are ordered best-first, each carrying how much of the query it
+  matched. Unranked, an eleven-record result read as noise and the agent
+  answered from whichever summary came first.
+
+- Common words no longer decide a result. Matching is OR'd and substring-based,
+  so "at" on its own matched every record in the CV — it sits inside
+  "integrations" — and a question like "despatch advices at iEDI" came back
+  claiming the whole CV was relevant.
+
+- A hiring manager gets an answer when the tool-call budget runs out. Exhausting
+  MAX_TOOL_ROUNDS ended the turn on whatever had been streamed, which for a model
+  still asking for tools is nothing at all: an empty reply. One further call with
+  tools disabled now yields a thinner answer built from what was already fetched.
+
+### Added
+
+- Per-case CV records, so a case has a summary that describes it rather than
+  being buried in a role: the despatch advice redesign, the customer API
+  consolidation, and the Kubernetes to Nomad migration.
+
+- backend/evals: a 20-question harness that scores the agent on wrong denials,
+  invented answers and missed facts, and attributes every failure to the
+  retrieval step that caused it. It is what these numbers come from, and it
+  re-scores saved runs when the scoring changes, so past results stay comparable.
+
 ## [0.1.11] - 2026-08-14
 
 ### Fixed
