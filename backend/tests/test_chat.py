@@ -60,7 +60,11 @@ async def test_chat_stream_history_has_one_assistant_reply(client, issued_token,
 
 
 async def test_chat_tool_call_loop_is_bounded(client, issued_token, openai_mock):
-    """A model that never stops asking for tools must terminate, not spin on paid API calls."""
+    """
+    A model that never stops asking for tools must terminate, not spin on paid
+    API calls — and the hirer must still get an answer. Exhausting the budget
+    used to hand back an empty reply; the last call now goes out with tools off.
+    """
     from unittest.mock import AsyncMock, MagicMock
 
     from app.common.config import MAX_TOOL_ROUNDS
@@ -69,8 +73,14 @@ async def test_chat_tool_call_loop_is_bounded(client, issued_token, openai_mock)
     tool_call.function = MagicMock(name="search", arguments="{}")
     message = MagicMock(content=None, tool_calls=[tool_call])
     message.model_dump = MagicMock(return_value={"role": "assistant", "content": None})
-    completion = MagicMock(choices=[MagicMock(finish_reason="tool_calls", message=message)])
-    openai_mock.chat.completions.create = AsyncMock(return_value=completion)
+    wants_tools = MagicMock(choices=[MagicMock(finish_reason="tool_calls", message=message)])
+
+    forced = MagicMock(content="what I found so far", tool_calls=None)
+    forced.model_dump = MagicMock(return_value={"role": "assistant", "content": "what I found so far"})
+    answers = MagicMock(choices=[MagicMock(finish_reason="stop", message=forced)])
+
+    create = AsyncMock(side_effect=[*[wants_tools] * MAX_TOOL_ROUNDS, answers])
+    openai_mock.chat.completions.create = create
 
     resp = await client.post(
         "/chat",
@@ -78,8 +88,57 @@ async def test_chat_tool_call_loop_is_bounded(client, issued_token, openai_mock)
         json={"message": "hi"},
     )
     assert resp.status_code == 200
-    assert resp.json()["reply"] == ""
-    assert openai_mock.chat.completions.create.await_count == MAX_TOOL_ROUNDS
+    assert resp.json()["reply"] == "what I found so far"
+    assert create.await_count == MAX_TOOL_ROUNDS + 1
+    assert create.await_args.kwargs["tool_choice"] == "none"
+
+
+async def test_chat_stream_tool_call_loop_is_bounded(client, issued_token, openai_mock):
+    """Same escape hatch on the streaming path: the cap must not close the stream silently."""
+    import json
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.common.config import MAX_TOOL_ROUNDS
+
+    def _wants_tools():
+        async def _chunks():
+            call = MagicMock(index=0, id="call_1")
+            call.function = MagicMock(arguments="{}")
+            call.function.name = "search_cv"
+            yield MagicMock(choices=[MagicMock(delta=MagicMock(content=None, tool_calls=[call]), finish_reason=None)])
+            yield MagicMock(
+                choices=[MagicMock(delta=MagicMock(content=None, tool_calls=None), finish_reason="tool_calls")]
+            )
+
+        return _chunks()
+
+    def _answers():
+        async def _chunks():
+            yield MagicMock(
+                choices=[MagicMock(delta=MagicMock(content="what I found so far", tool_calls=None), finish_reason=None)]
+            )
+            yield MagicMock(choices=[MagicMock(delta=MagicMock(content=None, tool_calls=None), finish_reason="stop")])
+
+        return _chunks()
+
+    create = AsyncMock(side_effect=[*[_wants_tools() for _ in range(MAX_TOOL_ROUNDS)], _answers()])
+    openai_mock.chat.completions.create = create
+
+    resp = await client.post(
+        "/chat/stream",
+        headers={"Authorization": f"Bearer {issued_token}"},
+        json={"message": "hi"},
+    )
+    assert resp.status_code == 200
+
+    done = next(
+        json.loads(line.removeprefix("data: "))
+        for line in resp.text.splitlines()
+        if line.startswith("data: ") and '"reply"' in line
+    )
+    assert done["reply"] == "what I found so far"
+    assert create.await_count == MAX_TOOL_ROUNDS + 1
+    assert create.await_args.kwargs["tool_choice"] == "none"
 
 
 async def test_chat_quota_exhausted(client):

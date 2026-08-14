@@ -183,6 +183,9 @@ class Chat:
                 message = self._assistant_tool_call_message(content, tool_calls)
                 self.messages.append(message)
                 await self._run_tool_calls(tool_calls)
+            else:
+                async for event in self._stream_forced_reply(max_rounds):
+                    yield event
 
             yield sse_event(
                 event="done",
@@ -193,6 +196,37 @@ class Chat:
                     "conversation_id": str(self.conversation_id) if self.conversation_id else None,
                 },
             )
+
+    async def _stream_forced_reply(self, max_rounds: int):
+        """
+        What the hirer gets when the tool-call budget runs out.
+
+        The loop used to end on whatever had been streamed so far — usually
+        nothing, since a model still asking for tools has not written prose yet,
+        so the hirer got an empty bubble. One more call with tools switched off
+        turns the cap into a thinner answer built from what was already fetched.
+        """
+        logger.warning("Tool-call rounds exhausted without a final reply", extra={"max_rounds": max_rounds})
+        response = await self.client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=self.messages,
+            tools=await self.tools.get_tools(),
+            tool_choice="none",
+            stream=True,
+        )
+
+        content = ""
+        async for chunk in response:
+            delta = chunk.choices[0].delta
+            if chunk.choices[0].finish_reason:
+                self._finish_reason = chunk.choices[0].finish_reason
+            if delta.content:
+                content += delta.content
+                self._reply += delta.content
+                yield sse_event(event="token", data={"value": delta.content})
+
+        message: ChatCompletionAssistantMessageParam = {"role": "assistant", "content": content}
+        self.messages.append(message)
 
     @staticmethod
     def _assistant_tool_call_message(content: str, tool_calls: list[ToolCall]) -> ChatCompletionMessageParam | dict:
@@ -268,8 +302,15 @@ class Chat:
             if choice.finish_reason != "tool_calls":
                 return choice.message.content
 
+        # Same escape hatch as _stream_forced_reply, for the non-streaming path.
         logger.warning("Tool-call rounds exhausted without a final reply", extra={"max_rounds": max_rounds})
-        return None
+        response = await self.client.chat.completions.create(
+            model=OPENAI_MODEL, messages=self.messages, tools=await self.tools.get_tools(), tool_choice="none"
+        )
+        choice = response.choices[0]
+        self._finish_reason = choice.finish_reason
+        self.messages.append(choice.message.model_dump(exclude_none=True))
+        return choice.message.content
 
     @staticmethod
     def _system_content() -> str:
