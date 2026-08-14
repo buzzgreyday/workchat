@@ -277,16 +277,18 @@ class Chat:
         The system prompt plus today's date.
 
         Without it the model falls back on its training cutoff — it was telling
-        hirers "today is in early 2025" and miscalculating how long Michael had
-        been at iEDI. Added here rather than in system-prompt.md because that
-        file is gitignored and a hardcoded date would go stale the next day.
+        hirers "today is in early 2025" and miscalculating role tenure from
+        there. Added here rather than in system-prompt.md because that file is
+        gitignored and a hardcoded date would go stale the next day.
         """
         today = datetime.now(timezone.utc)
+        # Deliberately free of pronouns and names: who the CV describes, and how
+        # they refer to themselves, belongs in the resource records, not in code.
         return (
             f"{SYSTEM_PROMPT}\n\n"
             f"Today's date is {today.strftime('%A, %d %B %Y')}. Use it whenever a "
-            f"question depends on the current date — how long he has held a role, "
-            f"how recent something is, or whether a date is past or future. Never "
+            f"question depends on the current date — the length of a role, how "
+            f"recent something is, or whether a date is past or future. Never "
             f"assume the date from your training data."
         )
 

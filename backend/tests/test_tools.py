@@ -27,7 +27,7 @@ def cv(tmp_path, monkeypatch):
         {"file": "iedi.md", "type": "experience", "title": "Software Developer @ iEDI",
          "tags": ["monolith", "python"], "dates": "2025", "summary": "Backend work.", "skill_notes": {}},
         {"file": "bio.md", "type": "bio", "title": "Bio",
-         "tags": ["philosophy"], "dates": None, "summary": "Who he is.", "skill_notes": {}},
+         "tags": ["philosophy"], "dates": None, "summary": "Background.", "skill_notes": {}},
     ]
     index_path = tmp_path / "index.json"
     index_path.write_text(json.dumps(index))

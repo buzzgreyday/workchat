@@ -136,3 +136,27 @@ async def test_injected_date_is_not_returned_to_the_client(client, issued_token)
     )
     assert all(m["role"] != "system" for m in resp.json()["history"])
     assert "Today's date is" not in resp.text
+
+
+async def test_injected_system_text_is_gender_neutral(client, issued_token, openai_mock):
+    """
+    Who the CV describes, and how they refer to themselves, belongs in the
+    resource records. Code that wraps the system prompt must not assert it.
+    """
+    import re
+
+    await client.post(
+        "/chat",
+        headers={"Authorization": f"Bearer {issued_token}"},
+        json={"message": "hi"},
+    )
+
+    sent = openai_mock.chat.completions.create.call_args.kwargs["messages"]
+    system = next(m for m in sent if m["role"] == "system")
+    # Only the portion this codebase appends; the prompt file itself is the
+    # author's own content and out of scope here.
+    from app.common.config import SYSTEM_PROMPT
+    appended = system["content"].replace(SYSTEM_PROMPT, "")
+
+    gendered = re.findall(r"\b(he|him|his|she|her|hers|himself|herself)\b", appended, re.I)
+    assert not gendered, f"gendered pronouns hardcoded in appended system text: {gendered}"
