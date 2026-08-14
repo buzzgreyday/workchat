@@ -7,6 +7,12 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [Unreleased]
+
+### Fixed
+
+- The chat window is no longer overlapped by the mobile browser's URL bar.
+
 ## [0.1.1] - 2026-08-12
 
 ### Security

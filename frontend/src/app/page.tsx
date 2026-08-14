@@ -8,7 +8,7 @@ export default async function Home({
   const { token } = await searchParams;
 
   return (
-    <main className="chat-page-bg flex min-h-screen items-center justify-center p-4">
+    <main className="chat-page-bg flex min-h-dvh items-center justify-center p-4">
       <Chat token={token ?? ""} />
     </main>
   );

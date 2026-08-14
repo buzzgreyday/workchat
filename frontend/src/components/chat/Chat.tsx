@@ -27,7 +27,7 @@ export default function Chat({ token }: { token: string }) {
   } = useChat(token);
 
   return (
-    <div className="chat-card flex h-175 w-full max-w-4xl flex-col overflow-hidden rounded-3xl shadow-2xl">
+    <div className="chat-card flex h-[calc(100dvh-2rem)] max-h-175 w-full max-w-4xl flex-col overflow-hidden rounded-3xl shadow-2xl">
       <ChatHeader usage={usage} />
 
       <MessageList messages={messages} />
