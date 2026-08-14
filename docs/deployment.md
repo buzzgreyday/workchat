@@ -188,6 +188,43 @@ docker compose -f docker-compose.prod.yaml exec -T db \
 ls -lh backup-*.sql
 ```
 
+`*.sql` is gitignored, so a dump written into the checkout will not dirty the
+working tree or risk being committed — the dumps carry real hirer details and
+token rows. Move it off the host once taken; a backup sitting on the machine it
+protects is not a backup.
+
+### The private resource files
+
+`backend/resources/system-prompt.md` and `contact.md` are gitignored. They are
+therefore in no commit and no clone, and the production host is their only
+copy — if the server is lost, they are gone, and the backend **will not start**
+without a system prompt (see step 4 of "First deployment").
+
+Run this from your workstation, not the server; a backup that lives on the box
+it is protecting is not a backup:
+
+```bash
+scripts/backup-private-resources.sh
+```
+
+It writes a timestamped copy to `~/backups/workchat/`, verifies each file
+against the host by SHA-256, and points `~/backups/workchat/latest` at the run.
+It exits non-zero and skips the `latest` symlink if anything mismatches, so a
+truncated transfer cannot masquerade as a good backup. Override `BACKUP_HOST`,
+`BACKUP_REMOTE_DIR` or `BACKUP_DEST` if your setup differs.
+
+To restore onto a rebuilt host:
+
+```bash
+scp ~/backups/workchat/latest/{system-prompt.md,contact.md} \
+  aicv-prod:/root/ai-cv/backend/resources/
+sudo chown -R 1000:1000 backend/resources   # on the host, per step 6
+```
+
+`~/backups` is still one machine. For the system prompt in particular —
+unrecoverable and not reproducible from anything else — keep a second copy
+somewhere off this workstation as well.
+
 ## Notes
 
 - `NEXT_PUBLIC_API_URL` is baked into the frontend at build time as `/api`
