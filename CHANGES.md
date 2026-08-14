@@ -7,6 +7,13 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.1.5] - 2026-08-14
+
+### Added
+
+- A Frameworks and Tools record, and the real iEDI stack on the experience
+  record it was missing from.
+
 ## [0.1.4] - 2026-08-14
 
 ### Fixed
