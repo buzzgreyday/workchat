@@ -451,6 +451,21 @@ async def list_conversations(
             )
         ).scalar_one_or_none()
 
+        # The reply matters as much as the question here — the point of reading
+        # these is catching the agent answering wrongly, which the question alone
+        # cannot show. Latest rather than first, so a thread shows where it ended up.
+        last_reply = (
+            await db.execute(
+                select(DatabaseChatMessage.content)
+                .where(
+                    DatabaseChatMessage.conversation_id == conversation.id,
+                    DatabaseChatMessage.role == "assistant",
+                )
+                .order_by(DatabaseChatMessage.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
         summaries.append(
             {
                 "id": conversation.id,
@@ -462,6 +477,7 @@ async def list_conversations(
                 "last_message_at": conversation.last_message_at,
                 "redacted_at": conversation.redacted_at,
                 "preview": (first[:120] if first else None),
+                "reply_preview": (last_reply[:200] if last_reply else None),
             }
         )
 

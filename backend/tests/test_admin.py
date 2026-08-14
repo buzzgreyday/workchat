@@ -76,6 +76,8 @@ async def test_admin_conversations_lists_what_was_asked(client, issued_token):
     assert body[0]["company"] == "Acme"
     assert body[0]["message_count"] == 2
     assert body[0]["preview"] == "does he know FastAPI?"
+    # The reply is what shows whether the agent answered correctly.
+    assert body[0]["reply_preview"] == "hi from mock"
 
 
 async def test_admin_conversation_detail_returns_transcript(client, issued_token):

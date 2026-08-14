@@ -79,7 +79,10 @@ class ConversationSummary(BaseModel):
     created_at: datetime
     last_message_at: datetime | None = None
     redacted_at: datetime | None = None
+    # The opening question, and how the agent last replied — enough to spot a
+    # wrong answer from the list without opening every conversation.
     preview: str | None = None
+    reply_preview: str | None = None
 
 
 class ConversationDetail(BaseModel):
