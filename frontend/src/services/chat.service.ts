@@ -44,6 +44,7 @@ class ChatService {
       onDone: (
         history: ChatHistoryMessage[],
         usage: Usage,
+        conversationId: string | null,
       ) => void;
       onError?: (message: string) => void;
     },
@@ -112,6 +113,7 @@ class ChatService {
             callbacks.onDone(
               event.history,
               event.usage,
+              event.conversation_id ?? null,
             );
             break;
 

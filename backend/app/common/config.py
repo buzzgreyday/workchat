@@ -31,6 +31,16 @@ load_dotenv(BACKEND_DIR / ".env")
 
 ## Modes
 DEV_MODE = env_bool("DEV_MODE", default=False)
+# Chat content lives in Postgres, which has a retention policy and a redaction
+# path. Logs have neither — they are an unencrypted Docker ring buffer — so
+# message text stays out of them unless this is deliberately switched on for
+# local debugging.
+LOG_CHAT_CONTENT = env_bool("LOG_CHAT_CONTENT", default=False)
+
+## Retention
+# Days before chat message content is scrubbed by scripts/purge-chat-content.sh.
+# The row, its counts and its timings survive; only the text is nulled.
+CHAT_RETENTION_DAYS = int(os.environ.get("CHAT_RETENTION_DAYS") or 30)
 
 ## Database
 POSTGRES_USER = require_env("POSTGRES_USER")

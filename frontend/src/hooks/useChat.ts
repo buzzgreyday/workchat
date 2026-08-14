@@ -22,6 +22,12 @@ export function useChat(token: string) {
   const [history, setHistory] =
   useState<ChatHistoryMessage[]>([]);
 
+  // Returned by the server on the first turn and echoed back on every later one,
+  // so the whole session lands in a single conversation rather than one per
+  // message. The server verifies it belongs to this token before honouring it.
+  const [conversationId, setConversationId] =
+  useState<string | null>(null);
+
   const [usage, setUsage] = useState<Usage | null>(null);
 
   const [input, setInput] = useState("");
@@ -100,6 +106,7 @@ export function useChat(token: string) {
   {
     message: text,
     history,
+    conversation_id: conversationId,
   },
   {
     onToken(value) {
@@ -109,9 +116,12 @@ export function useChat(token: string) {
       }));
     },
 
-    onDone(history, usage) {
+    onDone(history, usage, newConversationId) {
       setHistory(history);
       setUsage(usage);
+      if (newConversationId) {
+        setConversationId(newConversationId);
+      }
 
       updateLastMessage((message) => ({
         ...message,

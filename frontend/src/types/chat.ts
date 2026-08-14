@@ -13,6 +13,7 @@ export interface ChatHistoryMessage {
 export interface ChatRequest {
   message: string;
   history: ChatHistoryMessage[];
+  conversation_id?: string | null;
 }
 
 
@@ -20,6 +21,7 @@ export interface ChatResponse {
   reply: string;
   history: ChatHistoryMessage[];
   usage: Usage;
+  conversation_id?: string | null;
 }
 
 

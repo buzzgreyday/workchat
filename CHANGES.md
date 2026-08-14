@@ -7,6 +7,20 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [Unreleased]
+
+### Added
+
+- Chat turns are now stored, so it is possible to see what hirers actually asked
+  and what the agent answered. Readable via `GET /admin/conversations`, content
+  scrubbed after 30 days.
+
+### Changed
+
+- Logs are structured JSON and carry a request id. `extra={...}` fields were
+  previously discarded by the format string; message content stays out of logs
+  and lives only in the database.
+
 ## [0.1.6] - 2026-08-14
 
 ### Changed

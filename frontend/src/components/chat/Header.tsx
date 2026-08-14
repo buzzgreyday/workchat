@@ -57,11 +57,18 @@ export default function ChatHeader({ usage }: Props) {
         </div>
       </div>
 
-      {usage && (
-        <span className="chat-badge mt-3 inline-block rounded-full px-3 py-1 text-xs font-medium shadow-sm">
-          {usage.remaining} / {usage.max} questions left
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {usage && (
+          <span className="chat-badge inline-block rounded-full px-3 py-1 text-xs font-medium shadow-sm">
+            {usage.remaining} / {usage.max} questions left
+          </span>
+        )}
+        {/* Questions are stored server-side, so say so rather than collecting
+            them silently. */}
+        <span className="chat-text-muted text-xs">
+          Questions are stored for 30 days
         </span>
-      )}
+      </div>
     </div>
   );
 }

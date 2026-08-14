@@ -33,7 +33,7 @@ import pytest  # noqa: E402
 from httpx import ASGITransport  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
-from app.common.db import Base, get_db  # noqa: E402
+from app.common.db import Base, get_db, get_session_factory  # noqa: E402
 from app.main import app  # noqa: E402
 from app.openai.client import get_openai_client  # noqa: E402
 
@@ -79,6 +79,11 @@ async def client(session_maker, openai_mock):
             yield s
 
     app.dependency_overrides[get_db] = _get_db
+    # The transcript recorders open their own sessions from the factory rather
+    # than reusing the request's, so the factory needs overriding too — without
+    # this they silently swallow a connection error to the real database and
+    # every persistence assertion fails for the wrong reason.
+    app.dependency_overrides[get_session_factory] = lambda: session_maker
     app.dependency_overrides[get_openai_client] = lambda: openai_mock
     try:
         async with httpx.AsyncClient(

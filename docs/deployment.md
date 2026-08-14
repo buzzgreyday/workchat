@@ -164,6 +164,44 @@ Not `docker compose exec backend curl …`: the backend image is
 expanded by the host shell (where it is unset) rather than inside the
 container, sending an empty header and getting a 401.
 
+## Read what hirers asked
+
+Chat turns are stored in Postgres and read through the admin API, using the same
+`ADMIN_KEY` as token issuance:
+
+```bash
+KEY=$(grep '^ADMIN_KEY=' backend/.env | cut -d= -f2-)
+
+# Recent conversations, newest activity first
+curl -s https://chat.example.com/api/admin/conversations -H "X-Admin-Key: $KEY"
+
+# One conversation in full
+curl -s https://chat.example.com/api/admin/conversations/<id> -H "X-Admin-Key: $KEY"
+
+# Erase one conversation's content, keeping counts and timings
+curl -s -X POST https://chat.example.com/api/admin/conversations/<id>/redact \
+  -H "X-Admin-Key: $KEY"
+```
+
+`/admin/conversations` accepts `limit` (1-200, default 50), `offset`, `company`
+and `since`.
+
+These return hiring managers' questions verbatim, protected by one static header
+secret. Caddy rate-limits `/api/admin*` to 5 requests per minute per IP, but if
+you want defence in depth, restricting `/api/admin*` to a known source address at
+the Caddy layer is the obvious next step — deliberately not configured here,
+since a wrong address locks you out of minting tokens.
+
+**Content is scrubbed after 30 days.** Add the purge to the same crontab as the
+backup:
+
+```
+30 3 * * * /usr/bin/flock -n /tmp/workchat-purge.lock /root/ai-cv/scripts/purge-chat-content.sh >> /var/log/workchat/purge.log 2>&1
+```
+
+Override the window with `CHAT_RETENTION_DAYS` in `backend/.env`. See
+`docs/database.md` for the erasure order and the backup caveat.
+
 ## Logs
 
 ```bash

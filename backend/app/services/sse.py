@@ -2,6 +2,7 @@ import json
 
 from pydantic import BaseModel
 
+from app.common.config import LOG_CHAT_CONTENT
 from app.common.logging import logging
 
 logger = logging.logger
@@ -18,9 +19,10 @@ def sse_event(event: str, data: dict) -> bytes:
             "Chat message sent to user",
             extra={"usage": payload.get("usage")}
         )
-        logger.debug(
-            "Chat message content sent to user",
-            extra=payload
-        )
+        if LOG_CHAT_CONTENT:
+            logger.debug(
+                "Chat message content sent to user",
+                extra=payload
+            )
 
     return f"data: {json.dumps(payload)}\n\n".encode()

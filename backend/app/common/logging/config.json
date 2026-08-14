@@ -1,15 +1,21 @@
 {
   "version": 1,
   "disable_existing_loggers": false,
+  "filters": {
+    "correlation": {
+      "()": "app.common.logging.filters.CorrelationFilter"
+    }
+  },
   "formatters": {
     "json": {
-      "format": "%(asctime)s %(name)s %(levelname)s %(message)s"
+      "()": "app.common.logging.formatters.JsonExtraFormatter"
     }
   },
   "handlers": {
     "console": {
       "class": "logging.StreamHandler",
       "formatter": "json",
+      "filters": ["correlation"],
       "stream": "ext://sys.stdout"
     }
   },
@@ -18,6 +24,12 @@
       "handlers": ["console"],
       "level": "ERROR",
       "propagate": false
+    },
+    "openai": {
+      "level": "INFO"
+    },
+    "httpx": {
+      "level": "WARNING"
     }
   },
   "root": {

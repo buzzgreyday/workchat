@@ -1,8 +1,9 @@
 import uuid
+from datetime import datetime
 from typing import List, Optional, Literal
 
 import jwt
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 class Usage(BaseModel):
     used: int
@@ -20,8 +21,14 @@ class Record(BaseModel):
                             # {"kubernetes": "Deployed existing services; did not design cluster architecture."}
 
 class ChatRequest(BaseModel):
-    message: str
+    # Bounded so it cannot exceed the chat_messages.content column, and to cap
+    # what a single request can cost in OpenAI tokens.
+    message: str = Field(min_length=1, max_length=4000)
     history: list = []  # [{"role": "user"/"assistant"/"tool", ...}]
+    # Echoed back by the server so a client can keep appending to one thread.
+    # Unverifiable client input: the server checks it belongs to the bearer's
+    # token and silently starts a new conversation if it doesn't.
+    conversation_id: uuid.UUID | None = None
 
 class IssueTokenRequest(BaseModel):
     subject: str = Field(min_length=1, max_length=255)
@@ -39,6 +46,52 @@ class ChatResponse(BaseModel):
     reply: str
     history: list[dict]
     usage: Usage
+    conversation_id: str | None = None
+
+
+class ChatMessageOut(BaseModel):
+    id: uuid.UUID
+    request_id: str
+    role: str
+    content: str | None = None
+    content_chars: int | None = None
+    truncated: int = 0
+    endpoint: str
+    status: str
+    finish_reason: str | None = None
+    tool_calls_count: int = 0
+    tool_names: str | None = None
+    model: str | None = None
+    latency_ms: int | None = None
+    error: str | None = None
+    redacted_at: datetime | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConversationSummary(BaseModel):
+    id: uuid.UUID
+    subject: str
+    company: str | None = None
+    job_title: str | None = None
+    message_count: int
+    created_at: datetime
+    last_message_at: datetime | None = None
+    redacted_at: datetime | None = None
+    preview: str | None = None
+
+
+class ConversationDetail(BaseModel):
+    id: uuid.UUID
+    subject: str
+    company: str | None = None
+    job_title: str | None = None
+    message_count: int
+    created_at: datetime
+    last_message_at: datetime | None = None
+    redacted_at: datetime | None = None
+    messages: list[ChatMessageOut]
 
 class TokenContext(BaseModel):
     sub: str

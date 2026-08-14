@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.common.config import DEV_MODE, ALLOWED_HOSTS
 from app.common.logging.logging import logger
+from app.common.middleware import RequestContextMiddleware
 from app.openai.client import get_openai_client
 from app.routes.admin import router as admin_router
 from app.routes.chat import router as chat_router
@@ -39,6 +40,10 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Added last, so it wraps outermost and every log line of the request — CORS
+# included — carries the correlation id.
+app.add_middleware(RequestContextMiddleware)
 
 app.include_router(health_router)
 app.include_router(chat_router)

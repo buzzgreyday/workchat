@@ -10,5 +10,17 @@ async def get_db():
     async with async_session() as session:
         yield session
 
+
+def get_session_factory() -> async_sessionmaker:
+    """
+    The factory itself, not a session.
+
+    Deliberately not a yield-dependency: nothing is registered on the request's
+    exit stack, so this stays usable after the request has torn down. The chat
+    transcript recorder needs exactly that — on client abort it runs after the
+    request-scoped session from get_db is already closed.
+    """
+    return async_session
+
 class Base(DeclarativeBase):
     pass
