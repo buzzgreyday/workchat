@@ -219,8 +219,8 @@
       "probes": "depth",
       "question": "Go into detail on his Redis experience.",
       "expect": "covered",
-      "must_include_any": ["lightly"],
-      "note": "Body-only: frameworks.md caps it as 'touched only lightly at iEDI'."
+      "must_include_any": ["lightly", "limited"],
+      "note": "Body-only: frameworks.md caps it as 'touched only lightly at iEDI'. 'limited' accepted as the same claim in other words; bare 'light' is not, since it hides inside 'slightly'."
     },
     {
       "id": 24,

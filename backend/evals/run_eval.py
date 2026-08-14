@@ -66,6 +66,8 @@ DENIAL = re.compile(
     | (?:don't|do\s+not|doesn't|does\s+not)\s+have\s+(?:[a-z'’]+\s+){0,3}on\s+file
     | not\s+on\s+file
     | (?:don't|do\s+not|doesn't|does\s+not)\s+have\s+(?:any\s+)?information
+    | (?:does\s+not|doesn't|did\s+not|didn't)\s+(?:show|turn\s+up|indicate|include)
+    | no\s+mention
     """,
     re.I | re.X,
 )
