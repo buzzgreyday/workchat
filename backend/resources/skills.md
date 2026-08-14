@@ -36,6 +36,7 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **integrations** — Software Developer @ iEDI
 - **kubernetes** — Software Developer @ iEDI
   - Scope: Created and managed services, ingress, and deployments through Rancher; did not author raw manifests/Helm charts or design cluster architecture from scratch.
+- **legacy-code** — Software Developer @ iEDI
 - **lxml** — Software Developer @ iEDI
 - **message-queues** — Software Developer @ iEDI
 - **mongodb** — Software Developer @ iEDI
@@ -51,20 +52,28 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **rabbitmq** — Software Developer @ iEDI
 - **rancher** — Software Developer @ iEDI
   - Scope: The cluster management UI through which he works with Kubernetes at iEDI.
+- **refactoring** — Software Developer @ iEDI
 - **remote** — Freelance Software Developer @ Constellation Network
 - **sdk** — Freelance Software Developer @ Constellation Network
 - **solution-ownership** — Software Developer @ iEDI
 - **sql** — Software Developer @ iEDI
 - **system-design** — Software Developer @ iEDI
+- **technical-debt** — Software Developer @ iEDI
 - **testing** — Software Developer @ iEDI
+- **troubleshooting** — Software Developer @ iEDI
 - **xml** — Software Developer @ iEDI
 - **typescript** — AI CV Chat Application, Blockchain Wallet Modification
 - **.NET** — .NET API
 - **alembic** — AI CV Chat Application
+- **async** — AI CV Chat Application
+- **authentication** — AI CV Chat Application
+- **bash** — AI CV Chat Application
 - **bootloader** — Custom iPodLinux Bootloader
 - **C#** — .NET API
 - **c++** — Custom iPodLinux Bootloader
   - Scope: I haven't used C++ since c. 2005; thus, I don't remember any C++.
+- **caching** — AI CV Chat Application
+- **concurrency** — AI CV Chat Application
 - **constellation-network** — Blockchain Wallet Modification
 - **crypto** — Blockchain Wallet Modification
 - **csharp** — .NET API
@@ -86,8 +95,13 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **opentelemetry** — Tracing and Distributed Logging
 - **postgresql** — AI CV Chat Application
 - **react** — AI CV Chat Application
+- **security** — AI CV Chat Application
 - **self-taught** — Custom iPodLinux Bootloader
+- **server-sent-events** — AI CV Chat Application
+- **shell-scripting** — AI CV Chat Application
 - **sqlalchemy** — AI CV Chat Application
+- **sse** — AI CV Chat Application
+- **streaming** — AI CV Chat Application
 - **systems-programming** — Custom iPodLinux Bootloader
 - **tailwind** — AI CV Chat Application
 - **tempo** — Tracing and Distributed Logging

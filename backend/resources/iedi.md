@@ -1,7 +1,7 @@
 ---
 title: Software Developer @ iEDI
 type: experience
-tags: [backend, backend-developer, backend-engineer, software-developer, software-engineer, python, fastapi, pyramid, pydantic, pika, rabbitmq, message-queues, lxml, xml, pandas, mongodb, nosql, javascript, api-development, rest-api, erp, e-invoicing, databases, sql, ci-cd, github-actions, code-review, docker, kubernetes, rancher, nomad, testing, github, integrations, cron, monolith, production-support, solution-ownership, system-design]
+tags: [backend, backend-developer, backend-engineer, software-developer, software-engineer, python, fastapi, pyramid, pydantic, pika, rabbitmq, message-queues, lxml, xml, pandas, mongodb, nosql, javascript, api-development, rest-api, erp, e-invoicing, databases, sql, ci-cd, github-actions, code-review, docker, kubernetes, rancher, nomad, testing, github, integrations, cron, monolith, refactoring, technical-debt, legacy-code, troubleshooting, production-support, solution-ownership, system-design]
 dates: "September 2025 - present"
 summary: "Software Developer / Backend Engineer at iEDI (Denmark, on-premise) - owns and troubleshoots production integrations and services (partner APIs, cron jobs, price-catalogue/invoice/despatch advice/document flows), makes independent design decisions, and helps shape team development practices. Daily stack is Python with FastAPI and Pyramid, Pydantic, Pika/RabbitMQ, lxml, Pandas, MongoDB and SQL, shipped via GitHub Actions and peer-reviewed pull requests onto Kubernetes (Rancher), now migrating to HashiCorp Nomad. IN PRODUCTION BUT INTERNAL: proprietary employer code, not publicly viewable or installable."
 skill_notes:
@@ -40,3 +40,16 @@ review on every pull request.
 The main engine is a monolith, surrounded by a large set of REST APIs
 tailored to individual customers — consolidating that bespoke surface area
 is ongoing work, as is the migration from Kubernetes to Nomad.
+
+For the full stack with depth noted per entry, see "Frameworks and Tools".
+
+## Working with existing systems
+Most of the work is on a codebase that predates him: reading unfamiliar code,
+refactoring it, and reducing the technical debt it carries. The despatch
+advice redesign above is the pattern — an existing flow diagnosed, then
+rebuilt on the supplier's packing slip so it produced fewer errors and less
+code than the legacy version it replaced. The API consolidation effort is the
+same instinct at a larger scale.
+
+Troubleshooting production failures is a routine part of the role. He does not
+work an on-call rotation, and mentoring is not part of the job.

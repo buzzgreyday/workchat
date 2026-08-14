@@ -11,7 +11,7 @@ iEDI since September 2025, building REST APIs, working across relational
 and non-relational databases, writing tests, and running CI/CD — the core
 day-to-day of a software developer or software engineer role (see
 "Software Developer @ iEDI"). That professional experience is backed by
-over 10 years of hobby programming that predates it (see Bio).
+over 10 years of hobby programming that predates it (see "Bio").
 
 ## Backend Developer / Backend Engineer
 His strongest, most consistent focus. At iEDI he owns and troubleshoots a
