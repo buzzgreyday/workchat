@@ -7,6 +7,14 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.1.10] - 2026-08-14
+
+### Fixed
+
+- The agent knows what day it is. It was reasoning from its training cutoff,
+  telling hirers "today is in early 2025" and miscalculating how long Michael
+  has been at iEDI.
+
 ## [0.1.9] - 2026-08-14
 
 ### Added
