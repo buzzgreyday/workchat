@@ -87,7 +87,14 @@ class ChatToolService:
                     "type": "function",
                     "function": {
                         "name": "get_full_entry",
-                        "description": "Fetch the full markdown content for one CV record given its file path from search_cv results.",
+                        "description": (
+                            "Fetch the full markdown content for one CV record given its file path from "
+                            "search_cv results. Call it whenever a record matched every word of the query, "
+                            "and whenever the question asks for depth rather than existence — 'tell me more', "
+                            "'go into detail', 'why', 'elaborate', or any specific fact about a record. "
+                            "Search results carry a summary of what each record is about, which is not the "
+                            "same as what it says."
+                        ),
                         "parameters": {
                             "type": "object",
                             "properties": {"file": {"type": "string"}},
@@ -113,6 +120,7 @@ class ChatToolService:
         logger.debug("Parsed search_cv query", extra={"query_words": query_words, "tag": tag_lower})
 
         results = []
+        strong: list[str] = []
         for r in records:
             if degenerate:
                 break
@@ -131,6 +139,8 @@ class ChatToolService:
             matched = sum(1 for word in query_words if word in haystack)
             if matched:
                 results.append({**r, "matched_words": f"{matched}/{len(query_words)}"})
+                if matched == len(query_words):
+                    strong.append(r["file"])
 
         # Best first. Unranked, every hit looked equally good: a record carrying
         # all three words of "despatch advices iEDI" was indistinguishable from
@@ -160,11 +170,43 @@ class ChatToolService:
                 indent=2,
             )
 
-        return json.dumps({"count": len(results), "matches": results}, indent=2)
+        # The score is only worth computing if it changes what happens next. A
+        # record carrying every word of the query is the one the question is
+        # about, and answering from its summary — which describes the record, not
+        # the question — is where the wrong answers came from.
+        if strong:
+            note = (
+                f"Contains every word of this query: {', '.join(strong)}. "
+                "Call get_full_entry on these before answering. A summary says "
+                "what a record is about; the answer to a specific question is in "
+                "the entry."
+            )
+        else:
+            note = (
+                "Nothing matched the whole query — these are partial hits, best "
+                "first. Open the top ones with get_full_entry rather than "
+                "concluding anything from a summary."
+            )
+        note += (
+            " If the question asks for depth — 'tell us more', 'go into detail', "
+            "'why', 'elaborate' — a summary cannot answer it at all: fetch the "
+            "entry and answer from what it actually says."
+        )
+
+        return json.dumps({"count": len(results), "matches": results, "note": note}, indent=2)
 
     async def get_full_entry(self, file: str) -> str:
         """Tool available to the AI: what does this specific entry actually say?"""
         path = RESOURCES_DIR / file
+        if not path.exists():
+            # The model retypes the filename from the search result and sometimes
+            # changes its case — "iEDI.md" for "iedi.md". On a case-sensitive
+            # filesystem that was a dead end indistinguishable, from where the
+            # model sits, from the record not existing: it fell back to the
+            # summary and answered from that. Only names inside the resources
+            # directory are considered, so the traversal guard below still holds.
+            wanted = file.strip().lower()
+            path = next((p for p in RESOURCES_DIR.glob("*.md") if p.name.lower() == wanted), path)
         if not path.exists() or RESOURCES_DIR not in path.resolve().parents:
             return f"Error: no such file '{file}'"
         async with aiofiles.open(path, mode="r") as f:

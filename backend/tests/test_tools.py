@@ -87,6 +87,20 @@ async def test_query_of_only_common_words_is_a_miss_not_a_browse(cv):
     assert out["count"] == 0
 
 
+async def test_full_entry_tolerates_the_wrong_filename_case(cv):
+    """
+    The model retypes filenames out of search results and changes their case —
+    it asked for "iEDI.md". On a case-sensitive filesystem that read as "no such
+    record", so it answered from the summary instead of the entry it had asked for.
+    """
+    assert "monolith" in await cv.get_full_entry("iEDI.md")
+
+
+async def test_full_entry_still_refuses_paths_outside_resources(cv):
+    out = await cv.get_full_entry("../../../etc/passwd")
+    assert out.startswith("Error:")
+
+
 async def test_unmatched_tag_also_reports_zero(cv):
     out = json.loads(await cv.search_cv(tag="kubernetes"))
     assert out["count"] == 0
