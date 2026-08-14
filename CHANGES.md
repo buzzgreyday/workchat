@@ -7,6 +7,12 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.1.4] - 2026-08-14
+
+### Fixed
+
+- Long unbroken text no longer overflows the message bubble.
+
 ## [0.1.3] - 2026-08-14
 
 ### Fixed
