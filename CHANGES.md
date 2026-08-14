@@ -7,6 +7,13 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.1.6] - 2026-08-14
+
+### Changed
+
+- CV records now carry the vocabulary a hiring manager would actually search
+  for, and the orphaned records are reachable by link.
+
 ## [0.1.5] - 2026-08-14
 
 ### Added
