@@ -30,6 +30,10 @@ backend/resources/contact.md
 backend/resources/system-prompt.md
 backend/resources/index.json
 
+# Eval transcripts. One JSON per run, holding the model's replies — a run
+# artifact, not source. The question set itself is tracked.
+backend/evals/results/
+
 # Database dumps. `pg_dump` output carries real hirer details and token rows,
 # and the documented backup command writes backup-<date>.sql into the working
 # directory. Force-add with `git add -f` if you ever need a SQL file tracked.

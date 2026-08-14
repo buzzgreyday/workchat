@@ -1,0 +1,202 @@
+{
+  "_comment": [
+    "Eval set for the CV chat. Each question states what the CV actually holds,",
+    "so a reply can be scored without a human in the loop.",
+    "",
+    "expect:",
+    "  covered           - the CV answers this. Claiming absence is a WRONG NEGATIVE.",
+    "  absent            - the CV genuinely does not cover this. It must say so, not infer.",
+    "  covered_negative  - the CV covers the topic and the true answer is 'no'. Denial is",
+    "                      correct here, so the denial phrasing is given per-question in",
+    "                      deny_any rather than matched by the generic scorer.",
+    "",
+    "must_include_any  - at least one must appear in the reply, or it is a MISSED FACT.",
+    "caveat_any        - scope caveat that should appear. Reported, never fails a run.",
+    "deny_any          - overrides the generic denial regex for this question."
+  ],
+  "questions": [
+    {
+      "id": 1,
+      "probes": "synonym",
+      "question": "Any case where Michael simplified for example despatch advices",
+      "expect": "covered",
+      "must_include_any": ["packing slip", "despatch"],
+      "note": "The original failure. iedi.md:26 describes the redesign outright."
+    },
+    {
+      "id": 2,
+      "probes": "synonym",
+      "question": "Has he ever streamlined a business process?",
+      "expect": "covered",
+      "must_include_any": ["packing slip", "despatch"]
+    },
+    {
+      "id": 3,
+      "probes": "synonym",
+      "question": "Tell me about a time he reduced complexity in a system.",
+      "expect": "covered",
+      "must_include_any": ["packing slip", "despatch", "monolith", "consolidat"]
+    },
+    {
+      "id": 4,
+      "probes": "synonym",
+      "question": "Did he ever clean up a messy legacy flow?",
+      "expect": "covered",
+      "must_include_any": ["packing slip", "despatch", "legacy", "technical debt"]
+    },
+    {
+      "id": 5,
+      "probes": "synonym",
+      "question": "Give me an example of him making something less error-prone.",
+      "expect": "covered",
+      "must_include_any": ["packing slip", "despatch", "error"]
+    },
+    {
+      "id": 6,
+      "probes": "direct",
+      "question": "What did he do about despatch advices at iEDI?",
+      "expect": "covered",
+      "must_include_any": ["packing slip"]
+    },
+    {
+      "id": 7,
+      "probes": "direct",
+      "question": "What is his Kubernetes experience?",
+      "expect": "covered",
+      "must_include_any": ["rancher", "kubernetes"],
+      "caveat_any": ["helm", "manifest", "did not", "didn't", "cluster architecture"],
+      "note": "skill_notes in iedi.md caps this: no raw manifests, no cluster design."
+    },
+    {
+      "id": 8,
+      "probes": "direct",
+      "question": "How long has he been at iEDI?",
+      "expect": "covered",
+      "must_include_any": [
+        "11 month",
+        "eleven month",
+        "almost a year",
+        "nearly a year",
+        "just under a year"
+      ],
+      "note": "Started September 2025. Guards the date-injection fix from 0.1.10."
+    },
+    {
+      "id": 9,
+      "probes": "direct",
+      "question": "Does he have full-stack experience?",
+      "expect": "covered",
+      "must_include_any": ["full-stack", "full stack", "next.js", "nextjs", "frontend"]
+    },
+    {
+      "id": 10,
+      "probes": "direct",
+      "question": "What did he build for Constellation Network?",
+      "expect": "covered",
+      "must_include_any": ["pypergraph", "sdk"]
+    },
+    {
+      "id": 11,
+      "probes": "direct",
+      "question": "Has he worked with message queues?",
+      "expect": "covered",
+      "must_include_any": ["rabbitmq", "pika"]
+    },
+    {
+      "id": 12,
+      "probes": "direct",
+      "question": "What is his educational background?",
+      "expect": "covered",
+      "must_include_any": ["philosophy"],
+      "caveat_any": ["copenhagen"]
+    },
+    {
+      "id": 13,
+      "probes": "direct",
+      "question": "Who built this chat application?",
+      "expect": "covered",
+      "must_include_any": ["michael"],
+      "note": "The prompt requires claiming authorship plainly, not hedging."
+    },
+    {
+      "id": 14,
+      "probes": "direct",
+      "question": "Does he have any .NET experience?",
+      "expect": "covered",
+      "must_include_any": [".net", "dotnet", "c#"],
+      "caveat_any": [
+        "learning",
+        "exercise",
+        "never deployed",
+        "not deployed",
+        "local",
+        "not live",
+        "small"
+      ],
+      "note": "basic-net-api.md is explicitly a local learning exercise."
+    },
+    {
+      "id": 15,
+      "probes": "direct",
+      "question": "What are his career goals?",
+      "expect": "covered",
+      "must_include_any": ["responsibilit", "grow", "ownership", "design"]
+    },
+    {
+      "id": 16,
+      "probes": "absent",
+      "question": "Does he have Terraform or Ansible experience?",
+      "expect": "absent"
+    },
+    {
+      "id": 17,
+      "probes": "absent",
+      "question": "Has he worked with Go or Rust?",
+      "expect": "absent"
+    },
+    {
+      "id": 18,
+      "probes": "absent",
+      "question": "What are his salary expectations?",
+      "expect": "absent",
+      "caveat_any": ["directly", "michael", "conversation", "interview"],
+      "note": "Prompt says: not on file, suggest raising it with Michael."
+    },
+    {
+      "id": 19,
+      "probes": "covered_negative",
+      "question": "Has he mentored anyone?",
+      "expect": "covered_negative",
+      "must_include_any": ["mentor"],
+      "deny_any": [
+        "not part of",
+        "not been documented",
+        "no record",
+        "has not mentored",
+        "hasn't mentored",
+        "no mentoring",
+        "not something",
+        "no formal"
+      ],
+      "note": "iedi.md states mentoring is not part of the job. A sourced no, not a miss."
+    },
+    {
+      "id": 20,
+      "probes": "covered_negative",
+      "question": "Is he on an on-call rotation?",
+      "expect": "covered_negative",
+      "must_include_any": ["on-call", "on call"],
+      "deny_any": [
+        "does not work",
+        "doesn't work",
+        "no on-call",
+        "not on an on-call",
+        "not on call",
+        "not part of",
+        "does not participate",
+        "no record"
+      ],
+      "note": "iedi.md: 'He does not work an on-call rotation.'"
+    }
+  ]
+}
