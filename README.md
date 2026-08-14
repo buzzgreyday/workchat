@@ -565,7 +565,6 @@ access tokens, logs and backups.
 
 Possible future enhancements include:
 
-* Keep chat history in database and cache (server-side)
 * Handle max queries reached, invalid/expired token, etc. in frontend
 * Token persistence
 * CI/CD pipeline
