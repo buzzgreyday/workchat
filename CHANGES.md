@@ -7,6 +7,14 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.1.8] - 2026-08-14
+
+### Fixed
+
+- The agent no longer opens with a claim of microservices experience before
+  correcting itself; the tag that suggested it is gone, and the record is still
+  found by search.
+
 ## [0.1.7] - 2026-08-14
 
 ### Added
