@@ -22,12 +22,15 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **fastapi** — AI CV Chat Application, Software Developer @ iEDI
 - **javascript** — Blockchain Wallet Modification, Software Developer @ iEDI
   - Scope: A small part of the work at iEDI; his professional focus there is backend Python.
+- **architecture** — Software Developer @ iEDI
 - **backend-engineer** — Software Developer @ iEDI
 - **ci-cd** — Software Developer @ iEDI
 - **code-review** — Software Developer @ iEDI
 - **cron** — Software Developer @ iEDI
 - **cryptography** — Freelance Software Developer @ Constellation Network
 - **databases** — Software Developer @ iEDI
+- **distributed-systems** — Software Developer @ iEDI
+  - Scope: Many separate deployed services with RabbitMQ messaging and container orchestration, rather than a designed microservice architecture.
 - **e-invoicing** — Software Developer @ iEDI
 - **encryption** — Freelance Software Developer @ Constellation Network
 - **erp** — Software Developer @ iEDI
@@ -39,6 +42,8 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **legacy-code** — Software Developer @ iEDI
 - **lxml** — Software Developer @ iEDI
 - **message-queues** — Software Developer @ iEDI
+- **microservices** — Software Developer @ iEDI
+  - Scope: Not the architecture at iEDI, and not a claimed skill — the main engine is a monolith surrounded by customer-tailored services. Tagged so the question is answerable honestly rather than inferred.
 - **mongodb** — Software Developer @ iEDI
 - **monolith** — Software Developer @ iEDI
   - Scope: iEDI's main engine is a monolith, surrounded by customer-tailored REST APIs the team is working to consolidate.
@@ -55,6 +60,7 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **refactoring** — Software Developer @ iEDI
 - **remote** — Freelance Software Developer @ Constellation Network
 - **sdk** — Freelance Software Developer @ Constellation Network
+- **service-integration** — Software Developer @ iEDI
 - **solution-ownership** — Software Developer @ iEDI
 - **sql** — Software Developer @ iEDI
 - **system-design** — Software Developer @ iEDI

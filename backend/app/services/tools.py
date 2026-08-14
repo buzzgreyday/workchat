@@ -54,8 +54,10 @@ class ChatToolService:
                         "name": "search_cv",
                         "description": (
                             "Search CV records by free-text query and/or tag. Searches full entry content, "
-                            "not just title/summary. Returns lightweight summaries "
-                            "(file, title, tags, dates, summary), not full content."
+                            "not just title/summary. Returns {count, matches}, where each match is a "
+                            "lightweight summary (file, title, tags, dates, summary), not full content — "
+                            "call get_full_entry for the detail behind a promising summary. "
+                            "A count of 0 means nothing in the CV mentions it: say so rather than inferring."
                         ),
                         "parameters": {
                             "type": "object",
@@ -108,9 +110,28 @@ class ChatToolService:
                 results.append(r)
 
         if (query_words or tag) and not results:
-            results = records
+            # Previously this returned every record, which is indistinguishable
+            # from a precise hit: the model got the whole CV, assumed the search
+            # had worked, and inferred an answer rather than saying nothing was
+            # recorded. Report the miss instead.
+            logger.info(
+                "search_cv found no matching records",
+                extra={"query": query, "tag": tag},
+            )
+            return json.dumps(
+                {
+                    "count": 0,
+                    "matches": [],
+                    "note": (
+                        "No CV record mentions this. Say so plainly rather than "
+                        "inferring an answer — but you may search again with "
+                        "different wording if the term has a common synonym."
+                    ),
+                },
+                indent=2,
+            )
 
-        return json.dumps(results, indent=2)
+        return json.dumps({"count": len(results), "matches": results}, indent=2)
 
     async def get_full_entry(self, file: str) -> str:
         """Tool available to the AI: what does this specific entry actually say?"""
