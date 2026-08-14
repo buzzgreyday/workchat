@@ -30,7 +30,7 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **cryptography** — Freelance Software Developer @ Constellation Network
 - **databases** — Software Developer @ iEDI
 - **distributed-systems** — Software Developer @ iEDI
-  - Scope: Many separate deployed services with RabbitMQ messaging and container orchestration, rather than a designed microservice architecture.
+  - Scope: Many RESTful APIs deployed in Kubernetes and now migrating to Nomad, around a monolithic central engine. Some of those services use RabbitMQ; it is not the backbone of the estate.
 - **e-invoicing** — Software Developer @ iEDI
 - **encryption** — Freelance Software Developer @ Constellation Network
 - **erp** — Software Developer @ iEDI

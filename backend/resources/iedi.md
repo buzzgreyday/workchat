@@ -9,7 +9,7 @@ skill_notes:
   rancher: "The cluster management UI through which he works with Kubernetes at iEDI."
   javascript: "A small part of the work at iEDI; his professional focus there is backend Python."
   microservices: "Not the architecture at iEDI, and not a claimed skill — the main engine is a monolith surrounded by customer-tailored services. Tagged so the question is answerable honestly rather than inferred."
-  distributed-systems: "Many separate deployed services with RabbitMQ messaging and container orchestration, rather than a designed microservice architecture."
+  distributed-systems: "Many RESTful APIs deployed in Kubernetes and now migrating to Nomad, around a monolithic central engine. Some of those services use RabbitMQ; it is not the backbone of the estate."
   monolith: "iEDI's main engine is a monolith, surrounded by customer-tailored REST APIs the team is working to consolidate."
 ---
 
@@ -33,7 +33,7 @@ Running in production at iEDI, but internal: this is proprietary employer code, 
 
 ## Stack
 Python throughout, with FastAPI and Pyramid for services and Pydantic for
-validation. Pika for RabbitMQ message queues, lxml for the XML that
+validation. Pika for RabbitMQ message queues where services use them, lxml for the XML that
 underpins the e-invoicing and business-document flows, and Pandas for data
 handling. MongoDB alongside SQL. Some JavaScript, though the work here is
 predominantly backend Python. CI/CD runs on GitHub Actions, with peer
@@ -43,14 +43,15 @@ review on every pull request.
 The main engine is a monolith. Around it sits a large set of RESTful APIs and
 services tailored to individual customers — so the estate is distributed in
 practice, but it is not a microservice architecture, and he would not describe
-it as one. Consolidating that bespoke surface area is ongoing work, as is the
-migration from Kubernetes to Nomad.
+it as one. Reducing the number of those customer-specific APIs is ongoing work —
+that consolidation is about the bespoke API surface, not about decomposing the
+monolith — as is the migration from Kubernetes to Nomad.
 
-What that does mean in practice: working across many separate deployed services
-and their integrations, service-to-service messaging over RabbitMQ, and
-container orchestration — without the service-per-bounded-context design, or
-the service mesh and distributed-tracing tooling, that a microservices role
-would usually expect. His observability work with OpenTelemetry, Grafana, Loki
+What that does mean in practice: working across many separately deployed
+RESTful APIs and their integrations, orchestrated in Kubernetes and now moving
+to Nomad, with some of those services using RabbitMQ for message queues —
+without the service-per-bounded-context design, or the service mesh and
+distributed-tracing tooling, that a microservices role would usually expect. His observability work with OpenTelemetry, Grafana, Loki
 and Tempo was a self-initiated prototype aimed at exactly that gap (see
 "Tracing and Distributed Logging").
 

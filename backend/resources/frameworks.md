@@ -2,7 +2,7 @@
 title: Frameworks and Tools
 type: frameworks
 tags: [fastapi, pyramid, pydantic, pika, rabbitmq, amqp, lxml, xml, pandas, sqlalchemy, alembic, pytest, celery, redis, mongodb, sql, postgresql, nextjs, react, typescript, javascript, tailwind, shadcn, tanstack-query, opentelemetry, grafana, loki, tempo, docker, docker-compose, caddy, kubernetes, rancher, nomad, github-actions, ci-cd, code-review, dotnet, monolith, rest-api, frameworks, tooling, stack]
-summary: "The frameworks, libraries and tooling Michael actually works in, grouped by area, with depth stated per entry. At iEDI his daily stack is Python with FastAPI and Pyramid, Pydantic, Pika/RabbitMQ messaging, lxml, Pandas, MongoDB and SQL, tested and shipped through GitHub Actions and peer-reviewed pull requests, deployed on Kubernetes via Rancher and currently being migrated to HashiCorp Nomad. Outside work he builds with PostgreSQL, SQLAlchemy, Redis, Celery, OpenTelemetry, Next.js, Tailwind CSS and .NET."
+summary: "The frameworks, libraries and tooling Michael actually works in, grouped by area, with depth stated per entry. At iEDI his daily stack is Python with FastAPI and Pyramid, Pydantic, Pika/RabbitMQ in the services that use queues, lxml, Pandas, MongoDB and SQL, tested and shipped through GitHub Actions and peer-reviewed pull requests, deployed on Kubernetes via Rancher and currently being migrated to HashiCorp Nomad. Outside work he builds with PostgreSQL, SQLAlchemy, Redis, Celery, OpenTelemetry, Next.js, Tailwind CSS and .NET."
 ---
 
 ## How to read this
@@ -37,7 +37,8 @@ exposure.
 
 ## Messaging and data processing
 - **Pika (AMQP/RabbitMQ)** — worked in, regularly at iEDI, for message-queue
-  work.
+  work in the services that use it. RabbitMQ is not the backbone of the estate;
+  most of it is RESTful APIs.
 - **Celery** — built with, outside work, for task queues.
 - **Pandas** — worked in, regularly at iEDI.
 - **lxml** — worked in, regularly at iEDI, for XML processing — which sits
