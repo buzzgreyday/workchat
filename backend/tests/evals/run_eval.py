@@ -11,15 +11,15 @@ The point is to compare candidate fixes on evidence rather than argument, so the
 question set and the scoring are fixed before any of them are tried.
 
 Usage:
-  docker compose exec backend python -m evals.run_eval
-  docker compose exec backend python -m evals.run_eval --arm granular-resources
-  docker compose exec backend python -m evals.run_eval --only 1,6,16   # smoke test
+  docker compose exec backend python -m tests.evals.run_eval
+  docker compose exec backend python -m tests.evals.run_eval --arm granular-resources
+  docker compose exec backend python -m tests.evals.run_eval --only 1,6,16   # smoke test
 
 Overrides:
   EVAL_BASE_URL  backend to hit (default: http://localhost:8000)
   ADMIN_KEY      admin key used to mint this run's access token (from the env)
 
-Writes one transcript per run to evals/results/, which is gitignored — the
+Writes one transcript per run to tests/evals/results/, which is gitignored — the
 replies are run artifacts, not source. Each run mints one access token and
 leaves one conversation per question in the database.
 """
