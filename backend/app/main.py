@@ -41,7 +41,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Added last, so it wraps outermost and every log line of the request — CORS
+# Added last, for future observability, so it wraps outermost and every log line of the request — CORS
 # included — carries the correlation id.
 app.add_middleware(RequestContextMiddleware)
 
