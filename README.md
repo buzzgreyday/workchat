@@ -565,10 +565,12 @@ access tokens, logs and backups.
 
 Possible future enhancements include:
 
-* Move the hardcoded conditional prompts from the code to seperate files
+* Refresh token (via claim id/token)
+* Token persistence
+* Abstractions
+* Move the hardcoded conditional prompts from the code to separate files
 * Resource search scoring
 * Handle max queries reached, invalid/expired token, etc. in frontend
-* Token persistence
 * CI/CD pipeline
 * Automated testing
 * Background workers
