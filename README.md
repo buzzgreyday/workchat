@@ -566,7 +566,7 @@ access tokens, logs and backups.
 Possible future enhancements include:
 
 * AuthHandler
-* Refresh token (via claim id/token)
+* Refresh token (via claim/invite id/token)
 * Token persistence
 * Handle max queries reached, invalid/expired token, etc. in frontend
 
