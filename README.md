@@ -565,12 +565,16 @@ access tokens, logs and backups.
 
 Possible future enhancements include:
 
+* AuthHandler
 * Refresh token (via claim id/token)
 * Token persistence
+* Handle max queries reached, invalid/expired token, etc. in frontend
+
+* ChatClient
 * Abstractions
+
 * Move the hardcoded conditional prompts from the code to separate files
 * Resource search scoring
-* Handle max queries reached, invalid/expired token, etc. in frontend
 * CI/CD pipeline
 * Automated testing
 * Background workers
