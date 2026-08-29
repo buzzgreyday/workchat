@@ -388,6 +388,58 @@ OpenAPI Specification:
 http://localhost:8000/openapi.json
 ```
 
+## Token flow
+
+Two token versions are live at once. Which one a request is using is decided by
+the `ver` claim on the JWT, and its **absence** means version 1 — the tokens
+already handed out cannot grow a claim they were never minted with, so silence
+has to keep meaning v1 for as long as any of those links is still in an inbox.
+
+Only the auth endpoints are versioned. `/chat` and `/chat/stream` stay where they
+are and accept either kind of access token, because moving them under `/v2` would
+have left every v1 hirer holding a link to a frozen API.
+
+**v1 — the links already sent out.** One long-lived JWT per grant, delivered as
+`?token=...` and sent straight back as `Authorization: Bearer`. Its `jti` *is*
+the `tokens` row. Nothing about this path has changed.
+
+```
+/admin/issue-token (version=1)  ->  ?token=<access JWT>  ->  POST /chat
+```
+
+**v2 — claim, then refresh.** The link carries a claim token instead, which the
+client exchanges for a short-lived access token and a rotating refresh token.
+
+```
+/admin/issue-token (version=2)  ->  ?claim=<claim JWT>
+        |
+        v
+POST /v2/auth/claim    {claim_token}    -> {access_token, refresh_token, expires_in, ...}
+POST /v2/auth/refresh  {refresh_token}  -> a fresh pair; the one presented is retired
+POST /chat             Bearer <access_token>
+```
+
+Properties worth knowing:
+
+* **The claim link stays reusable** until the grant expires, so reopening it on a
+  second device works. Each exchange opens its own session rather than resetting
+  the first, and revoking one leaves the other alone.
+* **Quota is per grant, not per token.** Claiming and refreshing cost nothing;
+  only a question spends a query. Two devices on one link share one allowance.
+* **Nothing derived outlives its grant.** Access and refresh expiries are both
+  clamped to `tokens.expires_at`.
+* **Replaying a refresh token cuts the grant.** Rotation retires the token it was
+  given, so a second use of the same one is either a retry or a theft and nothing
+  can tell which — every session on the grant is revoked and the hirer re-claims.
+* **An access token dies with its session**, rotation included. The call that
+  rotates hands back a fresh access token, so a client only ever needs to carry
+  the newest pair.
+
+| Variable | Default | What it sets |
+| --- | --- | --- |
+| `ACCESS_TOKEN_TTL_SECONDS` | `900` (15 min) | v2 access token lifetime |
+| `REFRESH_TOKEN_TTL_SECONDS` | `604800` (7 days) | v2 refresh token lifetime |
+
 ---
 
 # Docker Commands
@@ -565,7 +617,7 @@ access tokens, logs and backups.
 
 Possible future enhancements include:
 
-* Refresh token (via claim id/token)
+* ~~Refresh token (via claim id/token)~~ — done, see [Token flow](#token-flow)
 * Token persistence
 * Abstractions
 * Move the hardcoded conditional prompts from the code to separate files

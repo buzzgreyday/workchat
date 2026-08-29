@@ -22,6 +22,12 @@ class DatabaseUser(Base):
 
 
 class DatabaseToken(Base):
+    """
+    One grant. In v1 the JWT in the ?token= link *was* the grant, so this row and
+    that token were the same thing. In v2 the row outlives every token derived
+    from it: a claim link, the refresh tokens it mints and the access tokens
+    those mint all point back here, and the query quota is still counted here.
+    """
     __tablename__ = "tokens"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -36,6 +42,52 @@ class DatabaseToken(Base):
     used_queries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # 1 = the token_hash is a long-lived access token handed out as ?token=.
+    # 2 = it is a claim token exchanged at /v2/auth/claim for a refresh/access
+    # pair. Defaulted to 1 so every row that predates this column keeps working
+    # exactly as it did, which is the whole point of the version claim.
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # When this grant's claim link was first exchanged. The claim stays usable
+    # until the grant expires, so this records the first exchange only — it is
+    # for spotting a link that was never opened, not for blocking a second one.
+    claimed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class DatabaseRefreshToken(Base):
+    """
+    One session within a grant.
+
+    A hirer who opens the claim link on their laptop and again on their phone
+    gets two rows, each rotating independently, and revoking one leaves the
+    other alone. Rotation is why rows are kept rather than updated in place:
+    `rotated_to` chains a session's history, so a refresh token presented after
+    it was already exchanged is recognisable as a replay rather than merely
+    unknown, and the whole chain can be cut.
+    """
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    token_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tokens.id", ondelete="RESTRICT"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Stamped both when a token is rotated away and when it is cut for replay;
+    # `rotated_to` is what tells the two apart.
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    rotated_to: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("refresh_tokens.id", ondelete="RESTRICT"), nullable=True
+    )
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(

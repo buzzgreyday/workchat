@@ -14,6 +14,7 @@ from app.common.logging.logging import logger
 from app.common.middleware import RequestContextMiddleware
 from app.openai.client import get_openai_client
 from app.routes.admin import router as admin_router
+from app.routes.auth import router as auth_router
 from app.routes.chat import router as chat_router
 from app.routes.health import router as health_router
 
@@ -46,5 +47,6 @@ app.add_middleware(
 app.add_middleware(RequestContextMiddleware)
 
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(admin_router)

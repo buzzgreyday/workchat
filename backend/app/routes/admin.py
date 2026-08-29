@@ -45,14 +45,24 @@ async def issue_token(req: IssueTokenRequest, db: AsyncSession = Depends(get_db)
         extra={
             "subject": req.subject, "job_title": req.job_title, "company": req.company,
             "email": req.email, "phone": req.phone, "expires_in_seconds": req.expires_in_seconds,
-            "max_queries": req.max_queries, "type": req.type
+            "max_queries": req.max_queries, "type": req.type, "version": req.version
         }
     )
-    access_token = await create_user_and_access_token(req, db)
+    token = await create_user_and_access_token(req, db)
+    # v1 puts the access token straight in the link; v2 puts a claim token there
+    # instead, so the query parameter has to change with it. The frontend reads
+    # whichever one it finds — ?token= is still what every issued link carries.
+    param = "token" if req.version == 1 else "claim"
     if req.type == "qr":
-        qr = get_qr_code(url=f"{BASE_URL}/?token={access_token}")
+        qr = get_qr_code(url=f"{BASE_URL}/?{param}={token}")
         return Response(content=bytes(qr), media_type="image/png", status_code=HTTP_200_OK)
-    return JSONResponse(content={"token": access_token}, media_type="application/json", status_code=HTTP_200_OK)
+    # "token" stays the key for both so an existing caller reading body["token"]
+    # is unaffected; "kind" is what says which flow it belongs to.
+    return JSONResponse(
+        content={"token": token, "version": req.version, "kind": "access" if req.version == 1 else "claim"},
+        media_type="application/json",
+        status_code=HTTP_200_OK,
+    )
 
 @router.get(
     "/conversations",

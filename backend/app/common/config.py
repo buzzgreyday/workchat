@@ -59,6 +59,15 @@ SECRET_KEY = require_env("JWT_SECRET")
 ADMIN_KEY = require_env("ADMIN_KEY")
 ALGORITHM = "HS256"
 
+## Token lifetimes (v2 claim/refresh/access flow)
+# A v1 token is the whole grant: one long-lived JWT handed out in a link, valid
+# until the grant expires. v2 splits that into a claim link the hirer exchanges,
+# a refresh token that survives a closed tab, and an access token short enough
+# that a leaked URL or log line goes stale on its own. Neither derived token can
+# outlive its grant — Auth clamps both to tokens.expires_at when minting.
+ACCESS_TOKEN_TTL_SECONDS = int(os.environ.get("ACCESS_TOKEN_TTL_SECONDS") or 60 * 15)
+REFRESH_TOKEN_TTL_SECONDS = int(os.environ.get("REFRESH_TOKEN_TTL_SECONDS") or 60 * 60 * 24 * 7)
+
 ## LLM
 # Measured, not assumed: on 26 eval questions x 3 runs, nano scored 22-24 and
 # mini 25-26, taking every depth question in every run. nano also never once
