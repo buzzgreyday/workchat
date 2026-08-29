@@ -67,6 +67,33 @@ ALGORITHM = "HS256"
 # outlive its grant — Auth clamps both to tokens.expires_at when minting.
 ACCESS_TOKEN_TTL_SECONDS = int(os.environ.get("ACCESS_TOKEN_TTL_SECONDS") or 60 * 15)
 REFRESH_TOKEN_TTL_SECONDS = int(os.environ.get("REFRESH_TOKEN_TTL_SECONDS") or 60 * 60 * 24 * 7)
+# How long a just-rotated refresh token is still recognised as *this* client
+# retrying rather than someone replaying a stolen token. Without a window, three
+# chat requests expiring at once and each retrying a refresh would be read as two
+# replays and cut the grant — the client locks itself out. Measured from the
+# moment of rotation; a token presented after it is a genuine replay.
+REFRESH_ROTATION_GRACE_SECONDS = int(os.environ.get("REFRESH_ROTATION_GRACE_SECONDS") or 30)
+# At most one operator notification per grant per window, so a bot hitting a dead
+# claim link cannot flood the log (or, later, an inbox).
+OWNER_NOTIFY_THROTTLE_SECONDS = int(os.environ.get("OWNER_NOTIFY_THROTTLE_SECONDS") or 60 * 60)
+
+## Refresh cookie
+# The refresh token is delivered as an httpOnly cookie and never in a response
+# body, so script on the page cannot read it. In production Caddy serves the
+# frontend and proxies the API under /api on one origin, so this is a plain
+# same-origin cookie; in dev :3000 and :8000 differ in port but not in site, so
+# SameSite=Strict still sends it once CORS allows credentials.
+REFRESH_COOKIE_NAME = os.environ.get("REFRESH_COOKIE_NAME") or "cv_refresh"
+# Path "/" rather than "/v2/auth" on purpose: behind Caddy the browser sees
+# /api/v2/auth/... while the backend only ever sees /v2/auth/..., so a narrow
+# path would be written for a prefix the browser never requests.
+REFRESH_COOKIE_PATH = "/"
+# No Secure flag in dev, where the frontend is plain http on localhost.
+REFRESH_COOKIE_SECURE = not DEV_MODE
+# Browsers refuse a credentialed request whose Access-Control-Allow-Origin is
+# "*", so the dev wildcard has to become a concrete list once cookies are in play.
+DEV_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+CORS_ORIGINS = DEV_ALLOWED_ORIGINS if DEV_MODE else ALLOWED_HOSTS
 
 ## LLM
 # Measured, not assumed: on 26 eval questions x 3 runs, nano scored 22-24 and

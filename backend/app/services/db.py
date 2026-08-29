@@ -2,10 +2,10 @@ import hashlib
 import hmac
 import uuid
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.common.logging import logging
@@ -16,9 +16,28 @@ from app.common.schemas import (
     DatabaseToken,
     DatabaseUser,
 )
-from app.common.config import TOKEN_HASHING_SECRET
+from app.common.config import (
+    OWNER_NOTIFY_THROTTLE_SECONDS,
+    REFRESH_ROTATION_GRACE_SECONDS,
+    TOKEN_HASHING_SECRET,
+)
 
 logger = logging.logger
+
+
+class ReplayDetected(Exception):
+    """
+    A refresh token was presented well after it was rotated away.
+
+    Raised rather than turned into a 401 here so the caller — which has already
+    loaded the grant, and so knows who it belongs to — can tell the operator that
+    this hirer is now locked out. With a single-use claim there is no self-serve
+    way back, so somebody has to hear about it.
+    """
+
+    def __init__(self, token_id: uuid.UUID):
+        self.token_id = token_id
+        super().__init__(f"refresh token replayed for grant {token_id}")
 
 def hash_token(raw_token: str) -> str:
     return hmac.new(
@@ -369,15 +388,35 @@ async def rotate_refresh_token(
     if not result.rowcount:
         await db.rollback()
         stale = await db.get(DatabaseRefreshToken, refresh_id)
-        if stale is not None and stale.revoked_at is not None:
-            logger.warning(
-                "Refresh token replayed after rotation, cutting the grant's sessions",
-                extra={"refresh_id": refresh_id, "token_id": stale.token_id},
+        if stale is None or stale.revoked_at is None:
+            logger.warning("Expired refresh token", extra={"refresh_id": refresh_id})
+            raise HTTPException(401, "Refresh token expired")
+
+        if stale.rotated_to is None:
+            # Revoked without a successor: an operator cut this grant, or replay
+            # detection did. Not a replay in itself, and re-cutting adds nothing.
+            logger.warning("Refresh token belongs to a revoked session", extra={"refresh_id": refresh_id})
+            raise HTTPException(401, "Session revoked")
+
+        rotated_ago = (now - _as_utc(stale.revoked_at)).total_seconds()
+        if rotated_ago <= REFRESH_ROTATION_GRACE_SECONDS:
+            # This client racing itself, not an attacker: parallel requests that
+            # all expired at once, or a retry after a network flake. Rejecting
+            # without cutting keeps the winner's session — which is the whole
+            # point, since cutting here would take down the pair that was just
+            # handed out and log the hirer out of their own tab.
+            logger.info(
+                "Refresh token re-presented inside the rotation grace window",
+                extra={"refresh_id": refresh_id, "rotated_ago_s": round(rotated_ago, 3)},
             )
-            await revoke_refresh_sessions(stale.token_id, db)
-            raise HTTPException(401, "Refresh token already used")
-        logger.warning("Expired refresh token", extra={"refresh_id": refresh_id})
-        raise HTTPException(401, "Refresh token expired")
+            raise HTTPException(409, "Refresh already rotated; retry with the newest token")
+
+        logger.warning(
+            "Refresh token replayed after rotation, cutting the grant's sessions",
+            extra={"refresh_id": refresh_id, "token_id": stale.token_id, "rotated_ago_s": round(rotated_ago, 3)},
+        )
+        await revoke_refresh_sessions(stale.token_id, db)
+        raise ReplayDetected(stale.token_id)
 
     await db.commit()
     await db.refresh(successor)
@@ -392,21 +431,76 @@ async def get_refresh_token(refresh_id: uuid.UUID, db: AsyncSession) -> Database
     return await db.get(DatabaseRefreshToken, refresh_id)
 
 
-async def mark_grant_claimed(token_id: uuid.UUID, db: AsyncSession) -> None:
+async def claim_grant_once(token_id: uuid.UUID, db: AsyncSession) -> bool:
     """
-    Stamp the first exchange of a claim link and leave it alone thereafter.
+    Spend a claim link, atomically. True if this call was the one that spent it.
 
-    The predicate is what keeps it first-only. The claim stays reusable until the
-    grant expires, so this is a record of whether the link was ever opened, not
-    a gate on opening it again.
+    The `claimed_at IS NULL` predicate is the whole mechanism — two requests
+    arriving together cannot both match it, so a claim link opens exactly one
+    session no matter how it is raced. A False return is not an error here; the
+    caller decides what a second presentation means.
     """
-    await db.execute(
+    result = await db.execute(
         update(DatabaseToken)
         .where(DatabaseToken.id == token_id, DatabaseToken.claimed_at.is_(None))
         .values(claimed_at=datetime.now(timezone.utc))
         .execution_options(synchronize_session=False)
     )
     await db.commit()
+    return bool(result.rowcount)
+
+
+async def should_notify_owner(token_id: uuid.UUID, db: AsyncSession) -> bool:
+    """
+    Claim the right to send one operator notification for this grant, atomically.
+
+    Same shape as the claim gate, and for the same reason: a dead link being hit
+    in a loop must produce one message, not one per request. The window predicate
+    lives in SQL so concurrent requests cannot both win it.
+    """
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=OWNER_NOTIFY_THROTTLE_SECONDS)
+    result = await db.execute(
+        update(DatabaseToken)
+        .where(
+            DatabaseToken.id == token_id,
+            or_(
+                DatabaseToken.owner_notified_at.is_(None),
+                DatabaseToken.owner_notified_at < cutoff,
+            ),
+        )
+        .values(owner_notified_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    await db.commit()
+    return bool(result.rowcount)
+
+
+async def revoke_grant(token_id: uuid.UUID, db: AsyncSession) -> tuple[bool, int]:
+    """
+    Kill a grant outright: the grant itself and every session under it.
+
+    The grant is what has to be revoked, not just its sessions. Cutting sessions
+    alone would have left anyone holding the claim link able to open a new one —
+    and before single-use claims landed, that made session revocation close to
+    decorative. Returns (was_already_revoked, sessions_cut).
+    """
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        update(DatabaseToken)
+        .where(DatabaseToken.id == token_id, DatabaseToken.revoked_at.is_(None))
+        .values(revoked_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    already_revoked = not result.rowcount
+    await db.commit()
+
+    sessions_cut = await revoke_refresh_sessions(token_id, db)
+    logger.warning(
+        "Revoked grant",
+        extra={"token_id": token_id, "already_revoked": already_revoked, "sessions_cut": sessions_cut},
+    )
+    return already_revoked, sessions_cut
 
 
 # --- Chat transcript capture -------------------------------------------------

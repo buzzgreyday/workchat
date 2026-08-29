@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.common.config import DEV_MODE, ALLOWED_HOSTS
+from app.common.config import CORS_ORIGINS, DEV_MODE
 from app.common.logging.logging import logger
 from app.common.middleware import RequestContextMiddleware
 from app.openai.client import get_openai_client
@@ -37,7 +37,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_HOSTS,
+    # Concrete origins, never "*": the refresh cookie makes these credentialed
+    # requests, and a browser refuses one whose Access-Control-Allow-Origin is a
+    # wildcard. In production the frontend and the API share an origin behind
+    # Caddy anyway, so this only really governs dev on :3000.
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )

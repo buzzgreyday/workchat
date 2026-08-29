@@ -49,10 +49,17 @@ class DatabaseToken(Base):
     # pair. Defaulted to 1 so every row that predates this column keeps working
     # exactly as it did, which is the whole point of the version claim.
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
-    # When this grant's claim link was first exchanged. The claim stays usable
-    # until the grant expires, so this records the first exchange only — it is
-    # for spotting a link that was never opened, not for blocking a second one.
+    # When this grant's claim link was exchanged, and the gate that makes the
+    # exchange single-use: the claiming UPDATE only matches while this is NULL.
+    # A second presentation of the link is refused and the operator is told, so
+    # a hirer who cleared their site data or moved device gets a new link rather
+    # than a way back in that a leaked URL would share.
     claimed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Throttles operator notifications for this grant — a dead link being hit
+    # repeatedly is one thing worth hearing about, not hundreds.
+    owner_notified_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -78,14 +85,20 @@ class DatabaseRefreshToken(Base):
         ForeignKey("tokens.id", ondelete="RESTRICT"), index=True
     )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Indexed for pruning, which is the only query that reads by expiry.
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     # Stamped both when a token is rotated away and when it is cut for replay;
     # `rotated_to` is what tells the two apart.
     revoked_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # SET NULL, not RESTRICT: this is an audit link between rows of one table,
+    # not an ownership edge worth blocking a delete over. Postgres checks RESTRICT
+    # immediately rather than at statement end, so a bulk
+    # `DELETE ... WHERE expires_at < now()` spanning a rotation chain could fail
+    # on ordering alone — which would make expired sessions impossible to prune.
     rotated_to: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("refresh_tokens.id", ondelete="RESTRICT"), nullable=True
+        ForeignKey("refresh_tokens.id", ondelete="SET NULL"), nullable=True
     )
     last_used_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True

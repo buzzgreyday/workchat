@@ -147,12 +147,24 @@ class JWT(BaseModel):
 
 
 class TokenPair(BaseModel):
-    """What /v2/auth/claim and /v2/auth/refresh hand back."""
+    """
+    Internal result of a claim or a rotation. Not a response model: the refresh
+    token leaves the process in a Set-Cookie header, never in a body, so that
+    script running on the page cannot read it.
+    """
     access_token: str
     refresh_token: str
-    token_type: Literal["bearer"] = "bearer"
     # Seconds until access_token expires, so a client can schedule a refresh
     # instead of waiting to be told 401. Clamped to the grant's own expiry.
+    expires_in: int
+    refresh_expires_in: int
+
+
+class SessionOut(BaseModel):
+    """What /v2/auth/claim and /v2/auth/refresh actually return. Deliberately
+    missing the refresh token — see TokenPair."""
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
     expires_in: int
     refresh_expires_in: int
 
@@ -162,5 +174,7 @@ class ClaimRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str = Field(min_length=1, max_length=4096)
+    # Optional because the cookie is the normal carrier. A non-browser client
+    # (curl, a test, a future mobile app) can still put it in the body.
+    refresh_token: str | None = Field(default=None, min_length=1, max_length=4096)
 

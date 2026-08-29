@@ -5,22 +5,26 @@ import {
   Usage,
 } from "@/types/chat";
 import { SSEEvent } from "@/types/sse";
+import { AuthFetch } from "@/hooks/useSession";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   "http://localhost:8000";
 
+// Takes an authFetch rather than a bearer string because with v2 the right
+// token is not knowable at call time: the one held when a request starts may
+// have expired by the time it lands, and authFetch is what refreshes and
+// retries. A v1 caller passes one that only ever attaches the same token.
 class ChatService {
   async send(
-    token: string,
+    authFetch: AuthFetch,
     request: ChatRequest,
   ): Promise<ChatResponse> {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_URL}/chat`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(request),
@@ -37,7 +41,7 @@ class ChatService {
   }
 
   async stream(
-    token: string,
+    authFetch: AuthFetch,
     request: ChatRequest,
     callbacks: {
       onToken: (value: string) => void;
@@ -49,12 +53,11 @@ class ChatService {
       onError?: (message: string) => void;
     },
   ): Promise<void> {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_URL}/chat/stream`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(request),

@@ -38,6 +38,17 @@
 			events 5
 			window 1m
 		}
+		# Claiming and refreshing each write rows, and a claim link is a
+		# credential worth guessing at. Generous enough for a real client
+		# rotating a session, tight enough that nobody grinds these.
+		zone auth_zone {
+			match {
+				path /api/v2/auth*
+			}
+			key {remote_host}
+			events 10
+			window 1m
+		}
 	}
 
 	# Backend API — strip /api prefix before proxying.
@@ -52,13 +63,16 @@
 
 	log {
 		output stdout
-		# Access tokens travel as a URL query param on first load
-		# (?token=...) — strip it before it ever hits the logs.
+		# Credentials travel as a URL query param on first load — v1 access
+		# tokens as ?token=, v2 claim tokens as ?claim=. Strip both before
+		# they ever hit the logs. A spent claim token is worth less than a
+		# live access token, but it is still a credential until it is used.
 		format filter {
 			wrap json
 			fields {
 				request>uri query {
 					delete token
+					delete claim
 				}
 			}
 		}

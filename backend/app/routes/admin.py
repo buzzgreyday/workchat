@@ -17,10 +17,12 @@ from app.common.models import (
 from app.helpers.qr_code import get_qr_code
 from app.services.admin import create_user_and_access_token
 from app.services.auth import require_admin
+from app.common.schemas import DatabaseToken
 from app.services.db import (
     get_conversation_messages,
     list_conversations,
     redact_conversation,
+    revoke_grant,
 )
 from app.common.logging import logging
 
@@ -63,6 +65,46 @@ async def issue_token(req: IssueTokenRequest, db: AsyncSession = Depends(get_db)
         media_type="application/json",
         status_code=HTTP_200_OK,
     )
+
+@router.post(
+    "/tokens/{token_id}/revoke",
+    dependencies=[Depends(require_admin)],
+    response_class=JSONResponse,
+    summary="Revoke a grant and every session under it",
+    description=(
+        "The kill switch. Stamps `tokens.revoked_at` and cuts every refresh "
+        "session, so outstanding refresh tokens stop rotating and outstanding "
+        "access tokens stop being honoured on their next request. Idempotent."
+    ),
+)
+async def revoke_token(
+    token_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    # Revoking the grant, not merely its sessions, is the point: with a v2 grant
+    # the claim link is the durable credential, and cutting sessions alone would
+    # leave anyone still holding that link able to open a fresh one.
+    grant = await db.get(DatabaseToken, token_id)
+    if grant is None:
+        raise HTTPException(status_code=404, detail="Token not found")
+
+    already_revoked, sessions_cut = await revoke_grant(token_id, db)
+    logger.warning(
+        "Grant revoked by admin",
+        extra={
+            "token_id": token_id, "subject": grant.subject, "company": grant.company,
+            "already_revoked": already_revoked, "sessions_cut": sessions_cut,
+        },
+    )
+    return JSONResponse(
+        content={
+            "token_id": str(token_id),
+            "already_revoked": already_revoked,
+            "sessions_cut": sessions_cut,
+        },
+        status_code=HTTP_200_OK,
+    )
+
 
 @router.get(
     "/conversations",

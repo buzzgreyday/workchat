@@ -407,38 +407,65 @@ the `tokens` row. Nothing about this path has changed.
 /admin/issue-token (version=1)  ->  ?token=<access JWT>  ->  POST /chat
 ```
 
-**v2 — claim, then refresh.** The link carries a claim token instead, which the
-client exchanges for a short-lived access token and a rotating refresh token.
+**v2 — claim, then refresh.** The link carries a single-use claim token, which
+the client exchanges for a short-lived access token and a rotating refresh token.
 
 ```
 /admin/issue-token (version=2)  ->  ?claim=<claim JWT>
         |
         v
-POST /v2/auth/claim    {claim_token}    -> {access_token, refresh_token, expires_in, ...}
-POST /v2/auth/refresh  {refresh_token}  -> a fresh pair; the one presented is retired
+POST /v2/auth/claim    {claim_token}  -> {access_token, expires_in, ...}
+                                         + Set-Cookie: cv_refresh=... (HttpOnly)
+POST /v2/auth/refresh  (cookie)       -> a fresh pair; the one presented is retired
 POST /chat             Bearer <access_token>
 ```
 
 Properties worth knowing:
 
-* **The claim link stays reusable** until the grant expires, so reopening it on a
-  second device works. Each exchange opens its own session rather than resetting
-  the first, and revoking one leaves the other alone.
+* **The refresh token is only ever a cookie.** HttpOnly, Secure outside dev,
+  SameSite=Strict, and never in a response body — so script on the page cannot
+  read it. The access token *is* in the body, because the client has to put it in
+  an `Authorization` header, which is why it is short-lived. An XSS gets minutes
+  of access, not a week of it. In production Caddy serves the frontend and proxies
+  the API under `/api` on one origin, so this is a plain same-origin cookie.
+* **The claim link is single use.** The first exchange spends it; every later one
+  is refused with 409 and logs a notice that this hirer needs a new link. A leaked
+  URL — in a browser history, a mail thread, a photographed QR code — is therefore
+  worth nothing once the hirer has opened it. The cost is that clearing site data
+  or moving device needs a new link.
 * **Quota is per grant, not per token.** Claiming and refreshing cost nothing;
-  only a question spends a query. Two devices on one link share one allowance.
+  only a question spends a query.
 * **Nothing derived outlives its grant.** Access and refresh expiries are both
   clamped to `tokens.expires_at`.
-* **Replaying a refresh token cuts the grant.** Rotation retires the token it was
-  given, so a second use of the same one is either a retry or a theft and nothing
-  can tell which — every session on the grant is revoked and the hirer re-claims.
+* **Rotation has a grace window.** A refresh token re-presented within
+  `REFRESH_ROTATION_GRACE_SECONDS` of being rotated answers 409 and changes
+  nothing — that is one client racing itself, which happens whenever several
+  requests expire at once and each retries. Without the window those retries read
+  as replays and cut the grant, logging the hirer out of the tab they were sitting
+  in. The frontend also single-flights refreshes so it rarely comes up.
+* **Past the window, a replay cuts the grant.** Rotation retires the token it was
+  given, so a late second use is either theft or a badly behaved client and
+  nothing can tell which. Every session is revoked; with a single-use claim there
+  is no self-serve way back, so a notice is logged for the operator.
 * **An access token dies with its session**, rotation included. The call that
-  rotates hands back a fresh access token, so a client only ever needs to carry
-  the newest pair.
+  rotates hands back a fresh one, so a client only ever carries the newest pair.
+
+Revoking is `POST /admin/tokens/{token_id}/revoke` (admin key required). It stamps
+`tokens.revoked_at` *and* cuts every session, which matters because the grant — not
+the session — is what a claim link reaches: cutting sessions alone would leave
+anyone holding the link able to open a new one. It works on v1 grants too, and is
+idempotent.
 
 | Variable | Default | What it sets |
 | --- | --- | --- |
 | `ACCESS_TOKEN_TTL_SECONDS` | `900` (15 min) | v2 access token lifetime |
 | `REFRESH_TOKEN_TTL_SECONDS` | `604800` (7 days) | v2 refresh token lifetime |
+| `REFRESH_ROTATION_GRACE_SECONDS` | `30` | How long a rotated token still reads as a retry |
+| `OWNER_NOTIFY_THROTTLE_SECONDS` | `3600` | Minimum gap between operator notices per grant |
+| `REFRESH_COOKIE_NAME` | `cv_refresh` | Name of the refresh cookie |
+
+Operator notices go through `app/services/notify.py`, which logs today. Wiring it
+to an inbox is a change to that one file.
 
 ---
 

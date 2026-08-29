@@ -1,23 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { chatService } from "@/services/chat.service";
 import { getUserName } from "@/lib/auth";
 import { Message, ChatHistoryMessage, Usage } from "@/types/chat";
+import { AuthFetch, SessionStatus } from "@/hooks/useSession";
 
-export function useChat(token: string) {
-  const user = getUserName(token);
+const SPENT_LINK_MESSAGE =
+  "This chat link has already been used, so I can't start a new session with it. " +
+  "Links are single use — ask for a fresh one and I'll pick up from there.";
 
+const BROKEN_LINK_MESSAGE =
+  "I couldn't open a session from this link. It may have expired. " +
+  "Ask for a fresh one and we can get started.";
+
+export function useChat({
+  accessToken,
+  status,
+  authFetch,
+}: {
+  accessToken: string;
+  status: SessionStatus;
+  authFetch: AuthFetch;
+}) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
-      content: `Hi ${user}! 👋`,
+      content: "Hi! 👋",
       createdAt: new Date(0),
       status: "complete",
     },
   ]);
+
+  // The greeting can only be personalised once a token exists, and with a claim
+  // link that is one round trip after first paint. Telling the hirer their link
+  // is spent goes here too — the agent saying it reads better than a banner.
+  useEffect(() => {
+    const content =
+      status === "spent"
+        ? SPENT_LINK_MESSAGE
+        : status === "error"
+          ? BROKEN_LINK_MESSAGE
+          : accessToken
+            ? `Hi ${getUserName(accessToken)}! 👋`
+            : "Hi! 👋";
+
+    setMessages((prev) =>
+      prev.length === 1 && prev[0].id === "welcome"
+        ? [{ ...prev[0], content }]
+        : prev,
+    );
+  }, [accessToken, status]);
 
   const [history, setHistory] =
   useState<ChatHistoryMessage[]>([]);
@@ -34,6 +69,10 @@ export function useChat(token: string) {
 
   const loading =
     messages.at(-1)?.status === "streaming";
+
+  // Nothing to send with, so the composer stays shut rather than letting the
+  // hirer type a question into a 401.
+  const disabled = status !== "ready";
 
 
   const addMessage = (message: Message) => {
@@ -71,7 +110,7 @@ export function useChat(token: string) {
       ? question.trim()
       : input.trim();
 
-    if (!text || loading) {
+    if (!text || loading || disabled) {
       return;
     }
 
@@ -102,7 +141,7 @@ export function useChat(token: string) {
 
 
       await chatService.stream(
-  token,
+  authFetch,
   {
     message: text,
     history,
@@ -156,6 +195,7 @@ export function useChat(token: string) {
     messages,
     input,
     loading,
+    disabled,
     usage,
 
     setInput,

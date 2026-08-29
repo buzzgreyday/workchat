@@ -44,14 +44,17 @@ from app.common.logging.logging import logger
 from app.common.models import JWT, TokenContext, TokenPair
 from app.common.schemas import DatabaseToken
 from app.services.db import (
+    ReplayDetected,
+    claim_grant_once,
     create_refresh_token,
     get_active_grant,
     get_refresh_token,
     hash_token,
-    mark_grant_claimed,
     rotate_refresh_token,
+    should_notify_owner,
     update_token_used_query_count,
 )
+from app.services.notify import notifier
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -216,13 +219,16 @@ class Auth:
 
     async def claim(self, raw_claim: str, db: AsyncSession) -> TokenPair:
         """
-        Exchange a claim token for a session.
+        Exchange a claim token for a session. Once, and only once.
 
-        Deliberately repeatable until the grant expires: the link is what the
-        hirer was given, and it has to still work when they reopen it on their
-        phone, or after clearing site data. Each exchange opens a *new* session
-        rather than resetting the old one, so the laptop keeps working when the
-        phone claims. Costs no quota — questions are what quota is for.
+        The link is a one-shot: whoever presents it first gets the session, and
+        every later presentation is refused. That makes a leaked URL — sitting in
+        a browser history, a mail thread, a photographed QR code — worth far less
+        than a reusable one, at the cost of a hirer who clears their site data or
+        moves device needing a new link. The operator is told when that happens,
+        since only they can issue one.
+
+        Costs no quota; questions are what quota is for.
         """
         payload = self.decode(raw_claim)
         if self.version_of(payload) != 2 or payload.get("typ") != "claim":
@@ -236,7 +242,12 @@ class Auth:
             logger.warning("Claim token does not match its grant", extra={"token_id": grant_id})
             raise HTTPException(401, "Invalid token")
 
-        await mark_grant_claimed(grant_id, db)
+        if not await claim_grant_once(grant_id, db):
+            await self._notify_owner(
+                grant.id, grant.subject, grant.company, db,
+                event="claim_reuse", reason="claim link presented after it was spent",
+            )
+            raise HTTPException(409, "This link has already been used. Ask for a new one.")
 
         session_id = uuid.uuid4()
         refresh_token, refresh_expires_at, refresh_expires_in = self._mint_refresh(grant, session_id)
@@ -264,9 +275,10 @@ class Auth:
         """
         Rotate a session: one refresh token in, a fresh pair out.
 
-        The old token dies on use, which is what makes a replay detectable —
-        see rotate_refresh_token, which cuts every session on the grant when it
-        sees one. Like claim, this costs no quota.
+        The old token dies on use, which is what makes a replay detectable — see
+        rotate_refresh_token, which cuts every session on the grant when it sees
+        one outside the grace window, and answers 409 inside it. Like claim, this
+        costs no quota.
         """
         payload = self.decode(raw_refresh)
         if self.version_of(payload) != 2 or payload.get("typ") != "refresh":
@@ -290,13 +302,28 @@ class Auth:
 
         successor_id = uuid.uuid4()
         refresh_token, refresh_expires_at, refresh_expires_in = self._mint_refresh(grant, successor_id)
-        successor = await rotate_refresh_token(
-            refresh_id=session_id,
-            raw_new_token=refresh_token,
-            new_expires_at=refresh_expires_at,
-            db=db,
-            new_refresh_id=successor_id,
-        )
+        # Snapshot who this grant belongs to before rotating. The replay branch
+        # rolls back, which expires every object loaded in this session, and
+        # reading grant.subject afterwards would attempt lazy IO outside the
+        # async context and raise MissingGreenlet instead of notifying anyone.
+        owner = (grant.id, grant.subject, grant.company)
+        try:
+            successor = await rotate_refresh_token(
+                refresh_id=session_id,
+                raw_new_token=refresh_token,
+                new_expires_at=refresh_expires_at,
+                db=db,
+                new_refresh_id=successor_id,
+            )
+        except ReplayDetected:
+            # The sessions are already cut by the time this lands. All that is
+            # left is telling the operator, because a single-use claim leaves the
+            # hirer no way back in on their own.
+            await self._notify_owner(
+                *owner, db, event="sessions_cut", reason="refresh token replayed after rotation"
+            )
+            raise HTTPException(401, "Refresh token already used")
+
         access_token, expires_in = self._mint_access(grant, successor.id)
 
         return TokenPair(
@@ -305,6 +332,33 @@ class Auth:
             expires_in=expires_in,
             refresh_expires_in=refresh_expires_in,
         )
+
+    async def _notify_owner(
+            self,
+            token_id: uuid.UUID,
+            subject: str,
+            company: str | None,
+            db: AsyncSession,
+            event: str,
+            reason: str,
+    ) -> None:
+        """
+        Tell the operator a hirer is locked out, at most once per grant per window.
+
+        Takes plain values rather than the grant row because one caller reaches
+        here after a rollback, where that row's attributes are no longer safe to
+        touch. Never raises: nothing about notifying anyone may change what the
+        caller returns, and the hirer's answer is already decided by this point.
+        """
+        try:
+            if not await should_notify_owner(token_id, db):
+                return
+            if event == "claim_reuse":
+                await notifier.claim_link_reused(token_id, subject, company)
+            else:
+                await notifier.sessions_cut(token_id, subject, company, reason)
+        except Exception:
+            logger.exception("Failed to notify owner", extra={"token_id": token_id, "event": event})
 
     # --- request-time verification -------------------------------------------
 
