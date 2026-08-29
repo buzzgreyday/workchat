@@ -32,6 +32,43 @@ const GENERIC_FAILURE_MESSAGE =
   "Something went wrong answering that — it's not you. Try again in a moment.";
 
 /**
+ * Did the *backend* refuse this for want of quota?
+ *
+ * Two things answer 429 and they mean opposite things to the person reading the
+ * screen. Only the backend sends a detail with its refusal, so the presence of
+ * that exact string is what distinguishes "you have none left", which is final,
+ * from the rate limiter's "too fast", which clears by itself. Keying on the
+ * status alone told a rate-limited hirer their questions were gone and shut the
+ * composer on them.
+ */
+// Returns a plain boolean rather than a type predicate on purpose: narrowing to
+// `error is ChatError` would make the *false* branch `never` at call sites that
+// have already established the error is a ChatError, which is exactly where the
+// rate-limit case needs to read retryAfter.
+function isQuotaExhausted(
+  error: unknown,
+): boolean {
+  return (
+    error instanceof ChatError &&
+    error.status === 429 &&
+    error.detail === "Query limit reached"
+  );
+}
+
+function rateLimitedMessage(
+  retryAfter: number | null,
+): string {
+  const wait = retryAfter
+    ? `about ${retryAfter} second${retryAfter === 1 ? "" : "s"}`
+    : "a moment";
+
+  return (
+    `That came through a bit quickly, so it didn't go anywhere. ` +
+    `Give it ${wait} and ask again — your questions are all still there.`
+  );
+}
+
+/**
  * What to tell the hirer when a question fails.
  *
  * Worth the specificity: "you have used all your questions" and "something went
@@ -44,7 +81,9 @@ function failureMessage(error: unknown): string {
   }
 
   if (error.status === 429) {
-    return OUT_OF_QUESTIONS_MESSAGE;
+    return isQuotaExhausted(error)
+      ? OUT_OF_QUESTIONS_MESSAGE
+      : rateLimitedMessage(error.retryAfter);
   }
 
   if (error.status === 401) {
@@ -261,12 +300,11 @@ export function useChat({
 
       console.error(error);
 
-      // A 429 means the allowance is gone; reflect that in the header too, so
-      // the count and the message agree and the composer shuts.
-      if (
-        error instanceof ChatError &&
-        error.status === 429
-      ) {
+      // Only a *quota* 429 means the allowance is gone. Reflect that in the
+      // header so the count and the message agree and the composer shuts — but
+      // never for a rate-limit 429, which would strand someone at zero
+      // questions they still have.
+      if (isQuotaExhausted(error)) {
         setUsage((prev) =>
           prev
             ? { ...prev, remaining: 0, used: prev.max }

@@ -27,7 +27,7 @@
 				path /api/chat*
 			}
 			key {remote_host}
-			events 20
+			events 30
 			window 1m
 		}
 		zone admin_zone {
@@ -35,31 +35,32 @@
 				path /api/admin*
 			}
 			key {remote_host}
-			events 5
+			events 20
 			window 1m
 		}
 		# Claiming and refreshing each write rows, and a claim link is a
-		# credential worth guessing at. Generous enough for a real client
-		# rotating a session, tight enough that nobody grinds these.
+		# credential worth guessing at. Sized for a shared egress IP rather
+		# than one person: a company's hiring managers reach this from behind
+		# one NAT address, so several claims in the same minute is normal use.
 		zone auth_zone {
 			match {
 				path /api/v2/auth*
 			}
 			key {remote_host}
-			events 10
+			events 30
 			window 1m
 		}
 		# The loosest of the four, because it is the cheapest — one indexed
-		# read, no write, no OpenAI call — and the most likely to be hit
-		# legitimately more than once, since every page load and reload asks
-		# it how many questions are left. Present so the endpoint is not the
-		# one unmetered way to probe whether a token is still good.
+		# read, no write, no OpenAI call — and the most often hit legitimately:
+		# every page load, every reload, and every token rotation asks it how
+		# many questions are left. Present so the endpoint is not the one
+		# unmetered way to probe whether a token is still good.
 		zone session_zone {
 			match {
 				path /api/session
 			}
 			key {remote_host}
-			events 30
+			events 60
 			window 1m
 		}
 	}

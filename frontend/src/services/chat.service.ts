@@ -17,15 +17,30 @@ import { AuthFetch } from "@/hooks/useSession";
 export class ChatError extends Error {
   readonly status: number;
   readonly detail: string;
+  // Seconds to wait, when the response said. Only the rate limiter sets it.
+  readonly retryAfter: number | null;
 
-  constructor(status: number, detail: string) {
+  constructor(
+    status: number,
+    detail: string,
+    retryAfter: number | null = null,
+  ) {
     super(detail || `Server returned ${status}`);
     this.name = "ChatError";
     this.status = status;
     this.detail = detail;
+    this.retryAfter = retryAfter;
   }
 }
 
+/**
+ * The status alone is not enough to know what happened.
+ *
+ * Two very different things answer 429: the backend refusing a question because
+ * the grant's allowance is spent, and Caddy refusing it because requests arrived
+ * too fast. The first is a dead end and the second clears on its own, so the
+ * detail — which only the backend sets — is what tells them apart.
+ */
 async function toError(
   response: Response,
 ): Promise<ChatError> {
@@ -38,7 +53,20 @@ async function toError(
     // status to speak for itself.
   }
 
-  return new ChatError(response.status, detail);
+  const header = response.headers.get(
+    "Retry-After",
+  );
+  const seconds = header
+    ? Number.parseInt(header, 10)
+    : NaN;
+
+  return new ChatError(
+    response.status,
+    detail,
+    Number.isFinite(seconds) && seconds > 0
+      ? seconds
+      : null,
+  );
 }
 
 const API_URL =

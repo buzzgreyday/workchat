@@ -187,25 +187,49 @@ curl -s -X POST https://chat.example.com/api/admin/conversations/<id>/redact \
 and `since`.
 
 These return hiring managers' questions verbatim, protected by one static header
-secret. Caddy rate-limits `/api/admin*` to 5 requests per minute per IP, but if
+secret. Caddy rate-limits `/api/admin*` to 20 requests per minute per IP, but if
 you want defence in depth, restricting `/api/admin*` to a known source address at
 the Caddy layer is the obvious next step — deliberately not configured here,
 since a wrong address locks you out of minting tokens.
 
-Every route that costs something is metered per client IP, in rough proportion to
-what a request is worth to an attacker:
+Every route that costs something is metered per client IP:
 
 | Zone | Path | Limit | Why |
 | --- | --- | --- | --- |
-| `admin_zone` | `/api/admin*` | 5/min | Mints and revokes credentials |
-| `auth_zone` | `/api/v2/auth*` | 10/min | Writes rows; a claim link is worth guessing at |
-| `chat_zone` | `/api/chat*` | 20/min | Every call bills OpenAI |
-| `session_zone` | `/api/session` | 30/min | One indexed read, no write, no model call |
+| `admin_zone` | `/api/admin*` | 20/min | Mints and revokes credentials |
+| `auth_zone` | `/api/v2/auth*` | 30/min | Writes rows; a claim link is worth guessing at |
+| `chat_zone` | `/api/chat*` | 30/min | Every call bills OpenAI |
+| `session_zone` | `/api/session` | 60/min | One indexed read, no write, no model call |
 
-`session_zone` is the loosest because it is the cheapest and the most likely to be
-hit legitimately more than once — every page load and reload asks it how many
-questions are left. It is metered anyway so that it is not the one unmetered way
-to probe whether a token is still good.
+**These are deliberately loose, and none of them is the access control.** That is
+the signed token, the per-grant query quota and the single-use claim — and unlike
+an IP counter, none of those can be confused by two people sharing an address. The
+limiter only exists to cap cost and noise, so the numbers are set where they will
+not fire on a real visitor: an attacker without a valid token gets a 401 before any
+of this costs anything, while turning away a hiring manager is a real loss.
+
+Sizing assumes a **shared egress IP**, which is the normal case here — a company's
+hiring managers reach the site from behind one NAT address, so several people
+claiming links in the same minute is ordinary use, not abuse. `session_zone` gets
+the most headroom because it is the cheapest call and the most frequent: every page
+load, every reload and every token rotation asks it how many questions are left.
+
+**The keying breaks silently behind a proxy.** `key {remote_host}` is the true
+client address only because Caddy terminates TLS directly. Put Cloudflare, a load
+balancer or another reverse proxy in front and `remote_host` becomes *that* host,
+collapsing every visitor into a single counter — the first busy visitor then
+rate-limits everyone else. Nothing errors; it just starts refusing people. If you
+ever front this, set `trusted_proxies` and key on the forwarded client address
+instead:
+
+```
+key {http.request.header.CF-Connecting-IP}   # or X-Forwarded-For, per your proxy
+```
+
+Clients are told apart from the backend's own 429 by the response body: the backend
+sends `{"detail": "Query limit reached"}` when a grant is spent, the limiter sends
+none. The frontend keys off that, so a rate-limited visitor is asked to wait rather
+than told their questions are gone.
 
 **Content is scrubbed after 30 days.** Add the purge to the same crontab as the
 backup:

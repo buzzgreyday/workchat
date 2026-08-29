@@ -20,6 +20,25 @@ stay unversioned and accept either kind; only the auth endpoints are under /v2.
 Per-grant usage is enforced by an atomic UPDATE in the tokens table
 (see services/db.update_token_used_query_count), not in-memory, so it
 survives restarts and works across replicas.
+
+Why this is a dependency and not middleware, since it comes up: middleware would
+be the usual way to make an auth check impossible to forget, and it is the wrong
+tool here for three reasons.
+
+  - It has no dependency injection. verify_and_consume takes a session from
+    get_db, and tests/conftest.py swaps that out through app.dependency_overrides
+    — a mechanism that only exists for dependencies. Auth in middleware means the
+    suite can no longer point the app at its in-memory database.
+  - verify_and_consume *spends a query*, which is a business action rather than an
+    authentication one. Middleware runs on whatever matches a path, so depending
+    on where it sat in the stack a CORS preflight could cost a hirer a question.
+  - The three protected surfaces want different checks — /chat verifies and
+    consumes, /session verifies only, /admin authenticates a key — so one
+    middleware would need a path-to-policy table, which is a second router.
+
+The fail-closed property middleware would buy is worth having by other means if
+this grows: FastAPI takes dependencies at router level, and a test that walks
+app.routes asserting each is either public or guarded catches more than either.
 """
 
 import hmac
