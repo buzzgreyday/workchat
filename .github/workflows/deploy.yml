@@ -93,7 +93,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           # Not a secret — a path. Matches the default scripts/ already assumes.
-          REPO_DIR: ${{ vars.DEPLOY_REPO_DIR || '/root/ai-cv' }}
+          REPO_DIR: ${{ vars.DEPLOY_REPO_DIR || '/opt/ai-cv' }}
           # The commit this deploy is *for*, so the server can be asked to prove
           # it actually has it rather than merely being up.
           EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}

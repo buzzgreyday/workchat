@@ -17,14 +17,14 @@
 # Options:
 #   --host        server hostname or IP                        (required)
 #   --user        SSH user that can run docker compose there    (required)
-#   --repo-dir    checkout on the server        (default: /root/ai-cv)
+#   --repo-dir    checkout on the server        (default: /opt/ai-cv)
 #   --health-url  URL polled after deploying (default: https://<host>/api/health)
 #   --key         key path            (default: ~/.ssh/workchat_deploy)
 #   --dry-run     show what would happen, change nothing
 
 set -euo pipefail
 
-HOST="" USER_="" REPO_DIR="/root/ai-cv" HEALTH_URL="" DRY_RUN=0
+HOST="" USER_="" REPO_DIR="/opt/ai-cv" HEALTH_URL="" DRY_RUN=0
 KEY="$HOME/.ssh/workchat_deploy"
 
 while [ $# -gt 0 ]; do

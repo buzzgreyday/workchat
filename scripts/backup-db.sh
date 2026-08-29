@@ -12,13 +12,13 @@
 #   scripts/backup-db.sh
 #
 # Overrides:
-#   REPO_DIR      checkout on the host (default: /root/ai-cv)
+#   REPO_DIR      checkout on the host (default: /opt/ai-cv)
 #   COMPOSE_FILE  compose file to use (default: docker-compose.prod.yaml)
 #   BACKUP_DEST   where dumps are written (default: /root/backups/workchat/db)
 
 set -euo pipefail
 
-REPO_DIR="${REPO_DIR:-/root/ai-cv}"
+REPO_DIR="${REPO_DIR:-/opt/ai-cv}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yaml}"
 DEST="${BACKUP_DEST:-/root/backups/workchat/db}"
 

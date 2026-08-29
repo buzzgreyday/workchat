@@ -13,13 +13,13 @@
 #   scripts/purge-chat-content.sh [--dry-run]
 #
 # Overrides:
-#   REPO_DIR              checkout on the host (default: /root/ai-cv)
+#   REPO_DIR              checkout on the host (default: /opt/ai-cv)
 #   COMPOSE_FILE          compose file (default: docker-compose.prod.yaml)
 #   CHAT_RETENTION_DAYS   days of content to keep (default: 30)
 
 set -euo pipefail
 
-REPO_DIR="${REPO_DIR:-/root/ai-cv}"
+REPO_DIR="${REPO_DIR:-/opt/ai-cv}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yaml}"
 DAYS="${CHAT_RETENTION_DAYS:-30}"
 DRY_RUN=0

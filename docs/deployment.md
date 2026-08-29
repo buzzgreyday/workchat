@@ -235,7 +235,7 @@ than told their questions are gone.
 backup:
 
 ```
-30 3 * * * /usr/bin/flock -n /tmp/workchat-purge.lock /root/ai-cv/scripts/purge-chat-content.sh >> /var/log/workchat/purge.log 2>&1
+30 3 * * * /usr/bin/flock -n /tmp/workchat-purge.lock /opt/ai-cv/scripts/purge-chat-content.sh >> /var/log/workchat/purge.log 2>&1
 ```
 
 Override the window with `CHAT_RETENTION_DAYS` in `backend/.env`. See
@@ -245,7 +245,7 @@ Override the window with `CHAT_RETENTION_DAYS` in `backend/.env`. See
 links — `refresh_tokens` stays empty otherwise — but harmless to add either way:
 
 ```
-45 3 * * * /usr/bin/flock -n /tmp/workchat-sessions.lock /root/ai-cv/scripts/purge-expired-sessions.sh >> /var/log/workchat/purge.log 2>&1
+45 3 * * * /usr/bin/flock -n /tmp/workchat-sessions.lock /opt/ai-cv/scripts/purge-expired-sessions.sh >> /var/log/workchat/purge.log 2>&1
 ```
 
 Override the tail it keeps with `SESSION_GRACE_DAYS`. Both scripts take
@@ -277,7 +277,7 @@ green while this is unconfigured.
 | secret | what it is |
 | --- | --- |
 | `DEPLOY_HOST` | Hostname or IP of the server |
-| `DEPLOY_USER` | SSH user with permission to run `docker compose` there |
+| `DEPLOY_USER` | SSH user with permission to run `docker compose` there. Use a dedicated non-root account — see below |
 | `DEPLOY_SSH_KEY` | Private half of a keypair whose public half is in that user's `authorized_keys` |
 | `DEPLOY_KNOWN_HOSTS` | Output of `ssh-keyscan <host>`, pinning the host key |
 
@@ -285,8 +285,36 @@ And as **variables** (not secrets — neither is sensitive):
 
 | variable | default | what it is |
 | --- | --- | --- |
-| `DEPLOY_REPO_DIR` | `/root/ai-cv` | Checkout on the server |
+| `DEPLOY_REPO_DIR` | `/opt/ai-cv` | Checkout on the server |
 | `DEPLOY_HEALTH_URL` | *(unset)* | URL polled after deploying; unset means deploy without verifying |
+
+### The deploy account
+
+Deploy as a dedicated non-root user. The key sits in GitHub Actions secrets, so
+its blast radius is whatever that account can do; as root that is everything on
+the box, and there is no reason for CI to need that much.
+
+```bash
+useradd --create-home --shell /bin/bash deploy
+usermod -aG docker deploy          # docker group == able to run the stack
+usermod -p '*' deploy              # no password can authenticate
+```
+
+Use `usermod -p '*'`, **not** `passwd -l`. Both look like "lock the account", but
+`passwd -l` writes `!` to the shadow field and sshd then refuses the account
+outright — key and all — logging `User deploy not allowed because account is
+locked`. `*` means no password can ever authenticate while leaving key auth
+working, which is what a deploy account wants.
+
+The checkout has to live somewhere that user can own, so it is `/opt/ai-cv`
+rather than under `/root`. Moving it is safe because `docker-compose.prod.yaml`
+pins `name: ai-cv` — the compose project name, the container names and the
+`ai-cv_postgres_data` volume all come from that, not from the directory. Without
+that pin, moving the directory would rename the project and silently start
+against an empty database.
+
+Two things follow the move: `chown -R deploy:deploy` on the checkout, and root's
+crontab, whose backup and purge entries carry absolute paths.
 
 `scripts/setup-deploy-secrets.sh` does all six in one go — mints the key,
 installs it, pins the host key, proves the key can actually run `docker compose`
@@ -419,7 +447,7 @@ To restore onto a rebuilt host:
 
 ```bash
 scp ~/backups/workchat/latest/{system-prompt.md,contact.md} \
-  aicv-prod:/root/ai-cv/backend/resources/
+  aicv-prod:/opt/ai-cv/backend/resources/
 sudo chown -R 1000:1000 backend/resources   # on the host, per step 6
 ```
 

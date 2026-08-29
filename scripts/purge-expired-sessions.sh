@@ -20,13 +20,13 @@
 #   scripts/purge-expired-sessions.sh [--dry-run]
 #
 # Overrides:
-#   REPO_DIR              checkout on the host (default: /root/ai-cv)
+#   REPO_DIR              checkout on the host (default: /opt/ai-cv)
 #   COMPOSE_FILE          compose file (default: docker-compose.prod.yaml)
 #   SESSION_GRACE_DAYS    days past expiry to keep (default: 7)
 
 set -euo pipefail
 
-REPO_DIR="${REPO_DIR:-/root/ai-cv}"
+REPO_DIR="${REPO_DIR:-/opt/ai-cv}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yaml}"
 # A short tail past expiry, so a row is still there to explain a 401 to whoever
 # is reading the logs the morning after.
