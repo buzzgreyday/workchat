@@ -11,6 +11,12 @@ def require_env(name: str) -> str:
     return value
 
 
+def env_list(name: str) -> list[str]:
+    """Comma-separated env var to a list, dropping blanks. Absent or empty gives
+    an empty list, so a caller can tell "unset" from "set to something"."""
+    return [v.strip() for v in (os.environ.get(name) or "").split(",") if v.strip()]
+
+
 def env_bool(name: str, default: bool = False) -> bool:
     raw = os.environ.get(name)
     if raw is None or raw == "":
@@ -100,7 +106,28 @@ REFRESH_COOKIE_SECURE = not DEV_MODE
 # Browsers refuse a credentialed request whose Access-Control-Allow-Origin is
 # "*", so the dev wildcard has to become a concrete list once cookies are in play.
 DEV_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
-CORS_ORIGINS = DEV_ALLOWED_ORIGINS if DEV_MODE else ALLOWED_HOSTS
+
+
+def _dev_cors_origins() -> list[str]:
+    """
+    The dev origins, plus anything in ALLOWED_HOSTS that is actually an origin.
+
+    A union rather than an override, because ALLOWED_HOSTS in a dev .env is not
+    necessarily a CORS origin at all — a domain pattern like `*.example.com` is a
+    perfectly reasonable thing to have in there, and letting it *replace* the
+    defaults would leave localhost unable to talk to the API at all. Entries
+    without a scheme are skipped for the same reason: Starlette matches
+    allow_origins by exact string, so a pattern would never match an Origin
+    header and only crowds the list.
+    """
+    extra = [
+        origin for origin in env_list("ALLOWED_HOSTS")
+        if "://" in origin and origin not in DEV_ALLOWED_ORIGINS
+    ]
+    return DEV_ALLOWED_ORIGINS + extra
+
+
+CORS_ORIGINS = _dev_cors_origins() if DEV_MODE else ALLOWED_HOSTS
 
 ## LLM
 # Measured, not assumed: on 26 eval questions x 3 runs, nano scored 22-24 and
