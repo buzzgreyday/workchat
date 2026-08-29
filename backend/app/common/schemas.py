@@ -93,10 +93,13 @@ class DatabaseRefreshToken(Base):
         DateTime(timezone=True), nullable=True
     )
     # SET NULL, not RESTRICT: this is an audit link between rows of one table,
-    # not an ownership edge worth blocking a delete over. Postgres checks RESTRICT
-    # immediately rather than at statement end, so a bulk
-    # `DELETE ... WHERE expires_at < now()` spanning a rotation chain could fail
-    # on ordering alone — which would make expired sessions impossible to prune.
+    # not an ownership edge worth blocking a delete over. Under RESTRICT, any row
+    # still pointed at by a surviving row cannot be removed — deleting one
+    # successor while its predecessor remains raises, which is exactly the shape
+    # of an operator clearing a single bad session. A whole chain taken out in one
+    # statement is fine either way (checked against Postgres 16: the RI trigger
+    # runs at end of statement, by which point the referencing rows have gone
+    # too), so this is about partial and single-row deletes, not bulk pruning.
     rotated_to: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("refresh_tokens.id", ondelete="SET NULL"), nullable=True
     )

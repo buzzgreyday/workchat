@@ -30,10 +30,9 @@ def upgrade() -> None:
     sa.Column('last_used_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['token_id'], ['tokens.id'], ondelete='RESTRICT'),
-    # SET NULL rather than RESTRICT on the self-referencing audit link. Postgres
-    # checks RESTRICT immediately instead of at statement end, so a bulk
-    # `DELETE ... WHERE expires_at < now()` spanning a rotation chain could fail
-    # purely on the order rows came out — leaving expired sessions unprunable.
+    # SET NULL rather than RESTRICT on the self-referencing audit link, so that
+    # removing one session does not depend on what else happens to be pointing at
+    # it. RESTRICT refuses to delete a row a surviving row still references.
     sa.ForeignKeyConstraint(['rotated_to'], ['refresh_tokens.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )

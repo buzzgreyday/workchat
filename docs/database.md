@@ -51,13 +51,34 @@ preserves the size signal after the text is gone.
 
 To erase one conversation immediately, use `POST /admin/conversations/{id}/redact`.
 
+Expired refresh sessions are deleted outright by
+`scripts/purge-expired-sessions.sh`, on the same nightly schedule. Deletion rather
+than redaction, because there is no operational record worth keeping in a session
+that can no longer authenticate anything — the conversations it produced are
+their own rows and are untouched — and the table grows without bound otherwise:
+every rotation inserts a row, so one hirer refreshing on a 15-minute access token
+adds roughly a hundred rows a week.
+
+Only rows past their own expiry (plus `SESSION_GRACE_DAYS`, default 7) are
+touched. Revoked-but-unexpired rows are kept deliberately: they are what replay
+detection reads to tell a stolen token from an unknown one, and clearing them
+early would turn a detectable replay into a plain "invalid token".
+
 **Deletion order matters.** Every foreign key here is `ondelete="RESTRICT"`, so
 rows cannot be removed piecemeal and `DELETE FROM users` alone will fail. A full
 subject-erasure request has to walk the chain:
 
 ```
-chat_messages  ->  conversations  ->  tokens  ->  users
+refresh_tokens  ->  chat_messages  ->  conversations  ->  tokens  ->  users
 ```
+
+The one exception is `refresh_tokens.rotated_to`, the self-referencing link that
+chains a rotated session to its successor. That one is `SET NULL`: it is an audit
+pointer rather than an ownership edge, and under `RESTRICT` a row could not be
+removed while any surviving row still pointed at it — which is exactly what the
+session purge does when it clears an expired predecessor out from under a live
+successor. Taking a whole chain out in one statement works under either setting;
+this is about partial and single-row deletes.
 
 **Backups lag the purge.** `scripts/backup-db.sh` keeps 7 daily, 4 weekly and 6
 monthly dumps, so redacted content survives in backups for up to ~6 months after

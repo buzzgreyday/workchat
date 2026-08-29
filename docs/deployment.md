@@ -202,6 +202,21 @@ backup:
 Override the window with `CHAT_RETENTION_DAYS` in `backend/.env`. See
 `docs/database.md` for the erasure order and the backup caveat.
 
+**Expired sessions are pruned too.** Only relevant once you issue `version=2`
+links — `refresh_tokens` stays empty otherwise — but harmless to add either way:
+
+```
+45 3 * * * /usr/bin/flock -n /tmp/workchat-sessions.lock /root/ai-cv/scripts/purge-expired-sessions.sh >> /var/log/workchat/purge.log 2>&1
+```
+
+Override the tail it keeps with `SESSION_GRACE_DAYS`. Both scripts take
+`--dry-run`, which counts instead of writing.
+
+**Revoking access.** `POST /api/admin/tokens/{token_id}/revoke` with your admin
+key kills a grant and every session under it, v1 links included. Revoking the
+grant is the part that matters for a v2 link: cutting sessions alone would leave
+anyone still holding the claim URL able to open a fresh one.
+
 ## Logs
 
 ```bash

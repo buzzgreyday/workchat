@@ -4,7 +4,6 @@ import uuid
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import HTTPException
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -21,23 +20,19 @@ from app.common.config import (
     REFRESH_ROTATION_GRACE_SECONDS,
     TOKEN_HASHING_SECRET,
 )
+from app.common.exceptions import (
+    InvalidRefreshToken,
+    InvalidToken,
+    QuotaExhausted,
+    RefreshTokenExpired,
+    RefreshTokenReplayed,
+    RotationInProgress,
+    SessionRevoked,
+    TokenExpired,
+    TokenRevoked,
+)
 
 logger = logging.logger
-
-
-class ReplayDetected(Exception):
-    """
-    A refresh token was presented well after it was rotated away.
-
-    Raised rather than turned into a 401 here so the caller — which has already
-    loaded the grant, and so knows who it belongs to — can tell the operator that
-    this hirer is now locked out. With a single-use claim there is no self-serve
-    way back, so somebody has to hear about it.
-    """
-
-    def __init__(self, token_id: uuid.UUID):
-        self.token_id = token_id
-        super().__init__(f"refresh token replayed for grant {token_id}")
 
 def hash_token(raw_token: str) -> str:
     return hmac.new(
@@ -214,16 +209,16 @@ async def update_token_used_query_count(
         existing = await db.get(DatabaseToken, token_id)
         if existing is None:
             logger.warning("Invalid token", extra={"token_id": token_id})
-            raise HTTPException(401, "Invalid token")
+            raise InvalidToken()
         if existing.revoked_at is not None:
             logger.warning("Revoked token", extra={"token_id": token_id})
-            raise HTTPException(401, "Token revoked")
+            raise TokenRevoked()
         if expected_version is not None and existing.version != expected_version:
             logger.warning(
                 "Token version does not match its grant",
                 extra={"token_id": token_id, "expected_version": expected_version, "version": existing.version},
             )
-            raise HTTPException(401, "Invalid token")
+            raise InvalidToken()
         # DBs that don't preserve tzinfo (e.g. SQLite in tests) return naive
         # datetimes even though the column is DateTime(timezone=True). Treat
         # naive stored values as UTC before comparing to a tz-aware `now`.
@@ -232,8 +227,8 @@ async def update_token_used_query_count(
             expires_at = expires_at.replace(tzinfo=timezone.utc)
         if expires_at <= now:
             logger.warning("Expired token", extra={"token_id": token_id})
-            raise HTTPException(401, "Token expired")
-        raise HTTPException(429, "Query limit reached")
+            raise TokenExpired()
+        raise QuotaExhausted()
     logger.info(
         "Token updated",
         extra={
@@ -280,13 +275,13 @@ async def get_active_grant(token_id: uuid.UUID, db: AsyncSession) -> DatabaseTok
     grant = await db.get(DatabaseToken, token_id)
     if grant is None:
         logger.warning("Invalid token", extra={"token_id": token_id})
-        raise HTTPException(401, "Invalid token")
+        raise InvalidToken()
     if grant.revoked_at is not None:
         logger.warning("Revoked token", extra={"token_id": token_id})
-        raise HTTPException(401, "Token revoked")
+        raise TokenRevoked()
     if _as_utc(grant.expires_at) <= now:
         logger.warning("Expired token", extra={"token_id": token_id})
-        raise HTTPException(401, "Token expired")
+        raise TokenExpired()
     return grant
 
 
@@ -363,7 +358,7 @@ async def rotate_refresh_token(
     existing = await db.get(DatabaseRefreshToken, refresh_id)
     if existing is None:
         logger.warning("Unknown refresh token", extra={"refresh_id": refresh_id})
-        raise HTTPException(401, "Invalid refresh token")
+        raise InvalidRefreshToken()
 
     successor = await create_refresh_token(
         token_id=existing.token_id,
@@ -390,13 +385,13 @@ async def rotate_refresh_token(
         stale = await db.get(DatabaseRefreshToken, refresh_id)
         if stale is None or stale.revoked_at is None:
             logger.warning("Expired refresh token", extra={"refresh_id": refresh_id})
-            raise HTTPException(401, "Refresh token expired")
+            raise RefreshTokenExpired()
 
         if stale.rotated_to is None:
             # Revoked without a successor: an operator cut this grant, or replay
             # detection did. Not a replay in itself, and re-cutting adds nothing.
             logger.warning("Refresh token belongs to a revoked session", extra={"refresh_id": refresh_id})
-            raise HTTPException(401, "Session revoked")
+            raise SessionRevoked()
 
         rotated_ago = (now - _as_utc(stale.revoked_at)).total_seconds()
         if rotated_ago <= REFRESH_ROTATION_GRACE_SECONDS:
@@ -409,14 +404,14 @@ async def rotate_refresh_token(
                 "Refresh token re-presented inside the rotation grace window",
                 extra={"refresh_id": refresh_id, "rotated_ago_s": round(rotated_ago, 3)},
             )
-            raise HTTPException(409, "Refresh already rotated; retry with the newest token")
+            raise RotationInProgress()
 
         logger.warning(
             "Refresh token replayed after rotation, cutting the grant's sessions",
             extra={"refresh_id": refresh_id, "token_id": stale.token_id, "rotated_ago_s": round(rotated_ago, 3)},
         )
         await revoke_refresh_sessions(stale.token_id, db)
-        raise ReplayDetected(stale.token_id)
+        raise RefreshTokenReplayed(stale.token_id)
 
     await db.commit()
     await db.refresh(successor)

@@ -6,10 +6,12 @@ returns the model's final answer.
 """
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.common.config import CORS_ORIGINS, DEV_MODE
+from app.common.exceptions import AppError
 from app.common.logging.logging import logger
 from app.common.middleware import RequestContextMiddleware
 from app.openai.client import get_openai_client
@@ -50,6 +52,18 @@ app.add_middleware(
 # Added last, for future observability, so it wraps outermost and every log line of the request — CORS
 # included — carries the correlation id.
 app.add_middleware(RequestContextMiddleware)
+
+@app.exception_handler(AppError)
+async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+    """
+    The one place a domain exception becomes a status code.
+
+    Renders the same `{"detail": ...}` body FastAPI produces for an
+    HTTPException, so nothing downstream — a client, a test, the frontend's
+    error handling — can tell which of the two a given 401 came from.
+    """
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
 
 app.include_router(health_router)
 app.include_router(auth_router)

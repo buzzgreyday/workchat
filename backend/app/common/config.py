@@ -49,7 +49,14 @@ POSTGRES_DB = require_env("POSTGRES_DB")
 
 ## URLs
 BASE_URL = "http://localhost:8000" if DEV_MODE else require_env("BASE_URL")
-DATABASE_URL = f"postgresql+psycopg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@db:5432/{POSTGRES_DB}"
+# The host is `db`, the compose service name, which only resolves inside the
+# compose network. The override is for everything outside it — running alembic
+# from the host, pointing a migration rehearsal at a scratch database — and is
+# never set in production, where the assembled default is what you want.
+DATABASE_URL = (
+    os.environ.get("DATABASE_URL")
+    or f"postgresql+psycopg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@db:5432/{POSTGRES_DB}"
+)
 ALLOWED_HOSTS = ["*"] if DEV_MODE else [h.strip() for h in require_env("ALLOWED_HOSTS").split(",") if h.strip()]
 
 ## Secrets and hashing

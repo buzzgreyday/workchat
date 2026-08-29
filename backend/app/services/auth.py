@@ -28,7 +28,7 @@ import uuid
 from datetime import datetime, timezone
 
 import jwt
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,11 +40,24 @@ from app.common.config import (
     SECRET_KEY,
 )
 from app.common.db import get_db
+from app.common.exceptions import (
+    AdminForbidden,
+    ClaimAlreadyUsed,
+    InvalidRefreshToken,
+    InvalidToken,
+    MissingCredentials,
+    NotAClaimToken,
+    NotAnAccessToken,
+    NotARefreshToken,
+    RefreshTokenReplayed,
+    SessionRevoked,
+    TokenExpired,
+    UnsupportedTokenVersion,
+)
 from app.common.logging.logging import logger
 from app.common.models import JWT, TokenContext, TokenPair
 from app.common.schemas import DatabaseToken
 from app.services.db import (
-    ReplayDetected,
     claim_grant_once,
     create_refresh_token,
     get_active_grant,
@@ -97,9 +110,9 @@ class Auth:
         try:
             return jwt.decode(raw_token, self.secret_key, algorithms=[self.algorithm])
         except jwt.ExpiredSignatureError:
-            raise HTTPException(401, "Token expired")
+            raise TokenExpired()
         except jwt.InvalidTokenError:
-            raise HTTPException(401, "Invalid token")
+            raise InvalidToken()
 
     @staticmethod
     def version_of(payload: dict) -> int:
@@ -118,7 +131,7 @@ class Auth:
             return uuid.UUID(value)
         except (AttributeError, TypeError, ValueError):
             logger.warning("Token carries an unusable id", extra={"field": field})
-            raise HTTPException(401, "Invalid token")
+            raise InvalidToken()
 
     @staticmethod
     def _matches(raw_token: str, stored_hash: str) -> bool:
@@ -233,21 +246,21 @@ class Auth:
         payload = self.decode(raw_claim)
         if self.version_of(payload) != 2 or payload.get("typ") != "claim":
             logger.warning("Non-claim token presented at claim", extra={"typ": payload.get("typ")})
-            raise HTTPException(401, "Not a claim token")
+            raise NotAClaimToken()
 
         grant_id = self._uuid(payload.get("tid"), "tid")
         grant = await get_active_grant(grant_id, db)
 
         if grant.version != 2 or not self._matches(raw_claim, grant.token_hash):
             logger.warning("Claim token does not match its grant", extra={"token_id": grant_id})
-            raise HTTPException(401, "Invalid token")
+            raise InvalidToken()
 
         if not await claim_grant_once(grant_id, db):
             await self._notify_owner(
                 grant.id, grant.subject, grant.company, db,
                 event="claim_reuse", reason="claim link presented after it was spent",
             )
-            raise HTTPException(409, "This link has already been used. Ask for a new one.")
+            raise ClaimAlreadyUsed()
 
         session_id = uuid.uuid4()
         refresh_token, refresh_expires_at, refresh_expires_in = self._mint_refresh(grant, session_id)
@@ -283,7 +296,7 @@ class Auth:
         payload = self.decode(raw_refresh)
         if self.version_of(payload) != 2 or payload.get("typ") != "refresh":
             logger.warning("Non-refresh token presented at refresh", extra={"typ": payload.get("typ")})
-            raise HTTPException(401, "Not a refresh token")
+            raise NotARefreshToken()
 
         session_id = self._uuid(payload.get("jti"), "jti")
         grant_id = self._uuid(payload.get("tid"), "tid")
@@ -295,10 +308,10 @@ class Auth:
         # mint access to another hirer's quota.
         if session is None or session.token_id != grant_id:
             logger.warning("Unknown refresh session", extra={"session_id": session_id, "token_id": grant_id})
-            raise HTTPException(401, "Invalid refresh token")
+            raise InvalidRefreshToken()
         if not self._matches(raw_refresh, session.token_hash):
             logger.warning("Refresh token does not match its session", extra={"session_id": session_id})
-            raise HTTPException(401, "Invalid refresh token")
+            raise InvalidRefreshToken()
 
         successor_id = uuid.uuid4()
         refresh_token, refresh_expires_at, refresh_expires_in = self._mint_refresh(grant, successor_id)
@@ -315,14 +328,14 @@ class Auth:
                 db=db,
                 new_refresh_id=successor_id,
             )
-        except ReplayDetected:
+        except RefreshTokenReplayed:
             # The sessions are already cut by the time this lands. All that is
             # left is telling the operator, because a single-use claim leaves the
             # hirer no way back in on their own.
             await self._notify_owner(
                 *owner, db, event="sessions_cut", reason="refresh token replayed after rotation"
             )
-            raise HTTPException(401, "Refresh token already used")
+            raise
 
         access_token, expires_in = self._mint_access(grant, successor.id)
 
@@ -372,10 +385,7 @@ class Auth:
         spends one query from the grant either way.
         """
         if credentials is None or credentials.scheme.lower() != "bearer":
-            raise HTTPException(
-                status_code=401,
-                detail="Missing or malformed Authorization header",
-            )
+            raise MissingCredentials()
 
         raw_token = credentials.credentials  # already stripped of "Bearer " prefix
         payload = self.decode(raw_token)
@@ -389,7 +399,7 @@ class Auth:
             # through: only typ="access" may buy a message.
             if payload.get("typ") != "access":
                 logger.warning("Non-access token presented at chat", extra={"typ": payload.get("typ")})
-                raise HTTPException(401, "Not an access token")
+                raise NotAnAccessToken()
             grant_id = self._uuid(payload.get("tid"), "tid")
             session_id = self._uuid(payload.get("sid"), "sid")
             # Checked before the quota is consumed, so a token from a session cut
@@ -399,7 +409,7 @@ class Auth:
             await self._require_live_session(session_id, grant_id, db)
         else:
             logger.warning("Unknown token version", extra={"ver": payload.get("ver")})
-            raise HTTPException(401, "Unsupported token version")
+            raise UnsupportedTokenVersion()
 
         row = await update_token_used_query_count(
             token_id=grant_id, db=db, expected_version=version
@@ -421,7 +431,7 @@ class Auth:
         session = await get_refresh_token(session_id, db)
         if session is None or session.token_id != grant_id:
             logger.warning("Access token names an unknown session", extra={"session_id": session_id})
-            raise HTTPException(401, "Invalid token")
+            raise InvalidToken()
         if session.revoked_at is not None:
             # Revoked is revoked, rotated included: an access token dies with the
             # refresh token it was minted alongside. Sparing rotated rows here
@@ -431,10 +441,10 @@ class Auth:
             # fresh access token by the same call that rotates, so the strict rule
             # costs it nothing but a retry on an in-flight request.
             logger.warning("Access token belongs to a revoked session", extra={"session_id": session_id})
-            raise HTTPException(401, "Session revoked")
+            raise SessionRevoked()
         if self._as_utc(session.expires_at) <= datetime.now(timezone.utc):
             logger.warning("Access token belongs to an expired session", extra={"session_id": session_id})
-            raise HTTPException(401, "Session expired")
+            raise SessionRevoked("Session expired")
 
     # --- admin ---------------------------------------------------------------
 
@@ -443,7 +453,7 @@ class Auth:
         be able to mint tokens — protect this with a secret only you know."""
         # compare_digest avoids leaking key length / prefix through response timing.
         if not hmac.compare_digest(x_admin_key.encode(), self.admin_key.encode()):
-            raise HTTPException(status_code=403, detail="Forbidden")
+            raise AdminForbidden()
 
 
 auth = Auth()

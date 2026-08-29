@@ -12,7 +12,7 @@ header and therefore has to be able to read it; it is short-lived for exactly
 that reason. So an XSS on the page can steal minutes of access, not a week of it.
 """
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.config import (
@@ -21,6 +21,7 @@ from app.common.config import (
     REFRESH_COOKIE_SECURE,
 )
 from app.common.db import get_db
+from app.common.exceptions import MissingRefreshToken
 from app.common.logging.logging import logger
 from app.common.models import ClaimRequest, RefreshRequest, SessionOut, TokenPair
 from app.services.auth import auth
@@ -100,7 +101,7 @@ async def refresh(
     # hatch for callers that have no cookie jar.
     raw = refresh_cookie or (req.refresh_token if req else None)
     if not raw:
-        raise HTTPException(401, "Missing refresh token")
+        raise MissingRefreshToken()
 
     logger.info("Refresh token presented", extra={"via": "cookie" if refresh_cookie else "body"})
     pair = await auth.refresh(raw, db)
