@@ -316,6 +316,29 @@ cat ~/.ssh/workchat_deploy    # -> DEPLOY_SSH_KEY (the private half)
 Either way, give that key the narrowest access you are willing to: it can restart
 production.
 
+### Releases
+
+After a successful deploy, a third job tags and publishes a GitHub Release — but
+only if the version changed. It reads `version` from `backend/pyproject.toml`; if
+`v<version>` is not already released it creates the tag and a release with
+auto-generated notes, and otherwise says so and stops.
+
+The number stays your decision. Nothing infers it from commit messages, so
+cutting a release is the same `chore(release):` commit you already make:
+
+```bash
+# bump the version, commit, merge to main
+sed -i 's/^version = ".*"/version = "0.2.0"/' backend/pyproject.toml
+git commit -am "chore(release): 0.2.0"
+```
+
+The release runs **after** the deploy, and only when the deploy actually ran —
+the deploy job reports whether it deployed or skipped for missing secrets, and
+the release job checks that. So a tag on GitHub always means the same thing: it
+built, it deployed, and it answered a health check. A release that was never
+deployed would be worse than no release, because it reads as a claim about
+production that is not true.
+
 ### Why the deploy job is written the way it is
 
 This repository is public, which makes two things load-bearing rather than
