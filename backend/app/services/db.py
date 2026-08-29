@@ -263,13 +263,22 @@ def _as_utc(value: datetime) -> datetime:
     return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
 
 
-async def get_active_grant(token_id: uuid.UUID, db: AsyncSession) -> DatabaseToken:
+async def get_active_grant(
+        token_id: uuid.UUID,
+        db: AsyncSession,
+        expected_version: int | None = None,
+) -> DatabaseToken:
     """
-    The grant behind a claim or refresh token, if it is still good for minting.
+    The grant behind a claim, refresh or access token, if it is still usable.
 
-    Read-only and quota-free on purpose: exchanging a claim or rotating a refresh
-    token must not cost the hirer one of their questions. Quota is spent in
-    update_token_used_query_count, when a question is actually asked.
+    Read-only and quota-free on purpose: exchanging a claim, rotating a refresh
+    token or asking how many questions are left must not cost the hirer one of
+    them. Quota is spent in update_token_used_query_count, when a question is
+    actually asked.
+
+    Note what is *not* checked here: whether any quota remains. A grant with none
+    left is still a valid grant, and the caller that reports usage needs to be
+    able to say "zero" rather than raise.
     """
     now = datetime.now(timezone.utc)
     grant = await db.get(DatabaseToken, token_id)
@@ -279,6 +288,12 @@ async def get_active_grant(token_id: uuid.UUID, db: AsyncSession) -> DatabaseTok
     if grant.revoked_at is not None:
         logger.warning("Revoked token", extra={"token_id": token_id})
         raise TokenRevoked()
+    if expected_version is not None and grant.version != expected_version:
+        logger.warning(
+            "Token version does not match its grant",
+            extra={"token_id": token_id, "expected_version": expected_version, "version": grant.version},
+        )
+        raise InvalidToken()
     if _as_utc(grant.expires_at) <= now:
         logger.warning("Expired token", extra={"token_id": token_id})
         raise TokenExpired()

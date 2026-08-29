@@ -450,6 +450,26 @@ Properties worth knowing:
 * **An access token dies with its session**, rotation included. The call that
   rotates hands back a fresh one, so a client only ever carries the newest pair.
 
+## Reading the allowance
+
+`GET /session` reports who a token belongs to and what is left of its quota,
+without spending any of it. Unversioned, like the chat routes: a v1 `?token=`
+JWT and a v2 access token are both valid ways to be here and get the same
+answer.
+
+```
+GET /session   Authorization: Bearer <access token>
+-> {"subject": "...", "version": 2, "expires_at": "...",
+    "usage": {"used": 0, "remaining": 5, "max": 5}, "session_id": "..."}
+```
+
+It exists because usage used to arrive only inside a chat response, so the one
+number a hirer wants on arrival — how many questions they get — was the one thing
+they had to spend a question to learn. An exhausted grant returns
+`remaining: 0` with a 200 rather than a 429: that is a state to display, and the
+person with none left is exactly who needs telling. `/chat` still answers 429
+when one is actually attempted.
+
 Revoking is `POST /admin/tokens/{token_id}/revoke` (admin key required). It stamps
 `tokens.revoked_at` *and* cuts every session, which matters because the grant — not
 the session — is what a claim link reaches: cutting sessions alone would leave

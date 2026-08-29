@@ -7,6 +7,40 @@ import {
 import { SSEEvent } from "@/types/sse";
 import { AuthFetch } from "@/hooks/useSession";
 
+/**
+ * A failed chat request, with enough detail to say something true about it.
+ *
+ * The bare `Error("Server returned 429")` this replaces meant the UI could only
+ * ever offer one apology for every failure, so a hirer who had simply used up
+ * their questions was told something might have gone wrong.
+ */
+export class ChatError extends Error {
+  readonly status: number;
+  readonly detail: string;
+
+  constructor(status: number, detail: string) {
+    super(detail || `Server returned ${status}`);
+    this.name = "ChatError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+async function toError(
+  response: Response,
+): Promise<ChatError> {
+  let detail = "";
+
+  try {
+    detail = (await response.json())?.detail ?? "";
+  } catch {
+    // A non-JSON body (a proxy error page, a dropped connection) leaves the
+    // status to speak for itself.
+  }
+
+  return new ChatError(response.status, detail);
+}
+
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   "http://localhost:8000";
@@ -32,9 +66,7 @@ class ChatService {
     );
 
     if (!response.ok) {
-      throw new Error(
-        `Server returned ${response.status}`,
-      );
+      throw await toError(response);
     }
 
     return response.json();
@@ -65,9 +97,7 @@ class ChatService {
     );
 
     if (!response.ok) {
-      throw new Error(
-        `Server returned ${response.status}`,
-      );
+      throw await toError(response);
     }
 
     if (!response.body) {

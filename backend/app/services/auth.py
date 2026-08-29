@@ -375,14 +375,19 @@ class Auth:
 
     # --- request-time verification -------------------------------------------
 
-    async def verify_and_consume(
+    async def _authenticate(
             self,
-            credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-            db: AsyncSession = Depends(get_db),
-    ) -> TokenContext:
+            credentials: HTTPAuthorizationCredentials | None,
+            db: AsyncSession,
+    ) -> tuple[uuid.UUID, int, uuid.UUID | None]:
         """
-        The chat endpoints' dependency. Accepts a v1 or a v2 access token and
-        spends one query from the grant either way.
+        Everything both dependencies do before they diverge: prove the bearer,
+        work out which grant it names, and for v2 prove the session is still
+        live. Returns (grant_id, version, session_id).
+
+        Shared so that reading the quota and spending it cannot drift apart on
+        what counts as a valid token — an endpoint that reported a usable session
+        which the next request then rejected would be worse than no endpoint.
         """
         if credentials is None or credentials.scheme.lower() != "bearer":
             raise MissingCredentials()
@@ -392,9 +397,9 @@ class Auth:
         version = self.version_of(payload)
 
         if version == 1:
-            grant_id = self._uuid(payload.get("jti"), "jti")
-            session_id = None
-        elif version == 2:
+            return self._uuid(payload.get("jti"), "jti"), version, None
+
+        if version == 2:
             # A claim or refresh token is validly signed and would otherwise sail
             # through: only typ="access" may buy a message.
             if payload.get("typ") != "access":
@@ -407,23 +412,54 @@ class Auth:
             # cost is one extra read per v2 request; the alternative is honouring
             # a stolen access token for the rest of its lifetime.
             await self._require_live_session(session_id, grant_id, db)
-        else:
-            logger.warning("Unknown token version", extra={"ver": payload.get("ver")})
-            raise UnsupportedTokenVersion()
+            return grant_id, version, session_id
 
-        row = await update_token_used_query_count(
-            token_id=grant_id, db=db, expected_version=version
-        )
+        logger.warning("Unknown token version", extra={"ver": payload.get("ver")})
+        raise UnsupportedTokenVersion()
 
+    @staticmethod
+    def _context(row, version: int, session_id: uuid.UUID | None) -> TokenContext:
         return TokenContext(
             sub=row.subject,
             jti=str(row.id),
             max_queries=row.max_queries,
             used_queries=row.used_queries,
-            remaining_queries=row.max_queries - row.used_queries,
+            remaining_queries=max(row.max_queries - row.used_queries, 0),
             version=version,
             session_id=str(session_id) if session_id else None,
+            expires_at=Auth._as_utc(row.expires_at),
         )
+
+    async def verify_and_consume(
+            self,
+            credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+            db: AsyncSession = Depends(get_db),
+    ) -> TokenContext:
+        """
+        The chat endpoints' dependency. Accepts a v1 or a v2 access token and
+        spends one query from the grant either way.
+        """
+        grant_id, version, session_id = await self._authenticate(credentials, db)
+        row = await update_token_used_query_count(
+            token_id=grant_id, db=db, expected_version=version
+        )
+        return self._context(row, version, session_id)
+
+    async def verify(
+            self,
+            credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+            db: AsyncSession = Depends(get_db),
+    ) -> TokenContext:
+        """
+        Same checks, no spending. What /session is built on.
+
+        Deliberately does *not* raise when the quota is gone: a hirer with none
+        left still has a valid session and is precisely the person who needs to
+        be told how many they have. Reporting zero is the answer, not a 429.
+        """
+        grant_id, version, session_id = await self._authenticate(credentials, db)
+        row = await get_active_grant(grant_id, db, expected_version=version)
+        return self._context(row, version, session_id)
 
     async def _require_live_session(
             self, session_id: uuid.UUID, grant_id: uuid.UUID, db: AsyncSession

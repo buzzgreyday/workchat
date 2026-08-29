@@ -87,6 +87,7 @@ async def test_chat_stream_persists_on_client_abort(
         sub=token_row.subject, jti=str(token_row.id),
         max_queries=token_row.max_queries, used_queries=1,
         remaining_queries=token_row.max_queries - 1,
+        expires_at=token_row.expires_at,
     )
 
     async def _chunks():

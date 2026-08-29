@@ -113,6 +113,10 @@ class TokenContext(BaseModel):
     # v2 only: the refresh-token row the access token was minted from, i.e. which
     # of the hirer's devices this request came from.
     session_id: str | None = None
+    # When the grant itself lapses — not the access token, which is far shorter
+    # lived and reissued on demand. This is the date after which no amount of
+    # refreshing helps, which is the one a client can usefully display.
+    expires_at: datetime
 
 class JWT(BaseModel):
     """
@@ -167,6 +171,20 @@ class SessionOut(BaseModel):
     token_type: Literal["bearer"] = "bearer"
     expires_in: int
     refresh_expires_in: int
+
+
+class SessionInfo(BaseModel):
+    """
+    What GET /session reports: who the session belongs to and what is left of it.
+
+    Exists so the quota is knowable *before* the first question rather than only
+    as a side effect of asking one. Reading it spends nothing.
+    """
+    subject: str
+    version: int
+    usage: Usage
+    expires_at: datetime
+    session_id: str | None = None
 
 
 class ClaimRequest(BaseModel):

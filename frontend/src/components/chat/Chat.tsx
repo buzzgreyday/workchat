@@ -25,6 +25,7 @@ export default function Chat({
     input,
     loading,
     disabled,
+    disabledReason,
     usage,
     setInput,
     sendMessage,
@@ -40,6 +41,7 @@ export default function Chat({
         value={input}
         loading={loading}
         disabled={disabled}
+        disabledReason={disabledReason}
         onChange={setInput}
         onSend={sendMessage}
       />

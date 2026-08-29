@@ -483,3 +483,91 @@ async def test_claimed_at_is_stamped_once(client, session_maker):
         )).scalar_one()
         assert grant.claimed_at is not None
         assert grant.version == 2
+
+
+# --- GET /session ------------------------------------------------------------
+
+async def test_session_reports_usage_before_any_question_v1(client):
+    """The point of the endpoint: the allowance is knowable on load, not only as
+    a side effect of having already spent one."""
+    body = await issue(client)
+
+    resp = await client.get("/session", headers={"Authorization": f"Bearer {body['token']}"})
+    assert resp.status_code == 200
+    info = resp.json()
+    assert info["subject"] == "test-hire"
+    assert info["version"] == 1
+    assert info["usage"] == {"used": 0, "remaining": 5, "max": 5}
+    assert info["session_id"] is None
+    assert info["expires_at"]
+
+
+async def test_session_reports_usage_for_v2(client):
+    claim = await issue(client, version=2)
+    session = await claim_session(client, claim["token"])
+
+    resp = await client.get(
+        "/session", headers={"Authorization": f"Bearer {session['access_token']}"}
+    )
+    assert resp.status_code == 200
+    info = resp.json()
+    assert info["version"] == 2
+    assert info["usage"] == {"used": 0, "remaining": 5, "max": 5}
+    # Which device this is, so a session can be told apart in the admin log.
+    assert info["session_id"] == decode(session["refresh_token"])["jti"]
+
+
+async def test_session_spends_nothing(client):
+    """Reading the meter must not move it — otherwise polling it would cost the
+    hirer the very questions it is reporting on."""
+    body = await issue(client)
+    headers = {"Authorization": f"Bearer {body['token']}"}
+
+    for _ in range(5):
+        assert (await client.get("/session", headers=headers)).json()["usage"]["used"] == 0
+
+    await chat(client, body["token"])
+    assert (await client.get("/session", headers=headers)).json()["usage"] == {
+        "used": 1, "remaining": 4, "max": 5,
+    }
+
+
+async def test_session_reports_zero_rather_than_refusing(client):
+    """An exhausted grant is a state to display, not an error. A hirer with none
+    left is exactly the person who needs to be told how many they have."""
+    body = await issue(client, max_queries=1)
+    headers = {"Authorization": f"Bearer {body['token']}"}
+
+    assert (await chat(client, body["token"])).status_code == 200
+    # The next question is refused...
+    assert (await chat(client, body["token"])).status_code == 429
+    # ...but the meter still reads.
+    resp = await client.get("/session", headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["usage"] == {"used": 1, "remaining": 0, "max": 1}
+
+
+async def test_session_rejects_what_chat_rejects(client):
+    """The two must agree on what a valid token is: reporting a usable session
+    that the next request then refuses would be worse than no endpoint."""
+    assert (await client.get("/session")).status_code == 401
+
+    claim = await issue(client, version=2)
+    # A claim token is validly signed but is not an access token.
+    resp = await client.get("/session", headers={"Authorization": f"Bearer {claim['token']}"})
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Not an access token"
+
+
+async def test_session_dies_with_a_revoked_grant(client):
+    claim = await issue(client, version=2)
+    session = await claim_session(client, claim["token"])
+    headers = {"Authorization": f"Bearer {session['access_token']}"}
+    assert (await client.get("/session", headers=headers)).status_code == 200
+
+    grant_id = decode(claim["token"])["tid"]
+    await client.post(f"/admin/tokens/{grant_id}/revoke", headers=ADMIN_HEADERS)
+
+    resp = await client.get("/session", headers=headers)
+    assert resp.status_code == 401
+    assert resp.json()["detail"] in {"Token revoked", "Session revoked"}
