@@ -681,8 +681,10 @@ Possible future enhancements include:
 * ~~Handle max queries reached, invalid/expired token, etc. in frontend~~ — done;
   the allowance is shown from `GET /session` on load, and a refused question says
   which kind of refusal it was
-* CI/CD pipeline
-* Automated testing
+* ~~CI/CD pipeline~~ — done: GitHub Actions runs types, tests, migration drift,
+  Caddyfile, secret scanning and image builds on every push, and deploys `main`
+  after a green run. See [`docs/deployment.md`](docs/deployment.md#cicd)
+* ~~Automated testing~~ — done: 100 backend tests, run in CI
 * Background workers
 * Monitoring and metrics
 * Centralized logging

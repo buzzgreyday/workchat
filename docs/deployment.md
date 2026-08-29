@@ -256,6 +256,78 @@ key kills a grant and every session under it, v1 links included. Revoking the
 grant is the part that matters for a v2 link: cutting sessions alone would leave
 anyone still holding the claim URL able to open a fresh one.
 
+## CI/CD
+
+`.github/workflows/ci.yml` runs on every push and pull request: backend types
+(mypy) and tests, frontend types, lint and production build, an
+apply-and-drift-check of the migrations against a real Postgres, a Caddyfile
+adapt using the custom rate-limit build, a secret scan over the full history, and
+both Docker images.
+
+`.github/workflows/deploy.yml` then deploys **main** to production automatically.
+It triggers on CI *completing successfully*, not on push — `workflow_run` is what
+orders the two, where `on: push` would race them.
+
+### Secrets it needs
+
+Set these under **Settings → Secrets and variables → Actions**. Until every one
+of them exists the deploy job logs a warning and skips, so merging to main stays
+green while this is unconfigured.
+
+| secret | what it is |
+| --- | --- |
+| `DEPLOY_HOST` | Hostname or IP of the server |
+| `DEPLOY_USER` | SSH user with permission to run `docker compose` there |
+| `DEPLOY_SSH_KEY` | Private half of a keypair whose public half is in that user's `authorized_keys` |
+| `DEPLOY_KNOWN_HOSTS` | Output of `ssh-keyscan <host>`, pinning the host key |
+
+And as **variables** (not secrets — neither is sensitive):
+
+| variable | default | what it is |
+| --- | --- | --- |
+| `DEPLOY_REPO_DIR` | `/root/ai-cv` | Checkout on the server |
+| `DEPLOY_HEALTH_URL` | *(unset)* | URL polled after deploying; unset means deploy without verifying |
+
+Generate the deploy key **outside the repository** — `.gitignore` covers
+`id_ed25519*` and friends, but the surest way not to publish a private key is not
+to create it next to a public checkout:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/workchat_deploy -C "github-actions deploy"
+ssh-copy-id -i ~/.ssh/workchat_deploy.pub <user>@<host>
+ssh-keyscan <host>            # -> DEPLOY_KNOWN_HOSTS
+cat ~/.ssh/workchat_deploy    # -> DEPLOY_SSH_KEY (the private half)
+```
+
+Give that key the narrowest access you are willing to: it can restart production.
+
+### Why the deploy job is written the way it is
+
+This repository is public, which makes two things load-bearing rather than
+stylistic:
+
+- **Secrets reach the shell through `env:`, never `${{ }}` inside `run:`.**
+  Interpolating a secret into a `run:` block pastes the value into the generated
+  script, where a trace or a crafted argument can surface it; masking only covers
+  what the runner recognises on the way out.
+- **The job checks the run came from this repository and was not a pull request.**
+  `workflow_run` is privileged — it executes in the base repo with secrets no
+  matter who triggered the run it followed. The `branches: [main]` filter alone
+  is not enough, because anyone can fork, push a branch named `main`, and open a
+  PR whose CI run then carries `head_branch: main`.
+
+The CI workflow itself uses no secrets at all, which is what makes it safe to run
+on pull requests from forks. Keep it that way: a check that needs a credential
+belongs in the deploy workflow or behind an environment.
+
+### Turning the auto-deploy into approve-then-deploy
+
+The deploy job declares `environment: production`. Adding a required reviewer to
+that environment in repo settings gates every deploy behind an approval without
+editing the workflow.
+
+---
+
 ## Logs
 
 ```bash

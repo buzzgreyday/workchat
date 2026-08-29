@@ -1,0 +1,127 @@
+name: Deploy
+
+# Fires only when CI has finished on main, so a red build cannot reach the
+# server. `workflow_run` is what enforces that ordering across workflows —
+# `on: push` here would race CI rather than follow it.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+# One deploy at a time, and never cancel one midway: a half-applied
+# `docker compose up` is worse than a queued one.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Production
+    runs-on: ubuntu-latest
+    # This repo is public, and `workflow_run` is a privileged trigger: it runs in
+    # the base repo with access to secrets, regardless of who caused the run that
+    # triggered it. The branch filter above is not sufficient on its own —
+    # anyone can fork, push a branch called `main`, and open a PR, whose CI run
+    # then has head_branch `main`. So the origin of the run is checked here too:
+    # same repository, and not a pull request. Without these two lines a stranger
+    # could fire production deploys at will.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event != 'pull_request' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    # Add required reviewers to this environment in repo settings to turn the
+    # auto-deploy into an approve-then-deploy without touching this file.
+    environment: production
+    steps:
+      # Nothing is checked out: the host pulls its own copy. This job only needs
+      # to reach the box.
+      #
+      # Every secret below travels through `env:` and is read as a shell variable.
+      # Interpolating `${{ secrets.X }}` into a `run:` block would paste the value
+      # into the generated script itself, where a `set -x`, an error trace or a
+      # crafted argument can surface it — masking only covers what the runner
+      # recognises on the way out.
+      - name: Check the deploy configuration is present
+        id: preflight
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          missing=""
+          [ -n "${DEPLOY_HOST:-}" ]        || missing="$missing DEPLOY_HOST"
+          [ -n "${DEPLOY_USER:-}" ]        || missing="$missing DEPLOY_USER"
+          [ -n "${DEPLOY_SSH_KEY:-}" ]     || missing="$missing DEPLOY_SSH_KEY"
+          # Required, not optional. The alternative is trusting whatever answers
+          # at that address on the day, which is a poor trade for one secret.
+          [ -n "${DEPLOY_KNOWN_HOSTS:-}" ] || missing="$missing DEPLOY_KNOWN_HOSTS"
+          if [ -n "$missing" ]; then
+            # Names only — never the values. Skip rather than fail: until the
+            # secrets exist this would otherwise paint every merge to main red
+            # for a deploy nobody has configured yet.
+            echo "::warning::Deploy skipped — missing:$missing"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install the deploy key
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Pull and restart on the host
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          # Not a secret — a path. Matches the default scripts/ already assumes.
+          REPO_DIR: ${{ vars.DEPLOY_REPO_DIR || '/root/ai-cv' }}
+        run: |
+          # The remote script is a quoted heredoc, so nothing in it is expanded
+          # locally; REPO_DIR is handed over explicitly on the command line.
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "REPO_DIR='$REPO_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$REPO_DIR"
+          git fetch --prune origin
+          git checkout main
+          git reset --hard origin/main
+          # Migrations run in the backend entrypoint, so `up -d` is the whole
+          # deploy; --build picks up any Dockerfile or dependency change.
+          docker compose -f docker-compose.prod.yaml up -d --build
+          docker image prune -f
+          REMOTE
+
+      - name: Wait for the site to answer
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          # A public URL, so a repo variable rather than a secret.
+          SITE: ${{ vars.DEPLOY_HEALTH_URL }}
+        run: |
+          if [ -z "${SITE:-}" ]; then
+            echo "::warning::DEPLOY_HEALTH_URL unset — deployed without verifying"
+            exit 0
+          fi
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 5 "$SITE" >/dev/null; then
+              echo "healthy after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::the site did not answer within 30s of deploying"
+          exit 1
