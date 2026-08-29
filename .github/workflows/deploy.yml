@@ -90,24 +90,46 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           # Not a secret — a path. Matches the default scripts/ already assumes.
           REPO_DIR: ${{ vars.DEPLOY_REPO_DIR || '/root/ai-cv' }}
+          # The commit this deploy is *for*, so the server can be asked to prove
+          # it actually has it rather than merely being up.
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           # The remote script is a quoted heredoc, so nothing in it is expanded
-          # locally; REPO_DIR is handed over explicitly on the command line.
+          # locally; the two values it needs are handed over on the command line.
           ssh -i ~/.ssh/id_deploy -o BatchMode=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "REPO_DIR='$REPO_DIR' bash -s" <<'REMOTE'
+            "REPO_DIR='$REPO_DIR' EXPECTED_SHA='$EXPECTED_SHA' bash -s" <<'REMOTE'
           set -euo pipefail
           cd "$REPO_DIR"
           git fetch --prune origin
           git checkout main
           git reset --hard origin/main
-          # Migrations run in the backend entrypoint, so `up -d` is the whole
-          # deploy; --build picks up any Dockerfile or dependency change.
-          docker compose -f docker-compose.prod.yaml up -d --build
+
+          # Prove the tree contains the commit this run was triggered for.
+          # `--is-ancestor` rather than an equality test, so a push landing while
+          # this deploy is in flight leaves it correct rather than spuriously red.
+          if ! git merge-base --is-ancestor "$EXPECTED_SHA" HEAD; then
+            echo "checkout does not contain $EXPECTED_SHA (HEAD is $(git rev-parse HEAD))" >&2
+            exit 1
+          fi
+          echo "deploying $(git rev-parse --short HEAD)"
+
+          # --wait is what makes the health check downstream meaningful. Without
+          # it `up -d` returns once containers are *started*, so the job could
+          # curl the site and get a 200 from the container being replaced —
+          # reporting success for the deployment it had just superseded. With it,
+          # compose blocks until db and backend pass their own healthchecks,
+          # which for backend means the entrypoint's `alembic upgrade head`
+          # finished and uvicorn is serving.
+          docker compose -f docker-compose.prod.yaml up -d --build --wait --wait-timeout 180
           docker image prune -f
           REMOTE
 
-      - name: Wait for the site to answer
+      # Deliberately over the public URL rather than something on the box: by
+      # this point compose has already confirmed the containers are healthy, so
+      # what is left to check is the part only an outside request exercises —
+      # TLS, and Caddy routing /api to the backend rather than the frontend.
+      - name: Check the site answers from outside
         if: steps.preflight.outputs.ready == 'true'
         env:
           # A public URL, so a repo variable rather than a secret.
@@ -119,9 +141,9 @@ jobs:
           fi
           for i in $(seq 1 30); do
             if curl -fsS --max-time 5 "$SITE" >/dev/null; then
-              echo "healthy after ${i}s"; exit 0
+              echo "site answered after ${i}s"; exit 0
             fi
             sleep 1
           done
-          echo "::error::the site did not answer within 30s of deploying"
+          echo "::error::$SITE did not answer within 30s, though the containers reported healthy"
           exit 1
