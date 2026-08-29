@@ -674,14 +674,18 @@ access tokens, logs and backups.
 
 Possible future enhancements include:
 
-* ~~Refresh token (via claim id/token)~~ — done, see [Token flow](#token-flow)
+* AuthHandler — done: `Auth` in `app/services/auth.py`
+* ~~Refresh token (via claim/invite id/token)~~ — done, see [Token flow](#token-flow)
 * Token persistence
-* Abstractions
-* Move the hardcoded conditional prompts from the code to separate files
-* Resource search scoring
 * ~~Handle max queries reached, invalid/expired token, etc. in frontend~~ — done;
   the allowance is shown from `GET /session` on load, and a refused question says
   which kind of refusal it was
+
+* ChatClient
+* Abstractions
+
+* Move the hardcoded conditional prompts from the code to separate files
+* Resource search scoring
 * ~~CI/CD pipeline~~ — done: GitHub Actions runs types, tests, migration drift,
   Caddyfile, secret scanning and image builds on every push, and deploys `main`
   after a green run. See [`docs/deployment.md`](docs/deployment.md#cicd)
