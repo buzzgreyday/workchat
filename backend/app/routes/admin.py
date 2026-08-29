@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +42,7 @@ logger = logging.logger
         }
     },
 )
-async def issue_token(req: IssueTokenRequest, db: AsyncSession = Depends(get_db)):
+async def issue_token(req: IssueTokenRequest, db: AsyncSession = Depends(get_db)) -> Response:
     logger.info(
         "Issuing a new access token",
         extra={
@@ -80,7 +81,7 @@ async def issue_token(req: IssueTokenRequest, db: AsyncSession = Depends(get_db)
 async def revoke_token(
     token_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> JSONResponse:
     # Revoking the grant, not merely its sessions, is the point: with a v2 grant
     # the claim link is the durable credential, and cutting sessions alone would
     # leave anyone still holding that link able to open a fresh one.
@@ -119,7 +120,7 @@ async def get_conversations(
     company: str | None = None,
     since: datetime | None = None,
     db: AsyncSession = Depends(get_db),
-):
+) -> list[dict[str, Any]]:
     return await list_conversations(db=db, limit=limit, offset=offset, company=company, since=since)
 
 
@@ -132,7 +133,7 @@ async def get_conversations(
 async def get_conversation(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> ConversationDetail:
     conversation, messages = await get_conversation_messages(conversation_id, db)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -164,7 +165,7 @@ async def get_conversation(
 async def redact(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> JSONResponse:
     conversation, _ = await get_conversation_messages(conversation_id, db)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")

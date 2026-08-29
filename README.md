@@ -13,7 +13,9 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 * PostgreSQL database
 * SQLAlchemy Async ORM
 * Alembic database migrations
-* JWT-based authentication
+* JWT authentication in two flows — a long-lived link, and a single-use claim
+  exchanged for a rotating refresh token and short-lived access token
+* Per-grant query quota, enforced by an atomic UPDATE rather than in memory
 * OpenAI integration
 * Dockerized development environment
 * TypeScript frontend
@@ -34,6 +36,7 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 * psycopg 3 (binary) — the driver, via `postgresql+psycopg://`
 * OpenAI SDK
 * uv package manager
+* mypy (typed, checked — see `backend/README.md`)
 
 ## Frontend
 
@@ -78,6 +81,12 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 │   ├── database.md
 │   ├── deployment.md
 │   └── development.md
+├── scripts                   # run from cron on the production host
+│   ├── backup-db.sh
+│   ├── backup-private-resources.sh
+│   ├── pull-backups.sh
+│   ├── purge-chat-content.sh
+│   └── purge-expired-sessions.sh
 ├── frontend
 │   ├── components.json
 │   ├── Dockerfile
@@ -669,13 +678,16 @@ Possible future enhancements include:
 * Abstractions
 * Move the hardcoded conditional prompts from the code to separate files
 * Resource search scoring
-* Handle max queries reached, invalid/expired token, etc. in frontend
+* ~~Handle max queries reached, invalid/expired token, etc. in frontend~~ — done;
+  the allowance is shown from `GET /session` on load, and a refused question says
+  which kind of refusal it was
 * CI/CD pipeline
 * Automated testing
 * Background workers
 * Monitoring and metrics
 * Centralized logging
 * Backup automation
-* API versioning
+* API versioning — partly done: the auth endpoints are under `/v2`, the chat ones
+  are deliberately unversioned so existing links keep working
 * Chat client polymorph and factory (YAGNI)
 

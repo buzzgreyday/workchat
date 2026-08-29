@@ -4,6 +4,7 @@ Hirers hit /chat with a message; this calls the model with tool definitions
 mirroring search_cv() / get_full_entry(), executes them locally, and
 returns the model's final answer.
 """
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -23,7 +24,7 @@ from app.routes.session import router as session_router
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f'Starting chat server, in {"DEV" if DEV_MODE else "PROD"} mode.', extra={"app": app})
     yield
     logger.info("Stopping chat server.", extra={"app": app})

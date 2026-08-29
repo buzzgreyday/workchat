@@ -20,7 +20,8 @@ docker compose exec backend alembic upgrade head
 | table | what it holds |
 |---|---|
 | `users` | One row per **company**, deduplicated on name. `users.name` is the company, not a person. |
-| `tokens` | One row per issued access token: the person (`subject`), job title, quota and expiry. |
+| `tokens` | One row per **grant**: the person (`subject`), job title, quota and expiry. In v1 the JWT in the link *was* the grant; in v2 the row outlives the claim link and every token derived from it, and `version` says which. |
+| `refresh_tokens` | One row per session within a grant — a hirer on a laptop and the same hirer on a phone are two rows. Rotation keeps the old row and chains it to its successor through `rotated_to`, which is what makes a replayed token recognisable rather than merely unknown. |
 | `conversations` | One chat session, with `subject`/`company`/`job_title` snapshotted from the token. |
 | `chat_messages` | Two rows per turn — the question as received, and the reply as it finished. |
 

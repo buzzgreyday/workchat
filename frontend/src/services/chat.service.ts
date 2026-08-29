@@ -77,6 +77,66 @@ const API_URL =
 // token is not knowable at call time: the one held when a request starts may
 // have expired by the time it lands, and authFetch is what refreshes and
 // retries. A v1 caller passes one that only ever attaches the same token.
+/**
+ * Parse one SSE frame into a known event, or nothing.
+ *
+ * This is a trust boundary, and `JSON.parse(...) as SSEEvent` — which is what
+ * used to be here — asserts a shape without checking a single field of it.
+ * TypeScript cannot see through an assertion however strict it is set, so a
+ * server change or a truncated frame would have surfaced as an undefined
+ * property somewhere further along, not here.
+ */
+function toSSEEvent(json: string): SSEEvent | null {
+  let raw: unknown;
+
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return null;
+  }
+
+  if (
+    typeof raw !== "object" ||
+    raw === null
+  ) {
+    return null;
+  }
+
+  const event = raw as Record<string, unknown>;
+
+  switch (event.type) {
+    case "token":
+      return typeof event.value === "string"
+        ? { type: "token", value: event.value }
+        : null;
+
+    case "done":
+      return Array.isArray(event.history) &&
+        typeof event.usage === "object" &&
+        event.usage !== null
+        ? {
+            type: "done",
+            history:
+              event.history as ChatHistoryMessage[],
+            usage: event.usage as Usage,
+            conversation_id:
+              typeof event.conversation_id ===
+              "string"
+                ? event.conversation_id
+                : null,
+          }
+        : null;
+
+    case "error":
+      return typeof event.message === "string"
+        ? { type: "error", message: event.message }
+        : null;
+
+    default:
+      return null;
+  }
+}
+
 class ChatService {
   async send(
     authFetch: AuthFetch,
@@ -162,8 +222,14 @@ class ChatService {
           "",
         );
 
-        const event =
-          JSON.parse(json) as SSEEvent;
+        const event = toSSEEvent(json);
+
+        // A frame we cannot make sense of is skipped rather than thrown: the
+        // rest of the stream is still carrying the hirer's answer, and losing
+        // the whole reply over one bad frame would be the worse failure.
+        if (!event) {
+          continue;
+        }
 
         switch (event.type) {
           case "token":

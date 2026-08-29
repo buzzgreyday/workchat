@@ -113,7 +113,7 @@ class Auth:
             admin_key: str = ADMIN_KEY,
             access_ttl_seconds: int = ACCESS_TOKEN_TTL_SECONDS,
             refresh_ttl_seconds: int = REFRESH_TOKEN_TTL_SECONDS,
-    ):
+    ) -> None:
         self.secret_key = secret_key
         self.algorithm = algorithm
         self.admin_key = admin_key
@@ -145,9 +145,9 @@ class Auth:
         return ver
 
     @staticmethod
-    def _uuid(value, field: str) -> uuid.UUID:
+    def _uuid(value: object, field: str) -> uuid.UUID:
         try:
-            return uuid.UUID(value)
+            return uuid.UUID(str(value))
         except (AttributeError, TypeError, ValueError):
             logger.warning("Token carries an unusable id", extra={"field": field})
             raise InvalidToken()
@@ -437,7 +437,7 @@ class Auth:
         raise UnsupportedTokenVersion()
 
     @staticmethod
-    def _context(row, version: int, session_id: uuid.UUID | None) -> TokenContext:
+    def _context(row: DatabaseToken, version: int, session_id: uuid.UUID | None) -> TokenContext:
         return TokenContext(
             sub=row.subject,
             jti=str(row.id),

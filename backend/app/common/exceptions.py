@@ -33,7 +33,7 @@ class AppError(Exception):
     status_code: int = 500
     detail: str = "Internal error"
 
-    def __init__(self, detail: str | None = None, **context):
+    def __init__(self, detail: str | None = None, **context: object) -> None:
         self.detail = detail or type(self).detail
         self.context = context
         super().__init__(self.detail)
@@ -111,7 +111,7 @@ class RefreshTokenReplayed(AuthError):
 
     detail = "Refresh token already used"
 
-    def __init__(self, token_id: uuid.UUID, detail: str | None = None):
+    def __init__(self, token_id: uuid.UUID, detail: str | None = None) -> None:
         self.token_id = token_id
         super().__init__(detail, token_id=str(token_id))
 

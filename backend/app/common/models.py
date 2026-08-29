@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import List, Optional, Literal
+from typing import Any, List, Optional, Literal
 
 import jwt
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -17,14 +17,16 @@ class Record(BaseModel):
     tags: List[str] = []
     dates: Optional[str] = None
     summary: Optional[str] = None  # 1-liner shown in search results before full fetch
-    skill_notes: dict = {}  # optional {tag: "scope/caveat note"}, e.g.
+    skill_notes: dict[str, str] = {}  # optional {tag: "scope/caveat note"}, e.g.
                             # {"kubernetes": "Deployed existing services; did not design cluster architecture."}
 
 class ChatRequest(BaseModel):
     # Bounded so it cannot exceed the chat_messages.content column, and to cap
     # what a single request can cost in OpenAI tokens.
     message: str = Field(min_length=1, max_length=4000)
-    history: list = []  # [{"role": "user"/"assistant"/"tool", ...}]
+    # Parameterised so the shape is stated rather than implied: after pydantic
+    # has parsed the request body these really are dicts, whatever the client sent.
+    history: list[dict[str, Any]] = []  # [{"role": "user"/"assistant"/"tool", ...}]
     # Echoed back by the server so a client can keep appending to one thread.
     # Unverifiable client input: the server checks it belongs to the bearer's
     # token and silently starts a new conversation if it doesn't.
@@ -48,7 +50,7 @@ class IssueTokenRequest(BaseModel):
 class ChatResponse(BaseModel):
     type: str | None = None
     reply: str
-    history: list[dict]
+    history: list[dict[str, Any]]
     usage: Usage
     conversation_id: str | None = None
 

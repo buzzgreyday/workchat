@@ -3,8 +3,9 @@ import hmac
 import uuid
 
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import CursorResult, Result, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.common.logging import logging
@@ -34,6 +35,18 @@ from app.common.exceptions import (
 
 logger = logging.logger
 
+
+def _rowcount(result: Result[Any]) -> int:
+    """
+    How many rows a statement touched.
+
+    `session.execute()` is typed as returning `Result`, which has no `rowcount`;
+    a DML statement actually returns a `CursorResult`, which does. Narrowing it
+    once here beats a cast at each of the half-dozen call sites, and puts the
+    reason in one place rather than none.
+    """
+    return cast("CursorResult[Any]", result).rowcount
+
 def hash_token(raw_token: str) -> str:
     return hmac.new(
         TOKEN_HASHING_SECRET.encode(), raw_token.encode(), hashlib.sha256
@@ -42,8 +55,8 @@ def hash_token(raw_token: str) -> str:
 
 async def get_or_create_user(
         name: str,
-        email: str,
-        phone: str,
+        email: str | None,
+        phone: str | None,
         db: AsyncSession
 ) -> DatabaseUser:
     """
@@ -165,7 +178,7 @@ async def update_token_used_query_count(
         token_id: uuid.UUID,
         db: AsyncSession,
         expected_version: int | None = None,
-):
+) -> DatabaseToken:
     logger.debug(
         "Updating token used query count",
         extra={
@@ -200,7 +213,7 @@ async def update_token_used_query_count(
         # makes that comparison raise. The row we act on comes back from the DB.
         .execution_options(synchronize_session=False)
     )
-    row: DatabaseToken = result.scalar_one_or_none()
+    row: DatabaseToken | None = result.scalar_one_or_none()
     await db.commit()
 
     if row is None:
@@ -343,7 +356,7 @@ async def revoke_refresh_sessions(token_id: uuid.UUID, db: AsyncSession) -> int:
         .execution_options(synchronize_session=False)
     )
     await db.commit()
-    revoked = result.rowcount or 0
+    revoked = _rowcount(result) or 0
     logger.warning("Revoked refresh sessions", extra={"token_id": token_id, "count": revoked})
     return revoked
 
@@ -395,7 +408,7 @@ async def rotate_refresh_token(
         .execution_options(synchronize_session=False)
     )
 
-    if not result.rowcount:
+    if not _rowcount(result):
         await db.rollback()
         stale = await db.get(DatabaseRefreshToken, refresh_id)
         if stale is None or stale.revoked_at is None:
@@ -457,7 +470,7 @@ async def claim_grant_once(token_id: uuid.UUID, db: AsyncSession) -> bool:
         .execution_options(synchronize_session=False)
     )
     await db.commit()
-    return bool(result.rowcount)
+    return bool(_rowcount(result))
 
 
 async def should_notify_owner(token_id: uuid.UUID, db: AsyncSession) -> bool:
@@ -483,7 +496,7 @@ async def should_notify_owner(token_id: uuid.UUID, db: AsyncSession) -> bool:
         .execution_options(synchronize_session=False)
     )
     await db.commit()
-    return bool(result.rowcount)
+    return bool(_rowcount(result))
 
 
 async def revoke_grant(token_id: uuid.UUID, db: AsyncSession) -> tuple[bool, int]:
@@ -502,7 +515,7 @@ async def revoke_grant(token_id: uuid.UUID, db: AsyncSession) -> tuple[bool, int
         .values(revoked_at=now)
         .execution_options(synchronize_session=False)
     )
-    already_revoked = not result.rowcount
+    already_revoked = not _rowcount(result)
     await db.commit()
 
     sessions_cut = await revoke_refresh_sessions(token_id, db)
@@ -845,7 +858,7 @@ async def redact_conversation(
     )
     await db.commit()
 
-    redacted = result.rowcount or 0
+    redacted = _rowcount(result) or 0
     logger.info(
         "Redacted conversation",
         extra={"conversation_id": conversation_id, "messages_redacted": redacted},

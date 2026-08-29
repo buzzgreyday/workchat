@@ -35,7 +35,7 @@ async def chat_stream(
     client: AsyncOpenAI = Depends(get_openai_client),
     tools: ChatToolService = Depends(get_chat_tool),
     session_factory: async_sessionmaker = Depends(get_session_factory),
-):
+) -> StreamingResponse:
     """
     Getting client and tools as dependencies (with lru_cache) will make this easy to test and still ensure that
     client and tools are singletons.
@@ -77,7 +77,7 @@ async def chat(
     client: AsyncOpenAI = Depends(get_openai_client),
     tools: ChatToolService = Depends(get_chat_tool),
     session_factory: async_sessionmaker = Depends(get_session_factory),
-):
+) -> ChatResponse:
     """
     Getting client and tools as dependencies (with lru_cache) will make this easy to test and still ensure that
     client and tools are singletons.

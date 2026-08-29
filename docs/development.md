@@ -40,6 +40,17 @@ Run them on the host:
 cd backend && uv sync && uv run pytest
 ```
 
+Type checking runs the same way, and is not part of the test run — with no CI,
+running it is a deliberate act:
+
+```bash
+cd backend && uv run mypy
+```
+
+The frontend is checked by `npx tsc --noEmit` and linted by `npx eslint`, both
+from `frontend/`. `next build` runs the type check itself, so a green build
+implies a green `tsc`.
+
 ## API docs
 
 `/docs`, `/redoc` and `/openapi.json` are served only while `DEV_MODE=1`. They

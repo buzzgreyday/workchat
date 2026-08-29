@@ -21,9 +21,38 @@ dependencies = [
 [dependency-groups]
 dev = [
     "aiosqlite>=0.20.0",
+    "mypy>=1.14.0",
+    "types-aiofiles>=24.1.0",
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
 ]
+
+[tool.mypy]
+# There is no CI yet, so nothing runs this but a person — see backend/README.md.
+# The settings are the strong-but-attainable middle: every function in a request
+# path must declare what it takes and returns, and a value that silently becomes
+# Any is an error rather than a shrug.
+python_version = "3.13"
+files = ["app"]
+disallow_untyped_defs = true
+warn_return_any = true
+no_implicit_optional = true
+strict_equality = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+# Script-shaped and config-shaped modules rather than request paths: build_index
+# is a one-shot CLI over markdown, and the logging package assembles dictConfig.
+# Neither carries a request, so the annotation burden buys much less there.
+[[tool.mypy.overrides]]
+module = ["app.build_index", "app.common.logging.*"]
+disallow_untyped_defs = false
+
+# qrcode ships no stubs and has no types-* package. Only get_qr_code touches it,
+# and its own signature is typed, so the untyped edge stops there.
+[[tool.mypy.overrides]]
+module = ["qrcode.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

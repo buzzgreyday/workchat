@@ -133,11 +133,17 @@ export function useChat({
               ? `Hi ${getUserName(accessToken)}! 👋`
               : "Hi! 👋";
 
-    setMessages((prev) =>
-      prev.length === 1 && prev[0].id === "welcome"
-        ? [{ ...prev[0], content }]
-        : prev,
-    );
+    setMessages((prev) => {
+      // Only ever rewrites the greeting, and only while it is still the only
+      // message — once the hirer has asked something, the transcript is theirs.
+      const [first, ...rest] = prev;
+
+      return first &&
+        rest.length === 0 &&
+        first.id === "welcome"
+        ? [{ ...first, content }]
+        : prev;
+    });
   }, [accessToken, status]);
 
   const [history, setHistory] =
@@ -208,14 +214,14 @@ export function useChat({
     updater: (message: Message) => Message
   ) => {
     setMessages((prev) => {
-      if (prev.length === 0) {
+      const last = prev.at(-1);
+
+      if (!last) {
         return prev;
       }
 
       const next = [...prev];
-
-      next[next.length - 1] =
-        updater(next[next.length - 1]);
+      next[next.length - 1] = updater(last);
 
       return next;
     });
