@@ -11,6 +11,12 @@ def require_env(name: str) -> str:
     return value
 
 
+def env_list(name: str) -> list[str]:
+    """Comma-separated env var to a list, dropping blanks. Absent or empty gives
+    an empty list, so a caller can tell "unset" from "set to something"."""
+    return [v.strip() for v in (os.environ.get(name) or "").split(",") if v.strip()]
+
+
 def env_bool(name: str, default: bool = False) -> bool:
     raw = os.environ.get(name)
     if raw is None or raw == "":
@@ -49,7 +55,14 @@ POSTGRES_DB = require_env("POSTGRES_DB")
 
 ## URLs
 BASE_URL = "http://localhost:8000" if DEV_MODE else require_env("BASE_URL")
-DATABASE_URL = f"postgresql+psycopg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@db:5432/{POSTGRES_DB}"
+# The host is `db`, the compose service name, which only resolves inside the
+# compose network. The override is for everything outside it — running alembic
+# from the host, pointing a migration rehearsal at a scratch database — and is
+# never set in production, where the assembled default is what you want.
+DATABASE_URL = (
+    os.environ.get("DATABASE_URL")
+    or f"postgresql+psycopg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@db:5432/{POSTGRES_DB}"
+)
 ALLOWED_HOSTS = ["*"] if DEV_MODE else [h.strip() for h in require_env("ALLOWED_HOSTS").split(",") if h.strip()]
 
 ## Secrets and hashing
@@ -58,6 +71,63 @@ TOKEN_HASHING_SECRET = require_env("TOKEN_HASHING_SECRET")
 SECRET_KEY = require_env("JWT_SECRET")
 ADMIN_KEY = require_env("ADMIN_KEY")
 ALGORITHM = "HS256"
+
+## Token lifetimes (v2 claim/refresh/access flow)
+# A v1 token is the whole grant: one long-lived JWT handed out in a link, valid
+# until the grant expires. v2 splits that into a claim link the hirer exchanges,
+# a refresh token that survives a closed tab, and an access token short enough
+# that a leaked URL or log line goes stale on its own. Neither derived token can
+# outlive its grant — Auth clamps both to tokens.expires_at when minting.
+ACCESS_TOKEN_TTL_SECONDS = int(os.environ.get("ACCESS_TOKEN_TTL_SECONDS") or 60 * 15)
+REFRESH_TOKEN_TTL_SECONDS = int(os.environ.get("REFRESH_TOKEN_TTL_SECONDS") or 60 * 60 * 24 * 7)
+# How long a just-rotated refresh token is still recognised as *this* client
+# retrying rather than someone replaying a stolen token. Without a window, three
+# chat requests expiring at once and each retrying a refresh would be read as two
+# replays and cut the grant — the client locks itself out. Measured from the
+# moment of rotation; a token presented after it is a genuine replay.
+REFRESH_ROTATION_GRACE_SECONDS = int(os.environ.get("REFRESH_ROTATION_GRACE_SECONDS") or 30)
+# At most one operator notification per grant per window, so a bot hitting a dead
+# claim link cannot flood the log (or, later, an inbox).
+OWNER_NOTIFY_THROTTLE_SECONDS = int(os.environ.get("OWNER_NOTIFY_THROTTLE_SECONDS") or 60 * 60)
+
+## Refresh cookie
+# The refresh token is delivered as an httpOnly cookie and never in a response
+# body, so script on the page cannot read it. In production Caddy serves the
+# frontend and proxies the API under /api on one origin, so this is a plain
+# same-origin cookie; in dev :3000 and :8000 differ in port but not in site, so
+# SameSite=Strict still sends it once CORS allows credentials.
+REFRESH_COOKIE_NAME = os.environ.get("REFRESH_COOKIE_NAME") or "cv_refresh"
+# Path "/" rather than "/v2/auth" on purpose: behind Caddy the browser sees
+# /api/v2/auth/... while the backend only ever sees /v2/auth/..., so a narrow
+# path would be written for a prefix the browser never requests.
+REFRESH_COOKIE_PATH = "/"
+# No Secure flag in dev, where the frontend is plain http on localhost.
+REFRESH_COOKIE_SECURE = not DEV_MODE
+# Browsers refuse a credentialed request whose Access-Control-Allow-Origin is
+# "*", so the dev wildcard has to become a concrete list once cookies are in play.
+DEV_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
+def _dev_cors_origins() -> list[str]:
+    """
+    The dev origins, plus anything in ALLOWED_HOSTS that is actually an origin.
+
+    A union rather than an override, because ALLOWED_HOSTS in a dev .env is not
+    necessarily a CORS origin at all — a domain pattern like `*.example.com` is a
+    perfectly reasonable thing to have in there, and letting it *replace* the
+    defaults would leave localhost unable to talk to the API at all. Entries
+    without a scheme are skipped for the same reason: Starlette matches
+    allow_origins by exact string, so a pattern would never match an Origin
+    header and only crowds the list.
+    """
+    extra = [
+        origin for origin in env_list("ALLOWED_HOSTS")
+        if "://" in origin and origin not in DEV_ALLOWED_ORIGINS
+    ]
+    return DEV_ALLOWED_ORIGINS + extra
+
+
+CORS_ORIGINS = _dev_cors_origins() if DEV_MODE else ALLOWED_HOSTS
 
 ## LLM
 # Measured, not assumed: on 26 eval questions x 3 runs, nano scored 22-24 and

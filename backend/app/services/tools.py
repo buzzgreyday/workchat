@@ -1,6 +1,6 @@
 import json
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal, cast
 
 import aiofiles
 from openai.types.chat import ChatCompletionFunctionToolParam
@@ -40,15 +40,17 @@ class ChatToolService:
     per-conversation state.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._tools_cache: list[ChatCompletionFunctionToolParam] | None = None
 
-    async def _load_index(self) -> list[dict]:
+    async def _load_index(self) -> list[dict[str, Any]]:
         """Read the index file containing markdown references."""
         async with aiofiles.open(INDEX_PATH, mode="r") as f:
             index_ = await f.read()
         logger.debug(f"Loaded {INDEX_PATH} for markdown references", extra={"index": index_})
-        return json.loads(index_)
+        # json.loads is Any by nature. The cast is the assertion that this file is
+        # the index build_index writes; a malformed one fails at the first use.
+        return cast(list[dict[str, Any]], json.loads(index_))
 
     async def get_tools(self) -> list[ChatCompletionFunctionToolParam]:
         """

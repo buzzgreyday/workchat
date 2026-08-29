@@ -22,6 +22,12 @@ class DatabaseUser(Base):
 
 
 class DatabaseToken(Base):
+    """
+    One grant. In v1 the JWT in the ?token= link *was* the grant, so this row and
+    that token were the same thing. In v2 the row outlives every token derived
+    from it: a claim link, the refresh tokens it mints and the access tokens
+    those mint all point back here, and the query quota is still counted here.
+    """
     __tablename__ = "tokens"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -36,6 +42,68 @@ class DatabaseToken(Base):
     used_queries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # 1 = the token_hash is a long-lived access token handed out as ?token=.
+    # 2 = it is a claim token exchanged at /v2/auth/claim for a refresh/access
+    # pair. Defaulted to 1 so every row that predates this column keeps working
+    # exactly as it did, which is the whole point of the version claim.
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # When this grant's claim link was exchanged, and the gate that makes the
+    # exchange single-use: the claiming UPDATE only matches while this is NULL.
+    # A second presentation of the link is refused and the operator is told, so
+    # a hirer who cleared their site data or moved device gets a new link rather
+    # than a way back in that a leaked URL would share.
+    claimed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Throttles operator notifications for this grant — a dead link being hit
+    # repeatedly is one thing worth hearing about, not hundreds.
+    owner_notified_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class DatabaseRefreshToken(Base):
+    """
+    One session within a grant.
+
+    A hirer who opens the claim link on their laptop and again on their phone
+    gets two rows, each rotating independently, and revoking one leaves the
+    other alone. Rotation is why rows are kept rather than updated in place:
+    `rotated_to` chains a session's history, so a refresh token presented after
+    it was already exchanged is recognisable as a replay rather than merely
+    unknown, and the whole chain can be cut.
+    """
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    token_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tokens.id", ondelete="RESTRICT"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # Indexed for pruning, which is the only query that reads by expiry.
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    # Stamped both when a token is rotated away and when it is cut for replay;
+    # `rotated_to` is what tells the two apart.
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # SET NULL, not RESTRICT: this is an audit link between rows of one table,
+    # not an ownership edge worth blocking a delete over. Under RESTRICT, any row
+    # still pointed at by a surviving row cannot be removed — deleting one
+    # successor while its predecessor remains raises, which is exactly the shape
+    # of an operator clearing a single bad session. A whole chain taken out in one
+    # statement is fine either way (checked against Postgres 16: the RI trigger
+    # runs at end of statement, by which point the referencing rows have gone
+    # too), so this is about partial and single-row deletes, not bulk pruning.
+    rotated_to: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("refresh_tokens.id", ondelete="SET NULL"), nullable=True
+    )
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(

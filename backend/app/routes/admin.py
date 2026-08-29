@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,10 +18,12 @@ from app.common.models import (
 from app.helpers.qr_code import get_qr_code
 from app.services.admin import create_user_and_access_token
 from app.services.auth import require_admin
+from app.common.schemas import DatabaseToken
 from app.services.db import (
     get_conversation_messages,
     list_conversations,
     redact_conversation,
+    revoke_grant,
 )
 from app.common.logging import logging
 
@@ -39,20 +42,70 @@ logger = logging.logger
         }
     },
 )
-async def issue_token(req: IssueTokenRequest, db: AsyncSession = Depends(get_db)):
+async def issue_token(req: IssueTokenRequest, db: AsyncSession = Depends(get_db)) -> Response:
     logger.info(
         "Issuing a new access token",
         extra={
             "subject": req.subject, "job_title": req.job_title, "company": req.company,
             "email": req.email, "phone": req.phone, "expires_in_seconds": req.expires_in_seconds,
-            "max_queries": req.max_queries, "type": req.type
+            "max_queries": req.max_queries, "type": req.type, "version": req.version
         }
     )
-    access_token = await create_user_and_access_token(req, db)
+    token = await create_user_and_access_token(req, db)
+    # v1 puts the access token straight in the link; v2 puts a claim token there
+    # instead, so the query parameter has to change with it. The frontend reads
+    # whichever one it finds — ?token= is still what every issued link carries.
+    param = "token" if req.version == 1 else "claim"
     if req.type == "qr":
-        qr = get_qr_code(url=f"{BASE_URL}/?token={access_token}")
+        qr = get_qr_code(url=f"{BASE_URL}/?{param}={token}")
         return Response(content=bytes(qr), media_type="image/png", status_code=HTTP_200_OK)
-    return JSONResponse(content={"token": access_token}, media_type="application/json", status_code=HTTP_200_OK)
+    # "token" stays the key for both so an existing caller reading body["token"]
+    # is unaffected; "kind" is what says which flow it belongs to.
+    return JSONResponse(
+        content={"token": token, "version": req.version, "kind": "access" if req.version == 1 else "claim"},
+        media_type="application/json",
+        status_code=HTTP_200_OK,
+    )
+
+@router.post(
+    "/tokens/{token_id}/revoke",
+    dependencies=[Depends(require_admin)],
+    response_class=JSONResponse,
+    summary="Revoke a grant and every session under it",
+    description=(
+        "The kill switch. Stamps `tokens.revoked_at` and cuts every refresh "
+        "session, so outstanding refresh tokens stop rotating and outstanding "
+        "access tokens stop being honoured on their next request. Idempotent."
+    ),
+)
+async def revoke_token(
+    token_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    # Revoking the grant, not merely its sessions, is the point: with a v2 grant
+    # the claim link is the durable credential, and cutting sessions alone would
+    # leave anyone still holding that link able to open a fresh one.
+    grant = await db.get(DatabaseToken, token_id)
+    if grant is None:
+        raise HTTPException(status_code=404, detail="Token not found")
+
+    already_revoked, sessions_cut = await revoke_grant(token_id, db)
+    logger.warning(
+        "Grant revoked by admin",
+        extra={
+            "token_id": token_id, "subject": grant.subject, "company": grant.company,
+            "already_revoked": already_revoked, "sessions_cut": sessions_cut,
+        },
+    )
+    return JSONResponse(
+        content={
+            "token_id": str(token_id),
+            "already_revoked": already_revoked,
+            "sessions_cut": sessions_cut,
+        },
+        status_code=HTTP_200_OK,
+    )
+
 
 @router.get(
     "/conversations",
@@ -67,7 +120,7 @@ async def get_conversations(
     company: str | None = None,
     since: datetime | None = None,
     db: AsyncSession = Depends(get_db),
-):
+) -> list[dict[str, Any]]:
     return await list_conversations(db=db, limit=limit, offset=offset, company=company, since=since)
 
 
@@ -80,7 +133,7 @@ async def get_conversations(
 async def get_conversation(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> ConversationDetail:
     conversation, messages = await get_conversation_messages(conversation_id, db)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -112,7 +165,7 @@ async def get_conversation(
 async def redact(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> JSONResponse:
     conversation, _ = await get_conversation_messages(conversation_id, db)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")

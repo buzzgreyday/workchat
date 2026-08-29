@@ -2,22 +2,50 @@ import hashlib
 import hmac
 import uuid
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 
-from fastapi import HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import CursorResult, Result, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.common.logging import logging
 from app.common.schemas import (
     DatabaseChatMessage,
     DatabaseConversation,
+    DatabaseRefreshToken,
     DatabaseToken,
     DatabaseUser,
 )
-from app.common.config import TOKEN_HASHING_SECRET
+from app.common.config import (
+    OWNER_NOTIFY_THROTTLE_SECONDS,
+    REFRESH_ROTATION_GRACE_SECONDS,
+    TOKEN_HASHING_SECRET,
+)
+from app.common.exceptions import (
+    InvalidRefreshToken,
+    InvalidToken,
+    QuotaExhausted,
+    RefreshTokenExpired,
+    RefreshTokenReplayed,
+    RotationInProgress,
+    SessionRevoked,
+    TokenExpired,
+    TokenRevoked,
+)
 
 logger = logging.logger
+
+
+def _rowcount(result: Result[Any]) -> int:
+    """
+    How many rows a statement touched.
+
+    `session.execute()` is typed as returning `Result`, which has no `rowcount`;
+    a DML statement actually returns a `CursorResult`, which does. Narrowing it
+    once here beats a cast at each of the half-dozen call sites, and puts the
+    reason in one place rather than none.
+    """
+    return cast("CursorResult[Any]", result).rowcount
 
 def hash_token(raw_token: str) -> str:
     return hmac.new(
@@ -27,8 +55,8 @@ def hash_token(raw_token: str) -> str:
 
 async def get_or_create_user(
         name: str,
-        email: str,
-        phone: str,
+        email: str | None,
+        phone: str | None,
         db: AsyncSession
 ) -> DatabaseUser:
     """
@@ -81,6 +109,7 @@ async def create_user_and_relate_token(
         email: str | None = None,
         phone: str | None = None,
         job_title: str | None = None,
+        version: int = 1,
 ) -> DatabaseToken:
     logger.debug(
         "Relating access token to user",
@@ -103,6 +132,7 @@ async def create_user_and_relate_token(
         created_at=created_at,
         max_queries=max_queries,
         expires_at=expires_at,
+        version=version,
     )
     logger.debug(
         "Creating token entry in database",
@@ -114,7 +144,8 @@ async def create_user_and_relate_token(
             "job_title": job_title,
             "created_at": created_at,
             "max_queries": max_queries,
-            "expires_at": expires_at
+            "expires_at": expires_at,
+            "version": version
         }
     )
     db.add(token_row)
@@ -145,30 +176,44 @@ async def create_user_and_relate_token(
 
 async def update_token_used_query_count(
         token_id: uuid.UUID,
-        db: AsyncSession
-):
+        db: AsyncSession,
+        expected_version: int | None = None,
+) -> DatabaseToken:
     logger.debug(
         "Updating token used query count",
         extra={
-            "token_id": token_id
+            "token_id": token_id,
+            "expected_version": expected_version
         }
     )
     now = datetime.now(timezone.utc)
     # Atomic consume: increments used_queries only if the token is still
     # valid (not revoked, not expired, under its query limit). This avoids
     # the read-then-write race condition of the in-memory version.
+    predicates = [
+        DatabaseToken.id == token_id,
+        DatabaseToken.revoked_at.is_(None),
+        DatabaseToken.expires_at > now,
+        DatabaseToken.used_queries < DatabaseToken.max_queries,
+    ]
+    # Version is a predicate rather than a check on the returned row so that a
+    # mismatch costs nothing: presenting a v1-shaped token against a v2 grant
+    # fails without first spending one of that grant's questions.
+    if expected_version is not None:
+        predicates.append(DatabaseToken.version == expected_version)
+
     result = await db.execute(
         update(DatabaseToken)
-        .where(
-            DatabaseToken.id == token_id,
-            DatabaseToken.revoked_at.is_(None),
-            DatabaseToken.expires_at > now,
-            DatabaseToken.used_queries < DatabaseToken.max_queries,
-        )
+        .where(*predicates)
         .values(used_queries=DatabaseToken.used_queries + 1)
         .returning(DatabaseToken)
+        # RETURNING is the only source of truth we want here. Left on "evaluate",
+        # SQLAlchemy re-runs the expires_at predicate in Python against any row
+        # already in the session, and a driver that drops tzinfo on read (SQLite)
+        # makes that comparison raise. The row we act on comes back from the DB.
+        .execution_options(synchronize_session=False)
     )
-    row: DatabaseToken = result.scalar_one_or_none()
+    row: DatabaseToken | None = result.scalar_one_or_none()
     await db.commit()
 
     if row is None:
@@ -177,10 +222,16 @@ async def update_token_used_query_count(
         existing = await db.get(DatabaseToken, token_id)
         if existing is None:
             logger.warning("Invalid token", extra={"token_id": token_id})
-            raise HTTPException(401, "Invalid token")
+            raise InvalidToken()
         if existing.revoked_at is not None:
             logger.warning("Revoked token", extra={"token_id": token_id})
-            raise HTTPException(401, "Token revoked")
+            raise TokenRevoked()
+        if expected_version is not None and existing.version != expected_version:
+            logger.warning(
+                "Token version does not match its grant",
+                extra={"token_id": token_id, "expected_version": expected_version, "version": existing.version},
+            )
+            raise InvalidToken()
         # DBs that don't preserve tzinfo (e.g. SQLite in tests) return naive
         # datetimes even though the column is DateTime(timezone=True). Treat
         # naive stored values as UTC before comparing to a tz-aware `now`.
@@ -189,8 +240,8 @@ async def update_token_used_query_count(
             expires_at = expires_at.replace(tzinfo=timezone.utc)
         if expires_at <= now:
             logger.warning("Expired token", extra={"token_id": token_id})
-            raise HTTPException(401, "Token expired")
-        raise HTTPException(429, "Query limit reached")
+            raise TokenExpired()
+        raise QuotaExhausted()
     logger.info(
         "Token updated",
         extra={
@@ -206,6 +257,273 @@ async def update_token_used_query_count(
         }
     )
     return row
+
+
+# --- v2 grants and refresh sessions ------------------------------------------
+#
+# The v1 path never needed any of this: its JWT was the grant, so verifying the
+# signature and consuming a query was the whole story. v2 mints tokens from a
+# grant repeatedly, which means the grant has to be re-checked on every mint and
+# refresh tokens have to be tracked as rows rather than trusted as signatures.
+
+
+def _as_utc(value: datetime) -> datetime:
+    """
+    DBs that don't preserve tzinfo (SQLite in tests) hand back naive datetimes
+    from a DateTime(timezone=True) column. Everything stored is UTC, so read a
+    naive value as UTC rather than letting it raise against a tz-aware `now`.
+    """
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+async def get_active_grant(
+        token_id: uuid.UUID,
+        db: AsyncSession,
+        expected_version: int | None = None,
+) -> DatabaseToken:
+    """
+    The grant behind a claim, refresh or access token, if it is still usable.
+
+    Read-only and quota-free on purpose: exchanging a claim, rotating a refresh
+    token or asking how many questions are left must not cost the hirer one of
+    them. Quota is spent in update_token_used_query_count, when a question is
+    actually asked.
+
+    Note what is *not* checked here: whether any quota remains. A grant with none
+    left is still a valid grant, and the caller that reports usage needs to be
+    able to say "zero" rather than raise.
+    """
+    now = datetime.now(timezone.utc)
+    grant = await db.get(DatabaseToken, token_id)
+    if grant is None:
+        logger.warning("Invalid token", extra={"token_id": token_id})
+        raise InvalidToken()
+    if grant.revoked_at is not None:
+        logger.warning("Revoked token", extra={"token_id": token_id})
+        raise TokenRevoked()
+    if expected_version is not None and grant.version != expected_version:
+        logger.warning(
+            "Token version does not match its grant",
+            extra={"token_id": token_id, "expected_version": expected_version, "version": grant.version},
+        )
+        raise InvalidToken()
+    if _as_utc(grant.expires_at) <= now:
+        logger.warning("Expired token", extra={"token_id": token_id})
+        raise TokenExpired()
+    return grant
+
+
+async def create_refresh_token(
+        token_id: uuid.UUID,
+        raw_token: str,
+        expires_at: datetime,
+        db: AsyncSession,
+        refresh_id: uuid.UUID | None = None,
+        commit: bool = True,
+) -> DatabaseRefreshToken:
+    """Open a new session on a grant. Called on every claim exchange, so opening
+    the link on a second device adds a session rather than stealing the first."""
+    row = DatabaseRefreshToken(
+        id=refresh_id or uuid.uuid4(),
+        token_id=token_id,
+        token_hash=hash_token(raw_token),
+        expires_at=expires_at,
+    )
+    db.add(row)
+    if commit:
+        await db.commit()
+        await db.refresh(row)
+    else:
+        await db.flush()
+    logger.info(
+        "Opened refresh session",
+        extra={"refresh_id": row.id, "token_id": token_id, "expires_at": expires_at},
+    )
+    return row
+
+
+async def revoke_refresh_sessions(token_id: uuid.UUID, db: AsyncSession) -> int:
+    """Cut every live session on a grant. The blunt response to a replayed
+    refresh token: we cannot tell the thief from the hirer, so both re-claim."""
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        update(DatabaseRefreshToken)
+        .where(
+            DatabaseRefreshToken.token_id == token_id,
+            DatabaseRefreshToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    await db.commit()
+    revoked = _rowcount(result) or 0
+    logger.warning("Revoked refresh sessions", extra={"token_id": token_id, "count": revoked})
+    return revoked
+
+
+async def rotate_refresh_token(
+        refresh_id: uuid.UUID,
+        raw_new_token: str,
+        new_expires_at: datetime,
+        db: AsyncSession,
+        new_refresh_id: uuid.UUID | None = None,
+) -> DatabaseRefreshToken:
+    """
+    Exchange one refresh token for its successor, atomically.
+
+    The new row is inserted *before* the old one is claimed so that rotated_to
+    has something to point at — the FK is checked immediately, not deferred. If
+    the claiming UPDATE then matches nothing, the rollback takes the insert with
+    it, so a lost race leaves no orphan.
+
+    Matching nothing means the token was already spent. That is either a client
+    that retried, or a stolen token being replayed, and nothing here can tell
+    which — so every live session on the grant is cut and the hirer re-claims.
+    """
+    now = datetime.now(timezone.utc)
+    new_id = new_refresh_id or uuid.uuid4()
+
+    existing = await db.get(DatabaseRefreshToken, refresh_id)
+    if existing is None:
+        logger.warning("Unknown refresh token", extra={"refresh_id": refresh_id})
+        raise InvalidRefreshToken()
+
+    successor = await create_refresh_token(
+        token_id=existing.token_id,
+        raw_token=raw_new_token,
+        expires_at=new_expires_at,
+        db=db,
+        refresh_id=new_id,
+        commit=False,
+    )
+
+    result = await db.execute(
+        update(DatabaseRefreshToken)
+        .where(
+            DatabaseRefreshToken.id == refresh_id,
+            DatabaseRefreshToken.revoked_at.is_(None),
+            DatabaseRefreshToken.expires_at > now,
+        )
+        .values(revoked_at=now, last_used_at=now, rotated_to=new_id)
+        .execution_options(synchronize_session=False)
+    )
+
+    if not _rowcount(result):
+        await db.rollback()
+        stale = await db.get(DatabaseRefreshToken, refresh_id)
+        if stale is None or stale.revoked_at is None:
+            logger.warning("Expired refresh token", extra={"refresh_id": refresh_id})
+            raise RefreshTokenExpired()
+
+        if stale.rotated_to is None:
+            # Revoked without a successor: an operator cut this grant, or replay
+            # detection did. Not a replay in itself, and re-cutting adds nothing.
+            logger.warning("Refresh token belongs to a revoked session", extra={"refresh_id": refresh_id})
+            raise SessionRevoked()
+
+        rotated_ago = (now - _as_utc(stale.revoked_at)).total_seconds()
+        if rotated_ago <= REFRESH_ROTATION_GRACE_SECONDS:
+            # This client racing itself, not an attacker: parallel requests that
+            # all expired at once, or a retry after a network flake. Rejecting
+            # without cutting keeps the winner's session — which is the whole
+            # point, since cutting here would take down the pair that was just
+            # handed out and log the hirer out of their own tab.
+            logger.info(
+                "Refresh token re-presented inside the rotation grace window",
+                extra={"refresh_id": refresh_id, "rotated_ago_s": round(rotated_ago, 3)},
+            )
+            raise RotationInProgress()
+
+        logger.warning(
+            "Refresh token replayed after rotation, cutting the grant's sessions",
+            extra={"refresh_id": refresh_id, "token_id": stale.token_id, "rotated_ago_s": round(rotated_ago, 3)},
+        )
+        await revoke_refresh_sessions(stale.token_id, db)
+        raise RefreshTokenReplayed(stale.token_id)
+
+    await db.commit()
+    await db.refresh(successor)
+    logger.info(
+        "Rotated refresh token",
+        extra={"refresh_id": refresh_id, "successor_id": successor.id, "token_id": successor.token_id},
+    )
+    return successor
+
+
+async def get_refresh_token(refresh_id: uuid.UUID, db: AsyncSession) -> DatabaseRefreshToken | None:
+    return await db.get(DatabaseRefreshToken, refresh_id)
+
+
+async def claim_grant_once(token_id: uuid.UUID, db: AsyncSession) -> bool:
+    """
+    Spend a claim link, atomically. True if this call was the one that spent it.
+
+    The `claimed_at IS NULL` predicate is the whole mechanism — two requests
+    arriving together cannot both match it, so a claim link opens exactly one
+    session no matter how it is raced. A False return is not an error here; the
+    caller decides what a second presentation means.
+    """
+    result = await db.execute(
+        update(DatabaseToken)
+        .where(DatabaseToken.id == token_id, DatabaseToken.claimed_at.is_(None))
+        .values(claimed_at=datetime.now(timezone.utc))
+        .execution_options(synchronize_session=False)
+    )
+    await db.commit()
+    return bool(_rowcount(result))
+
+
+async def should_notify_owner(token_id: uuid.UUID, db: AsyncSession) -> bool:
+    """
+    Claim the right to send one operator notification for this grant, atomically.
+
+    Same shape as the claim gate, and for the same reason: a dead link being hit
+    in a loop must produce one message, not one per request. The window predicate
+    lives in SQL so concurrent requests cannot both win it.
+    """
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=OWNER_NOTIFY_THROTTLE_SECONDS)
+    result = await db.execute(
+        update(DatabaseToken)
+        .where(
+            DatabaseToken.id == token_id,
+            or_(
+                DatabaseToken.owner_notified_at.is_(None),
+                DatabaseToken.owner_notified_at < cutoff,
+            ),
+        )
+        .values(owner_notified_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    await db.commit()
+    return bool(_rowcount(result))
+
+
+async def revoke_grant(token_id: uuid.UUID, db: AsyncSession) -> tuple[bool, int]:
+    """
+    Kill a grant outright: the grant itself and every session under it.
+
+    The grant is what has to be revoked, not just its sessions. Cutting sessions
+    alone would have left anyone holding the claim link able to open a new one —
+    and before single-use claims landed, that made session revocation close to
+    decorative. Returns (was_already_revoked, sessions_cut).
+    """
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        update(DatabaseToken)
+        .where(DatabaseToken.id == token_id, DatabaseToken.revoked_at.is_(None))
+        .values(revoked_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    already_revoked = not _rowcount(result)
+    await db.commit()
+
+    sessions_cut = await revoke_refresh_sessions(token_id, db)
+    logger.warning(
+        "Revoked grant",
+        extra={"token_id": token_id, "already_revoked": already_revoked, "sessions_cut": sessions_cut},
+    )
+    return already_revoked, sessions_cut
 
 
 # --- Chat transcript capture -------------------------------------------------
@@ -540,7 +858,7 @@ async def redact_conversation(
     )
     await db.commit()
 
-    redacted = result.rowcount or 0
+    redacted = _rowcount(result) or 0
     logger.info(
         "Redacted conversation",
         extra={"conversation_id": conversation_id, "messages_redacted": redacted},

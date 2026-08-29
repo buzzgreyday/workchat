@@ -1,0 +1,213 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  # So a red main can be re-checked without an empty commit.
+  workflow_dispatch:
+
+# A newer push supersedes an in-flight run on the same ref. Never cancel main:
+# its run is what gates the deploy.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend — types and tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      # --frozen so a lockfile that drifted from pyproject.toml fails here rather
+      # than resolving to something no one has run.
+      - run: uv sync --frozen
+
+      - name: mypy
+        run: uv run mypy
+
+      # conftest.py sets every variable config.py demands and points
+      # SYSTEM_PROMPT_PATH at a temp file, so the suite needs no secrets and no
+      # gitignored resources. That is a property worth keeping: if this step ever
+      # starts needing a secret, something has reached out of the test harness.
+      - name: pytest
+        run: uv run pytest -q
+
+  frontend:
+    name: Frontend — types, lint and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches frontend/Dockerfile's node:22-alpine, so CI compiles on the
+          # same major that production is built with.
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: tsc
+        run: npx tsc --noEmit
+
+      - name: eslint
+        run: npx eslint
+
+      # next build type-checks too, but tsc above fails faster and points at the
+      # line. This is here to catch what only shows up in a production build.
+      - name: next build
+        run: npx next build
+        env:
+          NEXT_PUBLIC_API_URL: /api
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  migrations:
+    name: Migrations — apply and check for drift
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # config.py assembles the URL against the `db` compose hostname, which does
+      # not resolve here; this override exists for exactly this case.
+      DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+      POSTGRES_USER: ci
+      POSTGRES_PASSWORD: ci
+      POSTGRES_DB: ci
+      DEV_MODE: "1"
+      OPENAI_API_KEY: ci-not-a-real-key
+      JWT_SECRET: ci-not-a-real-secret
+      TOKEN_HASHING_SECRET: ci-not-a-real-secret
+      ADMIN_KEY: ci-not-a-real-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - run: uv sync --frozen
+
+      # alembic/env.py imports app.common.config, which reads the system prompt at
+      # import time and raises if it is missing. The real one is gitignored.
+      - name: Seed the gitignored system prompt
+        run: cp resources/system-prompt.md.example resources/system-prompt.md
+
+      - name: Apply every migration from empty
+        run: uv run alembic upgrade head
+
+      # The gate: "No new upgrade operations detected" means the models and the
+      # migrations agree. A model changed without a revision fails here.
+      - name: Check for model/migration drift
+        run: uv run alembic check
+
+      - name: Downgrade one revision and re-apply
+        run: |
+          uv run alembic downgrade -1
+          uv run alembic upgrade head
+
+  caddy:
+    name: Caddyfile — adapt with the rate-limit module
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # The stock image has no rate_limit directive, so the Caddyfile can only be
+      # checked against this custom build.
+      - name: Build the custom Caddy image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./caddy
+          load: true
+          tags: caddy-ci:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # `caddy validate` passes whether or not the rate-limit module receives the
+      # zones, so adapt and assert all four are present in the output.
+      - name: Adapt and assert the rate-limit zones
+        run: |
+          docker run --rm \
+            -e ACME_EMAIL=ci@example.com -e SITE_DOMAIN=ci.example.com \
+            -v "$PWD/Caddyfile:/Caddyfile:ro" caddy-ci:latest \
+            caddy adapt --config /Caddyfile --adapter caddyfile > adapted.json
+          for zone in chat_zone admin_zone auth_zone session_zone; do
+            grep -q "\"$zone\"" adapted.json || { echo "::error::$zone missing from the adapted config"; exit 1; }
+          done
+          echo "all four rate-limit zones present"
+
+  secrets-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: a secret committed and then removed is still in the
+          # objects, and on a public repo it is still readable.
+          fetch-depth: 0
+
+      # --redact is the point. Without it a finding prints the secret it found
+      # into a public build log, which is a worse leak than the commit was.
+      - name: gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" \
+            zricethezav/gitleaks:latest detect \
+              --source=/repo --redact --no-banner --verbose
+
+  images:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          load: false
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          load: false
+          build-args: NEXT_PUBLIC_API_URL=/api
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend

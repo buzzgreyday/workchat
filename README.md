@@ -13,7 +13,9 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 * PostgreSQL database
 * SQLAlchemy Async ORM
 * Alembic database migrations
-* JWT-based authentication
+* JWT authentication in two flows — a long-lived link, and a single-use claim
+  exchanged for a rotating refresh token and short-lived access token
+* Per-grant query quota, enforced by an atomic UPDATE rather than in memory
 * OpenAI integration
 * Dockerized development environment
 * TypeScript frontend
@@ -34,6 +36,7 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 * psycopg 3 (binary) — the driver, via `postgresql+psycopg://`
 * OpenAI SDK
 * uv package manager
+* mypy (typed, checked — see `backend/README.md`)
 
 ## Frontend
 
@@ -78,6 +81,13 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 │   ├── database.md
 │   ├── deployment.md
 │   └── development.md
+├── scripts                   # run from cron on the production host
+│   ├── backup-db.sh
+│   ├── backup-private-resources.sh
+│   ├── pull-backups.sh
+│   ├── purge-chat-content.sh
+│   ├── purge-expired-sessions.sh
+│   └── setup-deploy-secrets.sh   # one-shot: CI deploy key + GitHub secrets
 ├── frontend
 │   ├── components.json
 │   ├── Dockerfile
@@ -388,6 +398,105 @@ OpenAPI Specification:
 http://localhost:8000/openapi.json
 ```
 
+## Token flow
+
+Two token versions are live at once. Which one a request is using is decided by
+the `ver` claim on the JWT, and its **absence** means version 1 — the tokens
+already handed out cannot grow a claim they were never minted with, so silence
+has to keep meaning v1 for as long as any of those links is still in an inbox.
+
+Only the auth endpoints are versioned. `/chat` and `/chat/stream` stay where they
+are and accept either kind of access token, because moving them under `/v2` would
+have left every v1 hirer holding a link to a frozen API.
+
+**v1 — the links already sent out.** One long-lived JWT per grant, delivered as
+`?token=...` and sent straight back as `Authorization: Bearer`. Its `jti` *is*
+the `tokens` row. Nothing about this path has changed.
+
+```
+/admin/issue-token (version=1)  ->  ?token=<access JWT>  ->  POST /chat
+```
+
+**v2 — claim, then refresh.** The link carries a single-use claim token, which
+the client exchanges for a short-lived access token and a rotating refresh token.
+
+```
+/admin/issue-token (version=2)  ->  ?claim=<claim JWT>
+        |
+        v
+POST /v2/auth/claim    {claim_token}  -> {access_token, expires_in, ...}
+                                         + Set-Cookie: cv_refresh=... (HttpOnly)
+POST /v2/auth/refresh  (cookie)       -> a fresh pair; the one presented is retired
+POST /chat             Bearer <access_token>
+```
+
+Properties worth knowing:
+
+* **The refresh token is only ever a cookie.** HttpOnly, Secure outside dev,
+  SameSite=Strict, and never in a response body — so script on the page cannot
+  read it. The access token *is* in the body, because the client has to put it in
+  an `Authorization` header, which is why it is short-lived. An XSS gets minutes
+  of access, not a week of it. In production Caddy serves the frontend and proxies
+  the API under `/api` on one origin, so this is a plain same-origin cookie.
+* **The claim link is single use.** The first exchange spends it; every later one
+  is refused with 409 and logs a notice that this hirer needs a new link. A leaked
+  URL — in a browser history, a mail thread, a photographed QR code — is therefore
+  worth nothing once the hirer has opened it. The cost is that clearing site data
+  or moving device needs a new link.
+* **Quota is per grant, not per token.** Claiming and refreshing cost nothing;
+  only a question spends a query.
+* **Nothing derived outlives its grant.** Access and refresh expiries are both
+  clamped to `tokens.expires_at`.
+* **Rotation has a grace window.** A refresh token re-presented within
+  `REFRESH_ROTATION_GRACE_SECONDS` of being rotated answers 409 and changes
+  nothing — that is one client racing itself, which happens whenever several
+  requests expire at once and each retries. Without the window those retries read
+  as replays and cut the grant, logging the hirer out of the tab they were sitting
+  in. The frontend also single-flights refreshes so it rarely comes up.
+* **Past the window, a replay cuts the grant.** Rotation retires the token it was
+  given, so a late second use is either theft or a badly behaved client and
+  nothing can tell which. Every session is revoked; with a single-use claim there
+  is no self-serve way back, so a notice is logged for the operator.
+* **An access token dies with its session**, rotation included. The call that
+  rotates hands back a fresh one, so a client only ever carries the newest pair.
+
+## Reading the allowance
+
+`GET /session` reports who a token belongs to and what is left of its quota,
+without spending any of it. Unversioned, like the chat routes: a v1 `?token=`
+JWT and a v2 access token are both valid ways to be here and get the same
+answer.
+
+```
+GET /session   Authorization: Bearer <access token>
+-> {"subject": "...", "version": 2, "expires_at": "...",
+    "usage": {"used": 0, "remaining": 5, "max": 5}, "session_id": "..."}
+```
+
+It exists because usage used to arrive only inside a chat response, so the one
+number a hirer wants on arrival — how many questions they get — was the one thing
+they had to spend a question to learn. An exhausted grant returns
+`remaining: 0` with a 200 rather than a 429: that is a state to display, and the
+person with none left is exactly who needs telling. `/chat` still answers 429
+when one is actually attempted.
+
+Revoking is `POST /admin/tokens/{token_id}/revoke` (admin key required). It stamps
+`tokens.revoked_at` *and* cuts every session, which matters because the grant — not
+the session — is what a claim link reaches: cutting sessions alone would leave
+anyone holding the link able to open a new one. It works on v1 grants too, and is
+idempotent.
+
+| Variable | Default | What it sets |
+| --- | --- | --- |
+| `ACCESS_TOKEN_TTL_SECONDS` | `900` (15 min) | v2 access token lifetime |
+| `REFRESH_TOKEN_TTL_SECONDS` | `604800` (7 days) | v2 refresh token lifetime |
+| `REFRESH_ROTATION_GRACE_SECONDS` | `30` | How long a rotated token still reads as a retry |
+| `OWNER_NOTIFY_THROTTLE_SECONDS` | `3600` | Minimum gap between operator notices per grant |
+| `REFRESH_COOKIE_NAME` | `cv_refresh` | Name of the refresh cookie |
+
+Operator notices go through `app/services/notify.py`, which logs today. Wiring it
+to an inbox is a change to that one file.
+
 ---
 
 # Docker Commands
@@ -565,22 +674,27 @@ access tokens, logs and backups.
 
 Possible future enhancements include:
 
-* AuthHandler
-* Refresh token (via claim/invite id/token)
+* AuthHandler — done: `Auth` in `app/services/auth.py`
+* ~~Refresh token (via claim/invite id/token)~~ — done, see [Token flow](#token-flow)
 * Token persistence
-* Handle max queries reached, invalid/expired token, etc. in frontend
+* ~~Handle max queries reached, invalid/expired token, etc. in frontend~~ — done;
+  the allowance is shown from `GET /session` on load, and a refused question says
+  which kind of refusal it was
 
 * ChatClient
 * Abstractions
 
 * Move the hardcoded conditional prompts from the code to separate files
 * Resource search scoring
-* CI/CD pipeline
-* Automated testing
+* ~~CI/CD pipeline~~ — done: GitHub Actions runs types, tests, migration drift,
+  Caddyfile, secret scanning and image builds on every push, and deploys `main`
+  after a green run. See [`docs/deployment.md`](docs/deployment.md#cicd)
+* ~~Automated testing~~ — done: 100 backend tests, run in CI
 * Background workers
 * Monitoring and metrics
 * Centralized logging
 * Backup automation
-* API versioning
+* API versioning — partly done: the auth endpoints are under `/v2`, the chat ones
+  are deliberately unversioned so existing links keep working
 * Chat client polymorph and factory (YAGNI)
 

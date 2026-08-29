@@ -187,10 +187,49 @@ curl -s -X POST https://chat.example.com/api/admin/conversations/<id>/redact \
 and `since`.
 
 These return hiring managers' questions verbatim, protected by one static header
-secret. Caddy rate-limits `/api/admin*` to 5 requests per minute per IP, but if
+secret. Caddy rate-limits `/api/admin*` to 20 requests per minute per IP, but if
 you want defence in depth, restricting `/api/admin*` to a known source address at
 the Caddy layer is the obvious next step — deliberately not configured here,
 since a wrong address locks you out of minting tokens.
+
+Every route that costs something is metered per client IP:
+
+| Zone | Path | Limit | Why |
+| --- | --- | --- | --- |
+| `admin_zone` | `/api/admin*` | 20/min | Mints and revokes credentials |
+| `auth_zone` | `/api/v2/auth*` | 30/min | Writes rows; a claim link is worth guessing at |
+| `chat_zone` | `/api/chat*` | 30/min | Every call bills OpenAI |
+| `session_zone` | `/api/session` | 60/min | One indexed read, no write, no model call |
+
+**These are deliberately loose, and none of them is the access control.** That is
+the signed token, the per-grant query quota and the single-use claim — and unlike
+an IP counter, none of those can be confused by two people sharing an address. The
+limiter only exists to cap cost and noise, so the numbers are set where they will
+not fire on a real visitor: an attacker without a valid token gets a 401 before any
+of this costs anything, while turning away a hiring manager is a real loss.
+
+Sizing assumes a **shared egress IP**, which is the normal case here — a company's
+hiring managers reach the site from behind one NAT address, so several people
+claiming links in the same minute is ordinary use, not abuse. `session_zone` gets
+the most headroom because it is the cheapest call and the most frequent: every page
+load, every reload and every token rotation asks it how many questions are left.
+
+**The keying breaks silently behind a proxy.** `key {remote_host}` is the true
+client address only because Caddy terminates TLS directly. Put Cloudflare, a load
+balancer or another reverse proxy in front and `remote_host` becomes *that* host,
+collapsing every visitor into a single counter — the first busy visitor then
+rate-limits everyone else. Nothing errors; it just starts refusing people. If you
+ever front this, set `trusted_proxies` and key on the forwarded client address
+instead:
+
+```
+key {http.request.header.CF-Connecting-IP}   # or X-Forwarded-For, per your proxy
+```
+
+Clients are told apart from the backend's own 429 by the response body: the backend
+sends `{"detail": "Query limit reached"}` when a grant is spent, the limiter sends
+none. The frontend keys off that, so a rate-limited visitor is asked to wait rather
+than told their questions are gone.
 
 **Content is scrubbed after 30 days.** Add the purge to the same crontab as the
 backup:
@@ -201,6 +240,108 @@ backup:
 
 Override the window with `CHAT_RETENTION_DAYS` in `backend/.env`. See
 `docs/database.md` for the erasure order and the backup caveat.
+
+**Expired sessions are pruned too.** Only relevant once you issue `version=2`
+links — `refresh_tokens` stays empty otherwise — but harmless to add either way:
+
+```
+45 3 * * * /usr/bin/flock -n /tmp/workchat-sessions.lock /root/ai-cv/scripts/purge-expired-sessions.sh >> /var/log/workchat/purge.log 2>&1
+```
+
+Override the tail it keeps with `SESSION_GRACE_DAYS`. Both scripts take
+`--dry-run`, which counts instead of writing.
+
+**Revoking access.** `POST /api/admin/tokens/{token_id}/revoke` with your admin
+key kills a grant and every session under it, v1 links included. Revoking the
+grant is the part that matters for a v2 link: cutting sessions alone would leave
+anyone still holding the claim URL able to open a fresh one.
+
+## CI/CD
+
+`.github/workflows/ci.yml` runs on every push and pull request: backend types
+(mypy) and tests, frontend types, lint and production build, an
+apply-and-drift-check of the migrations against a real Postgres, a Caddyfile
+adapt using the custom rate-limit build, a secret scan over the full history, and
+both Docker images.
+
+`.github/workflows/deploy.yml` then deploys **main** to production automatically.
+It triggers on CI *completing successfully*, not on push — `workflow_run` is what
+orders the two, where `on: push` would race them.
+
+### Secrets it needs
+
+Set these under **Settings → Secrets and variables → Actions**. Until every one
+of them exists the deploy job logs a warning and skips, so merging to main stays
+green while this is unconfigured.
+
+| secret | what it is |
+| --- | --- |
+| `DEPLOY_HOST` | Hostname or IP of the server |
+| `DEPLOY_USER` | SSH user with permission to run `docker compose` there |
+| `DEPLOY_SSH_KEY` | Private half of a keypair whose public half is in that user's `authorized_keys` |
+| `DEPLOY_KNOWN_HOSTS` | Output of `ssh-keyscan <host>`, pinning the host key |
+
+And as **variables** (not secrets — neither is sensitive):
+
+| variable | default | what it is |
+| --- | --- | --- |
+| `DEPLOY_REPO_DIR` | `/root/ai-cv` | Checkout on the server |
+| `DEPLOY_HEALTH_URL` | *(unset)* | URL polled after deploying; unset means deploy without verifying |
+
+`scripts/setup-deploy-secrets.sh` does all six in one go — mints the key,
+installs it, pins the host key, proves the key can actually run `docker compose`
+there, and sets everything:
+
+```bash
+scripts/setup-deploy-secrets.sh --host chat.example.com --user deploy
+scripts/setup-deploy-secrets.sh --host chat.example.com --user deploy --dry-run   # look first
+```
+
+It needs the GitHub CLI (`gh auth login`). Values reach `gh` on stdin rather than
+as arguments, so none of them lands in `ps`, your shell history or your
+scrollback, and the private key is never printed at all. It refuses to write a
+key inside the repository: `.gitignore` covers `id_ed25519*` and `*.pem`, but the
+surest way not to publish a private key is not to create one next to a public
+checkout.
+
+By hand, if you would rather:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/workchat_deploy -C "github-actions deploy"
+ssh-copy-id -i ~/.ssh/workchat_deploy.pub <user>@<host>
+ssh-keyscan <host>            # -> DEPLOY_KNOWN_HOSTS
+cat ~/.ssh/workchat_deploy    # -> DEPLOY_SSH_KEY (the private half)
+```
+
+Either way, give that key the narrowest access you are willing to: it can restart
+production.
+
+### Why the deploy job is written the way it is
+
+This repository is public, which makes two things load-bearing rather than
+stylistic:
+
+- **Secrets reach the shell through `env:`, never `${{ }}` inside `run:`.**
+  Interpolating a secret into a `run:` block pastes the value into the generated
+  script, where a trace or a crafted argument can surface it; masking only covers
+  what the runner recognises on the way out.
+- **The job checks the run came from this repository and was not a pull request.**
+  `workflow_run` is privileged — it executes in the base repo with secrets no
+  matter who triggered the run it followed. The `branches: [main]` filter alone
+  is not enough, because anyone can fork, push a branch named `main`, and open a
+  PR whose CI run then carries `head_branch: main`.
+
+The CI workflow itself uses no secrets at all, which is what makes it safe to run
+on pull requests from forks. Keep it that way: a check that needs a credential
+belongs in the deploy workflow or behind an environment.
+
+### Turning the auto-deploy into approve-then-deploy
+
+The deploy job declares `environment: production`. Adding a required reviewer to
+that environment in repo settings gates every deploy behind an approval without
+editing the workflow.
+
+---
 
 ## Logs
 

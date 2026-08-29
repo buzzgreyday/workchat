@@ -1,5 +1,7 @@
 import asyncio
 import json
+from collections.abc import AsyncIterator, Sequence
+from typing import Any, Protocol, cast
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -7,8 +9,14 @@ from datetime import datetime, timezone
 
 from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from openai.types.chat import ChatCompletionMessageParam, \
-    ChatCompletionToolMessageParam, ChatCompletionAssistantMessageParam
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageFunctionToolCall,
+    ChatCompletionMessageParam,
+    ChatCompletionSystemMessageParam,
+    ChatCompletionToolMessageParam,
+    ChatCompletionUserMessageParam,
+)
 from openai.types.chat.chat_completion import Choice
 
 from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
@@ -21,6 +29,31 @@ from app.services.sse import sse_event
 from app.services.tools import ChatToolService, ToolCall, ToolCallFunction
 from app.common.logging.logging import logger
 
+class ToolCallFunctionLike(Protocol):
+    @property
+    def name(self) -> str: ...
+    @property
+    def arguments(self) -> str: ...
+
+
+class ToolCallLike(Protocol):
+    """
+    What _run_tool_calls actually needs from a tool call.
+
+    Two unrelated shapes reach it: the ToolCall dataclass assembled from streaming
+    deltas, and OpenAI's own tool-call models from the non-streaming path. Neither
+    is a subtype of the other and both have exactly these fields, which is what a
+    Protocol is for — a union would have to be edited every time the SDK renames
+    or adds a class. Read-only properties rather than attributes, because that is
+    how they are used and it keeps the match covariant.
+    """
+
+    @property
+    def id(self) -> str: ...
+    @property
+    def function(self) -> ToolCallFunctionLike: ...
+
+
 class Chat:
     def __init__(
             self,
@@ -28,7 +61,7 @@ class Chat:
             tools: ChatToolService,
             session_factory: async_sessionmaker | None = None,
             endpoint: str = "/chat",
-    ):
+    ) -> None:
         self.client: AsyncOpenAI = client
         self.tools = tools
         self.messages: list[ChatCompletionMessageParam] = []
@@ -48,7 +81,7 @@ class Chat:
         self._finish_reason: str | None = None
         self._started_at: float = 0.0
 
-    async def prepare(self, request: ChatRequest, token: TokenContext):
+    async def prepare(self, request: ChatRequest, token: TokenContext) -> None:
         if LOG_CHAT_CONTENT:
             logger.debug(
                 "Preparing chat data",
@@ -90,7 +123,7 @@ class Chat:
             conversation_id_var.set(str(self.conversation_id) if self.conversation_id else None)
 
     @asynccontextmanager
-    async def _record_turn(self):
+    async def _record_turn(self) -> AsyncIterator[None]:
         """
         Records the reply however the turn ends — completed, aborted or failed.
 
@@ -134,7 +167,7 @@ class Chat:
                         extra={"request_id": self.request_id},
                     )
 
-    async def stream_response(self, reply: str = "", max_rounds: int = MAX_TOOL_ROUNDS):
+    async def stream_response(self, reply: str = "", max_rounds: int = MAX_TOOL_ROUNDS) -> AsyncIterator[bytes]:
         self._reply = reply
         async with self._record_turn():
             for _ in range(max_rounds):
@@ -180,8 +213,7 @@ class Chat:
                     ToolCall(id=tcc["id"], function=ToolCallFunction(name=tcc["name"], arguments=tcc["arguments"]))
                     for tcc in tool_call_chunks.values()
                 ]
-                message = self._assistant_tool_call_message(content, tool_calls)
-                self.messages.append(message)
+                self.messages.append(self._assistant_tool_call_message(content, tool_calls))
                 await self._run_tool_calls(tool_calls)
             else:
                 async for event in self._stream_forced_reply(max_rounds):
@@ -197,7 +229,7 @@ class Chat:
                 },
             )
 
-    async def _stream_forced_reply(self, max_rounds: int):
+    async def _stream_forced_reply(self, max_rounds: int) -> AsyncIterator[bytes]:
         """
         What the hirer gets when the tool-call budget runs out.
 
@@ -229,31 +261,39 @@ class Chat:
         self.messages.append(message)
 
     @staticmethod
-    def _assistant_tool_call_message(content: str, tool_calls: list[ToolCall]) -> ChatCompletionMessageParam | dict:
-        return {
+    def _assistant_tool_call_message(content: str, tool_calls: list[ToolCall]) -> ChatCompletionMessageParam:
+        return cast(ChatCompletionMessageParam, {
             "role": "assistant",
             "content": content or None,
             "tool_calls": [
                 {"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
                 for tc in tool_calls
             ],
-        }
+        })
 
     async def json_response(self) -> ChatResponse:
+        if self.usage is None:
+            # prepare() sets usage; arriving here means json_response was called on
+            # an unprepared Chat, which is a wiring mistake rather than anything a
+            # hirer did. It used to be an AttributeError on None several frames
+            # deeper — mypy is what surfaced it.
+            raise RuntimeError("Chat.json_response() called before prepare()")
+
         async with self._record_turn():
             reply = await self._get_full_reply() or ""
             self._reply = reply
-            usage = self.usage.model_dump()
             # Strip the system prompt before chat resp to user
             history = self._strip_system(self.messages)
-            logger.info("Sending chat response to user", extra={"usage": usage})
+            logger.info("Sending chat response to user", extra={"usage": self.usage.model_dump()})
             if LOG_CHAT_CONTENT:
                 logger.debug("Chat response content", extra={"reply": reply, "history": history})
             return ChatResponse(
                 type="done",
                 reply=reply,
-                history=history,
-                usage=usage,
+                # Message params are TypedDicts, so these already are dicts at
+                # runtime; the cast is only to say so.
+                history=cast(list[dict[str, Any]], history),
+                usage=self.usage,
                 conversation_id=str(self.conversation_id) if self.conversation_id else None,
             )
 
@@ -267,7 +307,7 @@ class Chat:
         """
         return self._strip_system(self.messages)
 
-    async def _run_tool_calls(self, tool_calls) -> None:
+    async def _run_tool_calls(self, tool_calls: Sequence[ToolCallLike]) -> None:
         for tool_call in tool_calls:
             self._tool_calls_count += 1
             name = tool_call.function.name
@@ -289,12 +329,31 @@ class Chat:
         )
         choice = response.choices[0]
         self._finish_reason = choice.finish_reason
-        self.messages.append(choice.message.model_dump(exclude_none=True))
+        self.messages.append(cast(ChatCompletionMessageParam, choice.message.model_dump(exclude_none=True)))
 
         if choice.finish_reason == "tool_calls":
-            await self._run_tool_calls(choice.message.tool_calls)
+            await self._run_tool_calls(self._function_calls(choice))
 
         return choice
+
+    @staticmethod
+    def _function_calls(choice: Choice) -> list[ChatCompletionMessageFunctionToolCall]:
+        """
+        Only the function calls, which are the only kind this service can run.
+
+        The SDK types tool_calls as function *or* custom calls, and a custom call
+        has no `.function` at all — it carries `.custom`. Nothing here registers a
+        custom tool so one should never arrive, but the old code would have met it
+        with an AttributeError rather than a log line.
+        """
+        calls = choice.message.tool_calls or []
+        function_calls = [c for c in calls if isinstance(c, ChatCompletionMessageFunctionToolCall)]
+        if len(function_calls) != len(calls):
+            logger.warning(
+                "Ignoring tool calls this service cannot run",
+                extra={"received": len(calls), "runnable": len(function_calls)},
+            )
+        return function_calls
 
     async def _get_full_reply(self, max_rounds: int = MAX_TOOL_ROUNDS) -> str | None:
         for _ in range(max_rounds):
@@ -309,7 +368,7 @@ class Chat:
         )
         choice = response.choices[0]
         self._finish_reason = choice.finish_reason
-        self.messages.append(choice.message.model_dump(exclude_none=True))
+        self.messages.append(cast(ChatCompletionMessageParam, choice.message.model_dump(exclude_none=True)))
         return choice.message.content
 
     @staticmethod
@@ -334,14 +393,29 @@ class Chat:
         )
 
     def _new_messages(self, req: ChatRequest) -> list[ChatCompletionMessageParam]:
-        system_message: ChatCompletionMessageParam | dict = {"role": "system", "content": self._system_content()}
-        self.messages = [system_message, *self._strip_system(req.history)]
-        user_message: ChatCompletionMessageParam | dict = {"role": "user", "content": req.message}
-        self.messages.append(user_message)
+        # Annotated rather than cast: a literal that has to satisfy the TypedDict
+        # is checked against it, where `| dict` merely widened the type until the
+        # checker stopped looking.
+        system_message: ChatCompletionSystemMessageParam = {
+            "role": "system", "content": self._system_content(),
+        }
+        user_message: ChatCompletionUserMessageParam = {"role": "user", "content": req.message}
+        self.messages = [system_message, *self._strip_system(req.history), user_message]
         return self.messages
 
     @staticmethod
-    def _strip_system(messages: list[ChatCompletionMessageParam] | None) -> list[ChatCompletionMessageParam]:
-        """The system prompt is backend-only: it never leaves the API and is re-added on every request."""
+    def _strip_system(
+        messages: Sequence[ChatCompletionMessageParam] | Sequence[dict[str, Any]] | None,
+    ) -> list[ChatCompletionMessageParam]:
+        """
+        The system prompt is backend-only: it never leaves the API and is re-added
+        on every request.
+
+        Both argument shapes are real and the signature now says so. Client history
+        arrives off the wire as plain dicts, while self.messages holds SDK message
+        params — which is exactly why the comprehension below tests for a dict
+        before reaching for .get.
+        """
         # If role is not == "system" the message is added in the comprehension list (whether dict or obj)
-        return [m for m in (messages or []) if (m.get("role") if isinstance(m, dict) else getattr(m, "role", None)) != "system"]
+        kept = [m for m in (messages or []) if (m.get("role") if isinstance(m, dict) else getattr(m, "role", None)) != "system"]
+        return cast(list[ChatCompletionMessageParam], kept)

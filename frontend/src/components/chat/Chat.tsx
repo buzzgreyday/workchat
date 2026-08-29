@@ -1,30 +1,35 @@
 "use client";
 
-import { useEffect } from "react";
-
 import ChatHeader from "./Header";
 import MessageList from "./MessageList";
 import ChatInput from "./Input";
 
 import { useChat } from "@/hooks/useChat";
+import { useSession } from "@/hooks/useSession";
 
-export default function Chat({ token }: { token: string }) {
-  // Drop the token from the address bar / history once it's been read, so it
-  // doesn't linger in browser history or get logged in server access logs.
-  useEffect(() => {
-    if (token && window.location.search.includes("token=")) {
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, [token]);
+export default function Chat({
+  token,
+  claim,
+}: {
+  token?: string;
+  claim?: string;
+}) {
+  // Owns the access token and, for a claim link, the one-shot exchange that
+  // produces it. Dropping the credential out of the address bar happens in
+  // there too — after the exchange settles, so a reload before it lands can
+  // still retry rather than finding an empty URL.
+  const session = useSession({ token, claim });
 
   const {
     messages,
     input,
     loading,
+    disabled,
+    disabledReason,
     usage,
     setInput,
     sendMessage,
-  } = useChat(token);
+  } = useChat(session);
 
   return (
     <div className="chat-card flex h-[calc(100dvh-2rem)] max-h-175 w-full max-w-4xl flex-col overflow-hidden rounded-3xl shadow-2xl">
@@ -35,6 +40,8 @@ export default function Chat({ token }: { token: string }) {
       <ChatInput
         value={input}
         loading={loading}
+        disabled={disabled}
+        disabledReason={disabledReason}
         onChange={setInput}
         onSend={sendMessage}
       />

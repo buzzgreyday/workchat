@@ -1,0 +1,149 @@
+name: Deploy
+
+# Fires only when CI has finished on main, so a red build cannot reach the
+# server. `workflow_run` is what enforces that ordering across workflows —
+# `on: push` here would race CI rather than follow it.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+# One deploy at a time, and never cancel one midway: a half-applied
+# `docker compose up` is worse than a queued one.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Production
+    runs-on: ubuntu-latest
+    # This repo is public, and `workflow_run` is a privileged trigger: it runs in
+    # the base repo with access to secrets, regardless of who caused the run that
+    # triggered it. The branch filter above is not sufficient on its own —
+    # anyone can fork, push a branch called `main`, and open a PR, whose CI run
+    # then has head_branch `main`. So the origin of the run is checked here too:
+    # same repository, and not a pull request. Without these two lines a stranger
+    # could fire production deploys at will.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event != 'pull_request' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    # Add required reviewers to this environment in repo settings to turn the
+    # auto-deploy into an approve-then-deploy without touching this file.
+    environment: production
+    steps:
+      # Nothing is checked out: the host pulls its own copy. This job only needs
+      # to reach the box.
+      #
+      # Every secret below travels through `env:` and is read as a shell variable.
+      # Interpolating `${{ secrets.X }}` into a `run:` block would paste the value
+      # into the generated script itself, where a `set -x`, an error trace or a
+      # crafted argument can surface it — masking only covers what the runner
+      # recognises on the way out.
+      - name: Check the deploy configuration is present
+        id: preflight
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          missing=""
+          [ -n "${DEPLOY_HOST:-}" ]        || missing="$missing DEPLOY_HOST"
+          [ -n "${DEPLOY_USER:-}" ]        || missing="$missing DEPLOY_USER"
+          [ -n "${DEPLOY_SSH_KEY:-}" ]     || missing="$missing DEPLOY_SSH_KEY"
+          # Required, not optional. The alternative is trusting whatever answers
+          # at that address on the day, which is a poor trade for one secret.
+          [ -n "${DEPLOY_KNOWN_HOSTS:-}" ] || missing="$missing DEPLOY_KNOWN_HOSTS"
+          if [ -n "$missing" ]; then
+            # Names only — never the values. Skip rather than fail: until the
+            # secrets exist this would otherwise paint every merge to main red
+            # for a deploy nobody has configured yet.
+            echo "::warning::Deploy skipped — missing:$missing"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install the deploy key
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Pull and restart on the host
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          # Not a secret — a path. Matches the default scripts/ already assumes.
+          REPO_DIR: ${{ vars.DEPLOY_REPO_DIR || '/root/ai-cv' }}
+          # The commit this deploy is *for*, so the server can be asked to prove
+          # it actually has it rather than merely being up.
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          # The remote script is a quoted heredoc, so nothing in it is expanded
+          # locally; the two values it needs are handed over on the command line.
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "REPO_DIR='$REPO_DIR' EXPECTED_SHA='$EXPECTED_SHA' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$REPO_DIR"
+          git fetch --prune origin
+          git checkout main
+          git reset --hard origin/main
+
+          # Prove the tree contains the commit this run was triggered for.
+          # `--is-ancestor` rather than an equality test, so a push landing while
+          # this deploy is in flight leaves it correct rather than spuriously red.
+          if ! git merge-base --is-ancestor "$EXPECTED_SHA" HEAD; then
+            echo "checkout does not contain $EXPECTED_SHA (HEAD is $(git rev-parse HEAD))" >&2
+            exit 1
+          fi
+          echo "deploying $(git rev-parse --short HEAD)"
+
+          # --wait is what makes the health check downstream meaningful. Without
+          # it `up -d` returns once containers are *started*, so the job could
+          # curl the site and get a 200 from the container being replaced —
+          # reporting success for the deployment it had just superseded. With it,
+          # compose blocks until db and backend pass their own healthchecks,
+          # which for backend means the entrypoint's `alembic upgrade head`
+          # finished and uvicorn is serving.
+          docker compose -f docker-compose.prod.yaml up -d --build --wait --wait-timeout 180
+          docker image prune -f
+          REMOTE
+
+      # Deliberately over the public URL rather than something on the box: by
+      # this point compose has already confirmed the containers are healthy, so
+      # what is left to check is the part only an outside request exercises —
+      # TLS, and Caddy routing /api to the backend rather than the frontend.
+      - name: Check the site answers from outside
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          # A public URL, so a repo variable rather than a secret.
+          SITE: ${{ vars.DEPLOY_HEALTH_URL }}
+        run: |
+          if [ -z "${SITE:-}" ]; then
+            echo "::warning::DEPLOY_HEALTH_URL unset — deployed without verifying"
+            exit 0
+          fi
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 5 "$SITE" >/dev/null; then
+              echo "site answered after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::$SITE did not answer within 30s, though the containers reported healthy"
+          exit 1
