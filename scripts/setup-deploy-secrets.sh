@@ -18,7 +18,7 @@
 #   --host        server hostname or IP                        (required)
 #   --user        SSH user that can run docker compose there    (required)
 #   --repo-dir    checkout on the server        (default: /root/ai-cv)
-#   --health-url  URL polled after deploying    (default: https://<host>/health)
+#   --health-url  URL polled after deploying (default: https://<host>/api/health)
 #   --key         key path            (default: ~/.ssh/workchat_deploy)
 #   --dry-run     show what would happen, change nothing
 
@@ -42,7 +42,10 @@ done
 
 [ -n "$HOST" ] || { echo "--host is required" >&2; exit 1; }
 [ -n "$USER_" ] || { echo "--user is required" >&2; exit 1; }
-[ -n "$HEALTH_URL" ] || HEALTH_URL="https://${HOST}/health"
+# /api/health, not /health: Caddy proxies /api/* to the backend and everything
+# else to the frontend, so /health reaches Next.js and 404s. Pass --health-url
+# explicitly when the certificate is for a domain rather than this address.
+[ -n "$HEALTH_URL" ] || HEALTH_URL="https://${HOST}/api/health"
 
 case "$KEY" in
   "$PWD"/*|./*|scripts/*)
@@ -78,8 +81,18 @@ else
 fi
 
 # 2. Install the public half -------------------------------------------------
-log "installing the public key for ${USER_}@${HOST}"
-run ssh-copy-id -i "${KEY}.pub" "${USER_}@${HOST}"
+# Checked first so the script is idempotent, and because ssh-copy-id has to
+# authenticate somehow: with the key already authorised it would fall back to the
+# agent, which on a machine with a confirm-protected key means an interactive
+# prompt this script cannot answer. IdentitiesOnly keeps the probe to this key
+# alone rather than letting the agent answer for it.
+if ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 \
+     "${USER_}@${HOST}" true 2>/dev/null; then
+  log "key already authorised for ${USER_}@${HOST} — nothing to install"
+else
+  log "installing the public key for ${USER_}@${HOST}"
+  run ssh-copy-id -i "${KEY}.pub" "${USER_}@${HOST}"
+fi
 
 # 3. Pin the host key --------------------------------------------------------
 log "scanning the host key"
@@ -94,7 +107,7 @@ fi
 # 4. Prove the key works before handing it to CI -----------------------------
 log "checking the key can reach docker compose on the server"
 if [ "$DRY_RUN" -eq 0 ]; then
-  ssh -i "$KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+  ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
     "${USER_}@${HOST}" "cd '$REPO_DIR' && docker compose version >/dev/null" \
     || { echo "Could not run docker compose in $REPO_DIR as $USER_." >&2; exit 1; }
   log "  reachable"
