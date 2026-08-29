@@ -55,12 +55,22 @@ if ! gzip -t "$tmp" 2>/dev/null; then
   exit 1
 fi
 
-if ! zcat "$tmp" | head -40 | grep -q "PostgreSQL database dump"; then
-  log "FAIL: dump lacks the pg_dump header"
-  exit 1
-fi
+# Captured into variables rather than tested through a pipeline. `grep -q` exits
+# at its first match and closes the pipe, `zcat` takes SIGPIPE, and `pipefail`
+# reports 141 for the whole pipeline — so a perfectly good dump was rejected with
+# "lacks the pg_dump header". It raced the pipe buffer: small dumps finished
+# writing before grep exited and passed, larger ones failed, which made it look
+# intermittent and get worse as the database grew. `|| true` keeps a SIGPIPE from
+# killing the script under `set -e`; the content check below is what actually
+# decides.
+header="$(zcat "$tmp" 2>/dev/null | head -40 || true)"
+case "$header" in
+  *"PostgreSQL database dump"*) ;;
+  *) log "FAIL: dump lacks the pg_dump header"; exit 1 ;;
+esac
 
-if ! zcat "$tmp" | grep -q "CREATE TABLE"; then
+tables="$(zcat "$tmp" 2>/dev/null | grep -c "^CREATE TABLE" || true)"
+if [ "${tables:-0}" -lt 1 ]; then
   log "FAIL: dump contains no tables"
   exit 1
 fi
@@ -72,7 +82,7 @@ mv "$tmp" "$out"
 chmod 600 "$out"
 trap - EXIT
 
-log "wrote ${out} (${size} bytes)"
+log "wrote ${out} (${size} bytes, ${tables} tables)"
 
 # Promote to the longer-lived tiers. Copies rather than links, so pruning one
 # tier can never remove a file another tier still depends on.
