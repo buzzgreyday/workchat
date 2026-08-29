@@ -15,6 +15,10 @@ const BROKEN_LINK_MESSAGE =
   "I couldn't open a session from this link. It may have expired. " +
   "Ask for a fresh one and we can get started.";
 
+const NO_LINK_MESSAGE =
+  "You'll need the chat link you were sent to start a session. " +
+  "If you had one open, it may just have timed out — ask for a new link.";
+
 export function useChat({
   accessToken,
   status,
@@ -43,9 +47,11 @@ export function useChat({
         ? SPENT_LINK_MESSAGE
         : status === "error"
           ? BROKEN_LINK_MESSAGE
-          : accessToken
-            ? `Hi ${getUserName(accessToken)}! 👋`
-            : "Hi! 👋";
+          : status === "none"
+            ? NO_LINK_MESSAGE
+            : accessToken
+              ? `Hi ${getUserName(accessToken)}! 👋`
+              : "Hi! 👋";
 
     setMessages((prev) =>
       prev.length === 1 && prev[0].id === "welcome"
