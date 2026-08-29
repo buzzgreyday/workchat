@@ -49,6 +49,19 @@
 			events 10
 			window 1m
 		}
+		# The loosest of the four, because it is the cheapest — one indexed
+		# read, no write, no OpenAI call — and the most likely to be hit
+		# legitimately more than once, since every page load and reload asks
+		# it how many questions are left. Present so the endpoint is not the
+		# one unmetered way to probe whether a token is still good.
+		zone session_zone {
+			match {
+				path /api/session
+			}
+			key {remote_host}
+			events 30
+			window 1m
+		}
 	}
 
 	# Backend API — strip /api prefix before proxying.

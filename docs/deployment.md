@@ -192,6 +192,21 @@ you want defence in depth, restricting `/api/admin*` to a known source address a
 the Caddy layer is the obvious next step — deliberately not configured here,
 since a wrong address locks you out of minting tokens.
 
+Every route that costs something is metered per client IP, in rough proportion to
+what a request is worth to an attacker:
+
+| Zone | Path | Limit | Why |
+| --- | --- | --- | --- |
+| `admin_zone` | `/api/admin*` | 5/min | Mints and revokes credentials |
+| `auth_zone` | `/api/v2/auth*` | 10/min | Writes rows; a claim link is worth guessing at |
+| `chat_zone` | `/api/chat*` | 20/min | Every call bills OpenAI |
+| `session_zone` | `/api/session` | 30/min | One indexed read, no write, no model call |
+
+`session_zone` is the loosest because it is the cheapest and the most likely to be
+hit legitimately more than once — every page load and reload asks it how many
+questions are left. It is metered anyway so that it is not the one unmetered way
+to probe whether a token is still good.
+
 **Content is scrubbed after 30 days.** Add the purge to the same crontab as the
 backup:
 
