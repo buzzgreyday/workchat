@@ -86,7 +86,8 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 │   ├── backup-private-resources.sh
 │   ├── pull-backups.sh
 │   ├── purge-chat-content.sh
-│   └── purge-expired-sessions.sh
+│   ├── purge-expired-sessions.sh
+│   └── setup-deploy-secrets.sh   # one-shot: CI deploy key + GitHub secrets
 ├── frontend
 │   ├── components.json
 │   ├── Dockerfile

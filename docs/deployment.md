@@ -288,9 +288,23 @@ And as **variables** (not secrets — neither is sensitive):
 | `DEPLOY_REPO_DIR` | `/root/ai-cv` | Checkout on the server |
 | `DEPLOY_HEALTH_URL` | *(unset)* | URL polled after deploying; unset means deploy without verifying |
 
-Generate the deploy key **outside the repository** — `.gitignore` covers
-`id_ed25519*` and friends, but the surest way not to publish a private key is not
-to create it next to a public checkout:
+`scripts/setup-deploy-secrets.sh` does all six in one go — mints the key,
+installs it, pins the host key, proves the key can actually run `docker compose`
+there, and sets everything:
+
+```bash
+scripts/setup-deploy-secrets.sh --host chat.example.com --user deploy
+scripts/setup-deploy-secrets.sh --host chat.example.com --user deploy --dry-run   # look first
+```
+
+It needs the GitHub CLI (`gh auth login`). Values reach `gh` on stdin rather than
+as arguments, so none of them lands in `ps`, your shell history or your
+scrollback, and the private key is never printed at all. It refuses to write a
+key inside the repository: `.gitignore` covers `id_ed25519*` and `*.pem`, but the
+surest way not to publish a private key is not to create one next to a public
+checkout.
+
+By hand, if you would rather:
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/workchat_deploy -C "github-actions deploy"
@@ -299,7 +313,8 @@ ssh-keyscan <host>            # -> DEPLOY_KNOWN_HOSTS
 cat ~/.ssh/workchat_deploy    # -> DEPLOY_SSH_KEY (the private half)
 ```
 
-Give that key the narrowest access you are willing to: it can restart production.
+Either way, give that key the narrowest access you are willing to: it can restart
+production.
 
 ### Why the deploy job is written the way it is
 
