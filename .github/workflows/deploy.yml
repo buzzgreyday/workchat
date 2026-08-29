@@ -38,6 +38,10 @@ jobs:
     # Add required reviewers to this environment in repo settings to turn the
     # auto-deploy into an approve-then-deploy without touching this file.
     environment: production
+    outputs:
+      # Distinguishes "deployed" from "skipped because it is not configured" —
+      # the job succeeds either way, and only the first should produce a release.
+      deployed: ${{ steps.preflight.outputs.ready }}
     steps:
       # Nothing is checked out: the host pulls its own copy. This job only needs
       # to reach the box.
@@ -147,3 +151,49 @@ jobs:
           done
           echo "::error::$SITE did not answer within 30s, though the containers reported healthy"
           exit 1
+
+  release:
+    name: Tag and release
+    runs-on: ubuntu-latest
+    needs: deploy
+    # Only after something actually reached the server. A release that was never
+    # deployed is worse than no release: it reads as a statement about production
+    # that is not true.
+    if: needs.deploy.outputs.deployed == 'true'
+    permissions:
+      # Overrides the workflow-wide read, and only for this job: creating a tag
+      # and a release is the one thing here that writes to the repository.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The commit that was deployed, not whatever main points at now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Release, if the version was bumped
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          # The version is whatever backend/pyproject.toml says. Deliberately not
+          # derived from commit messages: the number stays a decision you make in
+          # a `chore(release):` commit, and this only publishes it.
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' backend/pyproject.toml | head -1)"
+          if [ -z "$version" ]; then
+            echo "::error::could not read version from backend/pyproject.toml"
+            exit 1
+          fi
+          tag="v${version}"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "::notice::$tag already released — no version bump in this merge, nothing to do"
+            exit 0
+          fi
+
+          echo "releasing $tag from ${SHA}"
+          gh release create "$tag" \
+            --target "$SHA" \
+            --title "$tag" \
+            --generate-notes
+          echo "::notice::released $tag"
