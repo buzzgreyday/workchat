@@ -7,16 +7,40 @@ on:
   # So a red main can be re-checked without an empty commit.
   workflow_dispatch:
 
-# A newer push supersedes an in-flight run on the same ref. Never cancel main:
-# its run is what gates the deploy.
+# A newer push supersedes an in-flight run on the same ref. The two long-lived
+# branches are exempt: main's run is what gates the deploy, and development's is
+# what a promotion PR is judged on. Cancelling either loses the answer.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: >-
+    ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
 
 permissions:
   contents: read
 
 jobs:
+  # The promotion chain is experimental/* -> development -> main. Branch
+  # protection can require a pull request and a green build, but it has no notion
+  # of where that pull request came *from*, so the last link is enforced here:
+  # main takes development and nothing else.
+  branch-policy:
+    name: Branch policy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: main only accepts development
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+        run: |
+          if [ "$BASE" = "main" ] && [ "$HEAD" != "development" ]; then
+            echo "::error::main only accepts merges from development, but this PR" \
+                 "comes from '$HEAD'. Merge it into development first, then open a" \
+                 "promotion PR from development to main."
+            exit 1
+          fi
+          echo "ok: $HEAD -> $BASE"
+
   backend:
     name: Backend — types and tests
     runs-on: ubuntu-latest
@@ -80,6 +104,13 @@ jobs:
 
   migrations:
     name: Migrations — apply and check for drift
+    # Slow job, so it is scoped: every pull request and both long-lived branches
+    # run it, pushes to experimental/* do not. Nothing reaches development or
+    # main without having passed this — the promotion PR is where it bites.
+    if: >-
+      github.event_name != 'push' ||
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -139,6 +170,11 @@ jobs:
 
   caddy:
     name: Caddyfile — adapt with the rate-limit module
+    # Scoped like `migrations` above.
+    if: >-
+      github.event_name != 'push' ||
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -189,6 +225,11 @@ jobs:
 
   images:
     name: Docker images build
+    # Scoped like `migrations` above.
+    if: >-
+      github.event_name != 'push' ||
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
