@@ -386,11 +386,29 @@ The CI workflow itself uses no secrets at all, which is what makes it safe to ru
 on pull requests from forks. Keep it that way: a check that needs a credential
 belongs in the deploy workflow or behind an environment.
 
-### Turning the auto-deploy into approve-then-deploy
+### The approval gate
 
-The deploy job declares `environment: production`. Adding a required reviewer to
-that environment in repo settings gates every deploy behind an approval without
-editing the workflow.
+The deploy job declares `environment: production`, and that environment carries a
+required reviewer. A green CI run on `main` therefore *queues* a deployment and
+waits — the run sits in `waiting` until someone approves it from the Actions tab.
+Remove the reviewer in repo settings to make deploys automatic again; neither
+direction needs the workflow edited.
+
+The environment is also restricted to the `main` branch. The workflow's own
+`workflow_run` trigger already filters on `main`, but `workflow_dispatch` does
+not, and that filter is a branch name rather than a guarantee about which branch
+holds the secrets. The environment policy is the backstop.
+
+Approving from the CLI needs a JSON body — the obvious `-f environment_ids[]=…`
+form sends a string where the API wants an integer, and the call silently
+no-ops:
+
+```bash
+gh api -X POST repos/<owner>/<repo>/actions/runs/<run-id>/pending_deployments \
+  --input - <<'JSON'
+{ "environment_ids": [<id>], "state": "approved", "comment": "…" }
+JSON
+```
 
 ---
 

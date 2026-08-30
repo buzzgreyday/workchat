@@ -87,7 +87,7 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 │   ├── pull-backups.sh
 │   ├── purge-chat-content.sh
 │   ├── purge-expired-sessions.sh
-│   └── setup-deploy-secrets.sh   # one-shot: CI deploy key + GitHub secrets
+│   └── setup-deploy-secrets.sh   # CI deploy key + GitHub secrets; also key rotation
 ├── frontend
 │   ├── components.json
 │   ├── Dockerfile
@@ -690,8 +690,11 @@ Possible future enhancements include:
 * Move the hardcoded conditional prompts from the code to separate files
 * Resource search scoring
 * ~~CI/CD pipeline~~ — done: GitHub Actions runs types, tests, migration drift,
-  Caddyfile, secret scanning and image builds on every push, and deploys `main`
-  after a green run. See [`docs/deployment.md`](docs/deployment.md#cicd)
+  Caddyfile, secret scanning and image builds. Work happens on `experimental/*`,
+  integrates on `development` and reaches production through `main`, where a
+  green run queues a deploy for approval. See
+  [branches](docs/development.md#branches) and
+  [`docs/deployment.md`](docs/deployment.md#cicd)
 * ~~Automated testing~~ — done: 100 backend tests, run in CI
 * Background workers
 * Monitoring and metrics

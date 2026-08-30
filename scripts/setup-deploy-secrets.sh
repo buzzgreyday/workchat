@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 #
-# One-shot setup for the GitHub Actions deploy: mint a deploy key, install it on
-# the server, and set the four secrets the workflow needs.
+# Wires GitHub Actions up to the server: mint a deploy key, install it there, and
+# set the secrets and variables the deploy workflow reads.
 #
-# Run this from your machine, once. It is not a cron job like its neighbours —
-# it lives here so the steps are executable rather than a list in a document
-# somebody retypes slightly differently.
+# Run it from your machine, not the server. It is not a cron job like its
+# neighbours — it lives here so the steps are executable rather than a list in a
+# document somebody retypes slightly differently.
+#
+# It is idempotent, and that is the point: an existing key is reused, an
+# already-authorised key is left alone, and the secrets are simply overwritten.
+# So this is not only first-time setup — it is also how you rotate the deploy key
+# (delete the key file first) and how you re-establish trust after rebuilding the
+# server. Keep it for those days.
 #
 # Nothing it creates is written into this repository, and no secret is ever
 # echoed: values reach `gh` on stdin, so they stay out of your shell history,
@@ -35,7 +41,9 @@ while [ $# -gt 0 ]; do
     --health-url) HEALTH_URL="$2"; shift 2 ;;
     --key) KEY="$2"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
-    -h|--help) sed -n '2,25p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    # Prints the comment block above, however long it grows — a line range here
+    # silently truncates the help the next time someone edits the header.
+    -h|--help) awk 'NR>1 && /^#/ {sub(/^# ?/, ""); print; next} NR>1 {exit}' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -138,6 +146,7 @@ Set: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
 The private key stays at ${KEY} and was never printed. Anyone holding it can
 restart production, so treat it as you would a root password.
 
-Merging to main now deploys after CI goes green. To require an approval first,
-add a reviewer to the "production" environment in repo settings.
+Merging to main queues a deploy once CI is green. The "production" environment
+carries a required reviewer, so it waits for an approval rather than shipping on
+its own; remove the reviewer in repo settings to make it automatic.
 MSG
