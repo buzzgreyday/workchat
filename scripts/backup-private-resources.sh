@@ -11,13 +11,13 @@
 #   scripts/backup-private-resources.sh
 #
 # Override with environment variables if your setup differs:
-#   BACKUP_HOST        ssh host (default: aicv-prod)
+#   BACKUP_HOST        ssh host (default: aicv-deploy)
 #   BACKUP_REMOTE_DIR  resources dir on the host (default: /opt/ai-cv/backend/resources)
 #   BACKUP_DEST        where backups are written (default: ~/backups/workchat)
 
 set -euo pipefail
 
-HOST="${BACKUP_HOST:-aicv-prod}"
+HOST="${BACKUP_HOST:-aicv-deploy}"
 REMOTE_DIR="${BACKUP_REMOTE_DIR:-/opt/ai-cv/backend/resources}"
 DEST_ROOT="${BACKUP_DEST:-$HOME/backups/workchat}"
 

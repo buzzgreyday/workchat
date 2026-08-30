@@ -443,11 +443,27 @@ It exits non-zero and skips the `latest` symlink if anything mismatches, so a
 truncated transfer cannot masquerade as a good backup. Override `BACKUP_HOST`,
 `BACKUP_REMOTE_DIR` or `BACKUP_DEST` if your setup differs.
 
+It connects as the deploy user, which is all the read access it needs — the
+resources directory is owned by `deploy`. That wants its own alias, because the
+`aicv-prod` one pins root's key with `IdentitiesOnly yes` and so cannot
+authenticate as anyone else:
+
+```
+Host aicv-deploy
+    HostName <your host>
+    User deploy
+    IdentityFile ~/.ssh/workchat_deploy
+    IdentitiesOnly yes
+```
+
+`pull-backups.sh` stays on `aicv-prod`: the database dumps land in
+`/root/backups`, which the deploy user cannot read.
+
 To restore onto a rebuilt host:
 
 ```bash
 scp ~/backups/workchat/latest/{system-prompt.md,contact.md} \
-  aicv-prod:/opt/ai-cv/backend/resources/
+  aicv-deploy:/opt/ai-cv/backend/resources/
 sudo chown -R 1000:1000 backend/resources   # on the host, per step 6
 ```
 
