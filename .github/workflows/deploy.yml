@@ -35,8 +35,10 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event != 'pull_request' &&
        github.event.workflow_run.head_repository.full_name == github.repository)
-    # Add required reviewers to this environment in repo settings to turn the
-    # auto-deploy into an approve-then-deploy without touching this file.
+    # The `production` environment carries a required reviewer, so a green run on
+    # main queues a deploy and waits for a click rather than shipping on its own.
+    # That gate lives in repo settings, not here — removing the reviewer turns
+    # this back into an auto-deploy without touching this file.
     environment: production
     outputs:
       # Distinguishes "deployed" from "skipped because it is not configured" —
