@@ -573,6 +573,9 @@ Typical development workflow:
    after `pyproject.toml`/`uv.lock`, or `frontend` after `package.json`.
 6. Commit code and migration files together, so a checkout never has models and
    schema out of step.
+7. Work on an `experimental/*` branch and open a pull request into
+   `development`. `main` is production and takes merges from `development`
+   only — see [Branches](docs/development.md#branches).
 
 ---
 
