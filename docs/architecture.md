@@ -40,10 +40,55 @@ surfaces need three different checks.
 |---|---|---|
 | `app/routes/` | `HTTPException` | yes — this is the boundary |
 | `app/services/` | domain errors from `app/common/exceptions.py` | no |
+| `app/repositories/` | domain errors | no |
 | `app/common/` | domain errors | no |
 
 Services staying HTTP-free is what lets them be tested, and reused, without a
 request in flight.
+
+`app/repositories/` is persistence as its own layer, and the only layer allowed
+to know what the storage engine is.
+
+A repository speaks in the domain models from `app/common/models/`, never the
+ORM rows in `app/common/schemas.py`, and takes no session in its abstract
+methods — so a service that depends on `UserRepositoryBase` can be exercised
+against an in-memory implementation with no database in the process.
+
+```
+app/repositories/
+├── base.py     UserRepositoryBase, TokenRepositoryBase
+├── sql.py      the SQLAlchemy backend — the one module that names a session
+└── __init__.py the composition root: binds a backend, exports the providers
+```
+
+**There is deliberately no `commit` anywhere in `base`, and no unit of work.**
+SQLAlchemy's `Session` is already a unit of work, so wrapping it in another one
+would only add a verb other stores cannot honour: a file-write backend has no
+rollback in any meaningful sense, and Mongo without a replica set has no
+multi-document transaction and is already durable on an acknowledged write.
+Either would have to stub a `commit` whose name implies a guarantee it cannot
+keep.
+
+Instead, repositories flush and `get_db` commits when the request ends cleanly,
+rolling back when it does not. A service writes through repositories and says
+nothing about durability. SQL still gets one transaction per request — FastAPI
+caches `Depends(get_db)`, so every repository in a request shares a session —
+but as a property of that backend, never something a service claims.
+
+`get_user_repository` and `get_token_repository` are FastAPI dependencies whose
+*own* dependencies are whatever the chosen backend declares. The SQL providers
+ask for `Depends(get_db)`; a backend needing something else, or nothing, says so
+there, and the route asking for a repository is unaffected either way. That is
+what makes another store a new module plus a one-line change in `__init__.py`,
+rather than an edit to every route and service.
+
+Only the issue-token path has moved so far. The free functions in
+`app/services/db.py` are the same job done the previous way. Where those are
+genuinely transactional — `rotate_refresh_token` inserts a successor and
+conditionally revokes its predecessor, rolling back so a lost race leaves no
+orphan — the atomicity is internal to one operation, so a repository method can
+own it privately with whatever its backend has. None of them needs two
+repositories to share a transaction.
 
 ## Where to read next
 

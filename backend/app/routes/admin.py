@@ -16,7 +16,9 @@ from app.common.models import (
     IssueTokenRequest,
 )
 from app.helpers.qr_code import get_qr_code
-from app.services.admin import create_user_and_access_token
+from app.repositories import get_token_repository, get_user_repository
+from app.repositories.base import TokenRepositoryBase, UserRepositoryBase
+from app.services import admin
 from app.services.auth import require_admin
 from app.common.schemas import DatabaseToken
 from app.services.db import (
@@ -42,7 +44,11 @@ logger = logging.logger
         }
     },
 )
-async def issue_token(req: IssueTokenRequest, db: AsyncSession = Depends(get_db)) -> Response:
+async def issue_token(
+    req: IssueTokenRequest,
+    users: UserRepositoryBase = Depends(get_user_repository),
+    tokens: TokenRepositoryBase = Depends(get_token_repository),
+) -> Response:
     logger.info(
         "Issuing a new access token",
         extra={
@@ -51,7 +57,7 @@ async def issue_token(req: IssueTokenRequest, db: AsyncSession = Depends(get_db)
             "max_queries": req.max_queries, "type": req.type, "version": req.version
         }
     )
-    token = await create_user_and_access_token(req, db)
+    token = await admin.issue_token(req, users=users, tokens=tokens)
     # v1 puts the access token straight in the link; v2 puts a claim token there
     # instead, so the query parameter has to change with it. The frontend reads
     # whichever one it finds — ?token= is still what every issued link carries.

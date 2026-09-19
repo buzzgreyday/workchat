@@ -14,7 +14,6 @@ from app.common.schemas import (
     DatabaseConversation,
     DatabaseRefreshToken,
     DatabaseToken,
-    DatabaseUser,
 )
 from app.common.config import (
     OWNER_NOTIFY_THROTTLE_SECONDS,
@@ -52,127 +51,6 @@ def hash_token(raw_token: str) -> str:
         TOKEN_HASHING_SECRET.encode(), raw_token.encode(), hashlib.sha256
     ).hexdigest()
 
-
-async def get_or_create_user(
-        name: str,
-        email: str | None,
-        phone: str | None,
-        db: AsyncSession
-) -> DatabaseUser:
-    """
-
-    Args:
-        name: Company name
-        email:
-        phone:
-        db:
-
-    Returns:
-
-    """
-    logger.debug(
-        "Checking if user (company) exists",
-        extra={"company (name)": name}
-    )
-    result = await db.execute(select(DatabaseUser).where(DatabaseUser.name == name))
-    user = result.scalar_one_or_none()
-    if user is not None:
-        logger.info(
-            "User exists",
-            extra={"id": user.id, "company (name)": user.name, "email": user.email, "phone": user.phone}
-        )
-        return user
-
-    user = DatabaseUser(name=name, email=email, phone=phone)
-    logger.info(
-        "Creating new user",
-        extra={"company (name)": user.name, "email": user.email, "phone": user.phone}
-    )
-    db.add(user)
-    await db.flush()
-    logger.debug(
-        "Changes flushed to database: user assigned with user.id without ending the transaction",
-        extra={"id": user.id, "company (name)": user.name, "email": user.email, "phone": user.phone}
-    )
-    return user
-
-
-async def create_user_and_relate_token(
-        token_id: uuid.UUID,
-        raw_token: str,
-        max_queries: int,
-        expires_at: datetime,
-        subject: str,
-        company: str,
-        created_at: datetime,
-        db: AsyncSession,
-        email: str | None = None,
-        phone: str | None = None,
-        job_title: str | None = None,
-        version: int = 1,
-) -> DatabaseToken:
-    logger.debug(
-        "Relating access token to user",
-        extra={
-            "subject": subject, "job_title": job_title, "company": company,
-            "email": email, "phone": phone, "expires_at": expires_at,
-            "max_queries": max_queries
-        }
-    )
-    user = await get_or_create_user(name=company, email=email.lower() if email else None, phone=phone, db=db)
-
-    token_hash = hash_token(raw_token)
-    token_row = DatabaseToken(
-        id=token_id,
-        user_id=user.id,
-        token_hash=token_hash,
-        subject=subject,
-        company=company,
-        job_title=job_title,
-        created_at=created_at,
-        max_queries=max_queries,
-        expires_at=expires_at,
-        version=version,
-    )
-    logger.debug(
-        "Creating token entry in database",
-        extra={
-            "user_id": user.id,
-            "token_hash": token_hash,
-            "subject": subject,
-            "company": company,
-            "job_title": job_title,
-            "created_at": created_at,
-            "max_queries": max_queries,
-            "expires_at": expires_at,
-            "version": version
-        }
-    )
-    db.add(token_row)
-    await db.commit()
-    await db.refresh(token_row)
-    logger.info(
-        "Committed token and user changes to database",
-        extra={
-            "token": {
-                "user_id": user.id,
-                "token_hash": token_hash,
-                "subject": subject,
-                "company": company,
-                "job_title": job_title,
-                "created_at": created_at,
-                "max_queries": max_queries,
-                "expires_at": expires_at
-            },
-            "user": {
-                "id": user.id,
-                "company (name)": user.name,
-                "email": user.email,
-                "phone": user.phone
-            }
-        }
-    )
-    return token_row
 
 async def update_token_used_query_count(
         token_id: uuid.UUID,
