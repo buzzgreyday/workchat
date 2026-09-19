@@ -33,7 +33,7 @@ import pytest  # noqa: E402
 from httpx import ASGITransport  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
-from app.common.db import Base, get_db, get_session_factory  # noqa: E402
+from app.common.db import Base, get_db, get_session_factory, transaction  # noqa: E402
 from app.main import app  # noqa: E402
 from app.openai.client import get_openai_client  # noqa: E402
 
@@ -74,8 +74,11 @@ def openai_mock():
 
 @pytest.fixture
 async def client(session_maker, openai_mock):
+    # Bound to the test engine, but through the same `transaction` helper the
+    # real get_db uses — so a request here commits and rolls back exactly as it
+    # does in production, rather than testing a looser definition of one.
     async def _get_db():
-        async with session_maker() as s:
+        async with transaction(session_maker) as s:
             yield s
 
     app.dependency_overrides[get_db] = _get_db

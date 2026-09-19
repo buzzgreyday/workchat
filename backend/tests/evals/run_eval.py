@@ -19,6 +19,14 @@ Overrides:
   EVAL_BASE_URL  backend to hit (default: http://localhost:8000)
   ADMIN_KEY      admin key used to mint this run's access token (from the env)
 
+The model is not one of them. This harness drives whichever backend is already
+running, so an arm is whatever that server was started with — and a dev server
+defaults to the cheap model. Set OPENAI_MODEL in backend/.env and restart the
+backend before comparing arms, or the run will quietly measure nano and label
+the report accordingly:
+
+  OPENAI_MODEL=gpt-4.1-mini docker compose up -d backend
+
 Writes one transcript per run to tests/evals/results/, which is gitignored — the
 replies are run artifacts, not source. Each run mints one access token and
 leaves one conversation per question in the database.
