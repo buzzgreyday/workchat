@@ -1,7 +1,6 @@
 import {
   ChatHistoryMessage,
   ChatRequest,
-  ChatResponse,
   Usage,
 } from "@/types/chat";
 import { SSEEvent } from "@/types/sse";
@@ -138,27 +137,6 @@ function toSSEEvent(json: string): SSEEvent | null {
 }
 
 class ChatService {
-  async send(
-    authFetch: AuthFetch,
-    request: ChatRequest,
-  ): Promise<ChatResponse> {
-    const response = await authFetch(
-      `${API_URL}/chat`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(request),
-      },
-    );
-
-    if (!response.ok) {
-      throw await toError(response);
-    }
-
-    return response.json();
-  }
 
   async stream(
     authFetch: AuthFetch,

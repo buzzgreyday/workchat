@@ -17,14 +17,6 @@ export interface ChatRequest {
 }
 
 
-export interface ChatResponse {
-  reply: string;
-  history: ChatHistoryMessage[];
-  usage: Usage;
-  conversation_id?: string | null;
-}
-
-
 export interface Message {
   id: string;
 

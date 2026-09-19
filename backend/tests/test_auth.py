@@ -1,3 +1,5 @@
+from tests.conftest import done_frame
+
 """
 Both token versions, side by side.
 
@@ -57,7 +59,7 @@ async def refresh_with(client, raw_token):
 
 async def chat(client, access_token, message="hi"):
     return await client.post(
-        "/chat",
+        "/chat/stream",
         headers={"Authorization": f"Bearer {access_token}"},
         json={"message": message},
     )
@@ -114,7 +116,7 @@ async def test_v1_token_still_buys_a_chat(client):
     body = await issue(client)
     resp = await chat(client, body["token"])
     assert resp.status_code == 200
-    assert resp.json()["usage"] == {"used": 1, "remaining": 4, "max": 5}
+    assert done_frame(resp)["usage"] == {"used": 1, "remaining": 4, "max": 5}
 
 
 async def test_v1_token_cannot_be_claimed(client):
@@ -169,7 +171,7 @@ async def test_claim_returns_a_usable_session(client):
 
     resp = await chat(client, session["access_token"])
     assert resp.status_code == 200
-    assert resp.json()["usage"]["used"] == 1
+    assert done_frame(resp)["usage"]["used"] == 1
 
 
 async def test_claim_costs_no_quota(client):
@@ -178,7 +180,7 @@ async def test_claim_costs_no_quota(client):
     session = await claim_session(client, claim["token"])
 
     resp = await chat(client, session["access_token"])
-    assert resp.json()["usage"]["used"] == 1
+    assert done_frame(resp)["usage"]["used"] == 1
 
 
 async def test_claim_is_single_use(client, notifications):
@@ -437,7 +439,7 @@ async def test_v1_shaped_token_rejected_against_a_v2_grant(client):
 
     # And the rejection cost the grant nothing.
     session = await claim_session(client, claim["token"])
-    assert (await chat(client, session["access_token"])).json()["usage"]["used"] == 1
+    assert done_frame(await chat(client, session["access_token"]))["usage"]["used"] == 1
 
 
 async def test_unknown_token_version_rejected(client):

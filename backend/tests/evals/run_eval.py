@@ -99,6 +99,26 @@ def issue_token(client: httpx.Client, count: int) -> str:
     return resp.json()["token"]
 
 
+def done_frame(stream: str) -> dict:
+    """
+    The terminal frame of an SSE reply.
+
+    Chat is streaming-only, so the harness reads frames rather than a JSON body.
+    Everything it needs — the finished reply and the history `read_trace` walks —
+    is on the one `done` frame; the token frames are the same text arriving a
+    piece at a time.
+    """
+    for line in stream.splitlines():
+        if not line.startswith("data: "):
+            continue
+        frame = json.loads(line.removeprefix("data: "))
+        if frame.get("type") == "done":
+            return frame
+        if frame.get("type") == "error":
+            sys.exit(f"the server reported an error: {frame.get('message')}")
+    sys.exit("the stream ended without a done frame")
+
+
 def read_trace(history: list[dict]) -> dict:
     """
     The tool calls behind one reply, each search paired with the count it
@@ -241,9 +261,11 @@ def main() -> int:
 
         for question in questions:
             started = time.monotonic()
-            resp = client.post("/chat", headers=auth, json={"message": question["question"]})
+            resp = client.post(
+                "/chat/stream", headers=auth, json={"message": question["question"]}
+            )
             resp.raise_for_status()
-            body = resp.json()
+            body = done_frame(resp.text)
             reply = body["reply"]
 
             trace = read_trace(body["history"])

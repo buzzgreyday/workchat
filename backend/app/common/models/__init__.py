@@ -10,7 +10,6 @@ keeps working regardless of which side of that split X lives on.
 from app.common.models.api import (
     ChatMessageOut,
     ChatRequest,
-    ChatResponse,
     ClaimRequest,
     ConversationDetail,
     ConversationSummary,
@@ -39,7 +38,6 @@ __all__ = [
     "ChatMessage",
     "ChatMessageOut",
     "ChatRequest",
-    "ChatResponse",
     "ClaimRequest",
     "Conversation",
     "ConversationDetail",

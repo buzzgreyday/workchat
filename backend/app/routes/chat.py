@@ -1,20 +1,55 @@
+import uuid
+from collections.abc import AsyncIterator
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from openai import AsyncOpenAI
 from starlette.responses import StreamingResponse
 
 from app.common.config import LOG_CHAT_CONTENT
-from app.services.auth import verify_and_consume
-from app.common.models import ChatRequest, TokenContext, ChatResponse
 from app.common.logging.logging import logger
-from app.services.chat import Chat
+from app.common.models import ChatRequest, TokenContext
+from app.common import sse
 from app.openai.client import get_openai_client
 from app.repositories import get_transcript_repository
 from app.repositories.base import TranscriptRepository
-from app.services.tools import get_chat_tool, ChatToolService
+from app.services import chat as chat_service
+from app.services.auth import verify_and_consume
+from app.services.chat import ChatTooling, TokenProduced, TurnEvent, TurnFailed, TurnFinished
+from app.services.chat.tooling import get_tooling
 
 router = APIRouter(tags=["Chat"])
 
-# Unversioned endpoints
+
+def wire(event: TurnEvent) -> dict[str, Any] | None:
+    """
+    A domain event as the browser reads it, or None for one it has no use for.
+
+    The mapping lives at the HTTP boundary because that is what it is about.
+    `ToolInvoked` and `RoundFinished` are how the recorder learns what a turn
+    did; a client has no use for either, so they stop here.
+    """
+    if isinstance(event, TokenProduced):
+        return {"type": "token", "value": event.text}
+    if isinstance(event, TurnFinished):
+        return {
+            "type": "done",
+            "reply": event.reply,
+            "history": event.history,
+            "usage": event.usage.model_dump(),
+            "conversation_id": str(event.conversation_id) if event.conversation_id else None,
+        }
+    if isinstance(event, TurnFailed):
+        return {"type": "error", "message": event.message}
+    return None
+
+
+async def frames(events: AsyncIterator[TurnEvent]) -> AsyncIterator[bytes]:
+    async for event in events:
+        payload = wire(event)
+        if payload is not None:
+            yield sse.frame(payload)
+
 
 @router.post(
     "/chat/stream",
@@ -27,18 +62,20 @@ router = APIRouter(tags=["Chat"])
             "content": {"text/event-stream": {"schema": {"type": "string"}}},
             "description": "Server-Sent Events stream of the AI's reply.",
         }
-    }
+    },
 )
 async def chat_stream(
     req: ChatRequest,
     token: TokenContext = Depends(verify_and_consume),
     client: AsyncOpenAI = Depends(get_openai_client),
-    tools: ChatToolService = Depends(get_chat_tool),
+    tooling: ChatTooling = Depends(get_tooling),
     transcripts: TranscriptRepository = Depends(get_transcript_repository),
 ) -> StreamingResponse:
     """
-    Getting client and tools as dependencies (with lru_cache) will make this easy to test and still ensure that
-    client and tools are singletons.
+    The only chat endpoint.
+
+    Client and tooling arrive as dependencies so they can be swapped in tests
+    while staying singletons in production.
     """
     logger.info(
         "Chat message received from user",
@@ -47,53 +84,22 @@ async def chat_stream(
                 "sub": token.sub,
                 "used_queries": token.used_queries,
                 "max_queries": token.max_queries,
-                "remaining_queries": token.remaining_queries}
-        }
+                "remaining_queries": token.remaining_queries,
+            }
+        },
     )
     if LOG_CHAT_CONTENT:
         logger.debug(
             "Chat message content",
-            extra={"user_message": req.message, "history": req.history}
+            extra={"user_message": req.message, "history": req.history},
         )
 
-    chat = Chat(client, tools=tools, transcripts=transcripts, endpoint="/chat/stream")
-    await chat.prepare(req, token)
-
-    return StreamingResponse(
-        chat.stream_response(),
-        media_type="text/event-stream",
+    events = chat_service.answer(
+        request=req,
+        token=token,
+        client=client,
+        tooling=tooling,
+        transcripts=transcripts,
+        endpoint="/chat/stream",
     )
-
-
-@router.post(
-    "/chat",
-    summary="Send a message to the AI",
-    description="Send a message to the AI with chat history (requires authentication)",
-    response_model=ChatResponse
-)
-async def chat(
-    req: ChatRequest,
-    token: TokenContext = Depends(verify_and_consume),
-    client: AsyncOpenAI = Depends(get_openai_client),
-    tools: ChatToolService = Depends(get_chat_tool),
-    transcripts: TranscriptRepository = Depends(get_transcript_repository),
-) -> ChatResponse:
-    """
-    Getting client and tools as dependencies (with lru_cache) will make this easy to test and still ensure that
-    client and tools are singletons.
-    """
-    logger.info(
-        "Chat message received from user",
-        extra={
-            "token_details": {
-                "sub": token.sub,
-                "used_queries": token.used_queries,
-                "max_queries": token.max_queries,
-                "remaining_queries": token.remaining_queries}
-        }
-    )
-
-    chat = Chat(client, tools=tools, transcripts=transcripts, endpoint="/chat")
-    await chat.prepare(req, token)
-
-    return await chat.json_response()
+    return StreamingResponse(frames(events), media_type="text/event-stream")
