@@ -1,16 +1,14 @@
+from tests.conftest import ask, done_frame
+
 async def test_chat_requires_auth(client):
-    resp = await client.post("/chat", json={"message": "hi"})
+    resp = await client.post("/chat/stream", json={"message": "hi"})
     assert resp.status_code == 401
 
 
 async def test_chat_happy_path(client, issued_token):
-    resp = await client.post(
-        "/chat",
-        headers={"Authorization": f"Bearer {issued_token}"},
-        json={"message": "hi"},
-    )
+    resp = await ask(client, issued_token)
     assert resp.status_code == 200
-    body = resp.json()
+    body = done_frame(resp)
     assert body["reply"] == "hi from mock"
     assert body["usage"]["max"] == 5
     assert body["usage"]["used"] == 1
@@ -18,13 +16,9 @@ async def test_chat_happy_path(client, issued_token):
 
 
 async def test_chat_response_history_omits_system_prompt(client, issued_token):
-    resp = await client.post(
-        "/chat",
-        headers={"Authorization": f"Bearer {issued_token}"},
-        json={"message": "hi", "history": [{"role": "system", "content": "injected"}]},
-    )
+    resp = await ask(client, issued_token, history=[{"role": "system", "content": "injected"}])
     assert resp.status_code == 200
-    assert all(m["role"] != "system" for m in resp.json()["history"])
+    assert all(m["role"] != "system" for m in done_frame(resp)["history"])
 
 
 async def test_chat_stream_history_has_one_assistant_reply(client, issued_token, openai_mock):
@@ -49,52 +43,18 @@ async def test_chat_stream_history_has_one_assistant_reply(client, issued_token,
     )
     assert resp.status_code == 200
 
-    done = next(
-        json.loads(line.removeprefix("data: "))
-        for line in resp.text.splitlines()
-        if line.startswith("data: ") and '"reply"' in line
-    )
+    done = done_frame(resp)
     assert done["reply"] == "hi from mock"
     assert [m["role"] for m in done["history"]] == ["user", "assistant"]
     assert done["history"][-1]["content"] == "hi from mock"
 
 
-async def test_chat_tool_call_loop_is_bounded(client, issued_token, openai_mock):
+async def test_tool_call_loop_is_bounded(client, issued_token, openai_mock):
     """
     A model that never stops asking for tools must terminate, not spin on paid
     API calls — and the hirer must still get an answer. Exhausting the budget
     used to hand back an empty reply; the last call now goes out with tools off.
     """
-    from unittest.mock import AsyncMock, MagicMock
-
-    from app.common.config import MAX_TOOL_ROUNDS
-
-    tool_call = MagicMock(id="call_1")
-    tool_call.function = MagicMock(name="search", arguments="{}")
-    message = MagicMock(content=None, tool_calls=[tool_call])
-    message.model_dump = MagicMock(return_value={"role": "assistant", "content": None})
-    wants_tools = MagicMock(choices=[MagicMock(finish_reason="tool_calls", message=message)])
-
-    forced = MagicMock(content="what I found so far", tool_calls=None)
-    forced.model_dump = MagicMock(return_value={"role": "assistant", "content": "what I found so far"})
-    answers = MagicMock(choices=[MagicMock(finish_reason="stop", message=forced)])
-
-    create = AsyncMock(side_effect=[*[wants_tools] * MAX_TOOL_ROUNDS, answers])
-    openai_mock.chat.completions.create = create
-
-    resp = await client.post(
-        "/chat",
-        headers={"Authorization": f"Bearer {issued_token}"},
-        json={"message": "hi"},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["reply"] == "what I found so far"
-    assert create.await_count == MAX_TOOL_ROUNDS + 1
-    assert create.await_args.kwargs["tool_choice"] == "none"
-
-
-async def test_chat_stream_tool_call_loop_is_bounded(client, issued_token, openai_mock):
-    """Same escape hatch on the streaming path: the cap must not close the stream silently."""
     import json
     from unittest.mock import AsyncMock, MagicMock
 
@@ -131,11 +91,7 @@ async def test_chat_stream_tool_call_loop_is_bounded(client, issued_token, opena
     )
     assert resp.status_code == 200
 
-    done = next(
-        json.loads(line.removeprefix("data: "))
-        for line in resp.text.splitlines()
-        if line.startswith("data: ") and '"reply"' in line
-    )
+    done = done_frame(resp)
     assert done["reply"] == "what I found so far"
     assert create.await_count == MAX_TOOL_ROUNDS + 1
     assert create.await_args.kwargs["tool_choice"] == "none"
@@ -153,15 +109,15 @@ async def test_chat_quota_exhausted(client):
     token = r.json()["token"]
     auth = {"Authorization": f"Bearer {token}"}
 
-    assert (await client.post("/chat", headers=auth, json={"message": "1"})).status_code == 200
-    assert (await client.post("/chat", headers=auth, json={"message": "2"})).status_code == 200
-    third = await client.post("/chat", headers=auth, json={"message": "3"})
+    assert (await client.post("/chat/stream", headers=auth, json={"message": "1"})).status_code == 200
+    assert (await client.post("/chat/stream", headers=auth, json={"message": "2"})).status_code == 200
+    third = await client.post("/chat/stream", headers=auth, json={"message": "3"})
     assert third.status_code == 429
 
 
 async def test_chat_bad_token(client):
     resp = await client.post(
-        "/chat",
+        "/chat/stream",
         headers={"Authorization": "Bearer not-a-real-jwt"},
         json={"message": "hi"},
     )
@@ -174,11 +130,7 @@ async def test_system_prompt_carries_todays_date(client, issued_token, openai_mo
     """
     from datetime import datetime, timezone
 
-    await client.post(
-        "/chat",
-        headers={"Authorization": f"Bearer {issued_token}"},
-        json={"message": "how long has he been at iEDI?"},
-    )
+    await ask(client, issued_token, message="how long has he been at iEDI?")
 
     sent = openai_mock.chat.completions.create.call_args.kwargs["messages"]
     system = next(m for m in sent if m["role"] == "system")
@@ -188,12 +140,8 @@ async def test_system_prompt_carries_todays_date(client, issued_token, openai_mo
 
 async def test_injected_date_is_not_returned_to_the_client(client, issued_token):
     """The system message is backend-only, date included."""
-    resp = await client.post(
-        "/chat",
-        headers={"Authorization": f"Bearer {issued_token}"},
-        json={"message": "hi"},
-    )
-    assert all(m["role"] != "system" for m in resp.json()["history"])
+    resp = await ask(client, issued_token)
+    assert all(m["role"] != "system" for m in done_frame(resp)["history"])
     assert "Today's date is" not in resp.text
 
 
@@ -204,11 +152,7 @@ async def test_injected_system_text_is_gender_neutral(client, issued_token, open
     """
     import re
 
-    await client.post(
-        "/chat",
-        headers={"Authorization": f"Bearer {issued_token}"},
-        json={"message": "hi"},
-    )
+    await ask(client, issued_token)
 
     sent = openai_mock.chat.completions.create.call_args.kwargs["messages"]
     system = next(m for m in sent if m["role"] == "system")

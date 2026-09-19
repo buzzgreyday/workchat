@@ -47,14 +47,6 @@ class IssueTokenRequest(BaseModel):
     # that never heard of versions keeps getting exactly what it got before.
     version: Literal[1, 2] = 1
 
-class ChatResponse(BaseModel):
-    type: str | None = None
-    reply: str
-    history: list[dict[str, Any]]
-    usage: Usage
-    conversation_id: str | None = None
-
-
 class ChatMessageOut(BaseModel):
     id: uuid.UUID
     request_id: str

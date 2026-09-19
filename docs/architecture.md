@@ -20,7 +20,7 @@ streaming response, and CORS sits inside it.
 
 ```
 route handler
-  └─ Depends(auth.verify_and_consume)   /chat, /chat/stream — authenticate, spend one query
+  └─ Depends(auth.verify_and_consume)   /chat/stream — authenticate, spend one query
      Depends(auth.verify)               /session            — authenticate, spend nothing
      Depends(require_admin)             /admin/*            — static header secret
         └─ services/  business logic, raising domain errors
@@ -33,6 +33,35 @@ recorded in the `app/services/auth.py` module docstring rather than repeated her
 The short version: middleware has no dependency injection, `verify_and_consume`
 spends a query and so must not run on a preflight, and the three protected
 surfaces need three different checks.
+
+## A chat turn
+
+Chat is streaming-only, and the turn is a pipeline of generators rather than an
+object:
+
+```
+run_turn()      the model, the tool rounds, the reply  ->  domain events
+  └─ recorded() passes them through, writes the transcript
+       └─ route encodes each event as an SSE frame
+```
+
+Nothing in `app/services/chat/` mentions SSE and nothing in the route mentions
+OpenAI. That split is the reason there is one loop: while the transport was
+baked into it there were two — one yielding frames, one building a JSON body —
+and six things were duplicated between them.
+
+Everything a turn accumulates lives in generator locals, so a second call cannot
+inherit the first one's reply or tool counts. The previous class kept them on
+the instance and relied on the route building a fresh one per request.
+
+`ToolInvoked` and `RoundFinished` are emitted but never reach a client. They are
+how the recorder knows what a turn did when it is aborted and the terminal event
+never arrives — the job the mutable attributes used to do.
+
+Searching the CV (`app/services/search.py`) imports no vendor SDK. What the model
+is shown and told about those results — the schemas, the JSON encoding, the
+prose steering it toward opening an entry rather than answering from a summary —
+is the adapter's, in `app/services/chat/tooling.py`.
 
 ## Layering
 

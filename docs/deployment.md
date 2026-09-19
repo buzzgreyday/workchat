@@ -82,7 +82,7 @@ git clone https://github.com/buzzgreyday/workchat.git && cd workchat
 - [ ] **7. Build the index.** Generates `backend/resources/index.json`
       (gitignored) from the markdown. It is read per request rather than at
       startup, so the backend boots and `/health` passes without it — but
-      `/chat` cannot answer until it exists.
+      `/chat/stream` cannot answer until it exists.
       ```bash
       docker compose -f docker-compose.prod.yaml run --rm backend python -m app.build_index
       ```

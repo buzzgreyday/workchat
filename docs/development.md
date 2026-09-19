@@ -21,7 +21,7 @@ docker compose up -d
 The dev stack exposes the backend on `:8000` and the frontend on `:3000`
 directly; Caddy is production-only.
 
-`/chat` and `/chat/stream` additionally needs the search index, which is generated from the
+`/chat/stream` additionally needs the search index, which is generated from the
 markdown in `backend/resources/`:
 
 ```bash

@@ -405,7 +405,7 @@ the `ver` claim on the JWT, and its **absence** means version 1 — the tokens
 already handed out cannot grow a claim they were never minted with, so silence
 has to keep meaning v1 for as long as any of those links is still in an inbox.
 
-Only the auth endpoints are versioned. `/chat` and `/chat/stream` stay where they
+Only the auth endpoints are versioned. `/chat/stream` stays where it
 are and accept either kind of access token, because moving them under `/v2` would
 have left every v1 hirer holding a link to a frozen API.
 
@@ -414,7 +414,7 @@ have left every v1 hirer holding a link to a frozen API.
 the `tokens` row. Nothing about this path has changed.
 
 ```
-/admin/issue-token (version=1)  ->  ?token=<access JWT>  ->  POST /chat
+/admin/issue-token (version=1)  ->  ?token=<access JWT>  ->  POST /chat/stream
 ```
 
 **v2 — claim, then refresh.** The link carries a single-use claim token, which
@@ -427,7 +427,7 @@ the client exchanges for a short-lived access token and a rotating refresh token
 POST /v2/auth/claim    {claim_token}  -> {access_token, expires_in, ...}
                                          + Set-Cookie: cv_refresh=... (HttpOnly)
 POST /v2/auth/refresh  (cookie)       -> a fresh pair; the one presented is retired
-POST /chat             Bearer <access_token>
+POST /chat/stream      Bearer <access_token>
 ```
 
 Properties worth knowing:
@@ -477,7 +477,7 @@ It exists because usage used to arrive only inside a chat response, so the one
 number a hirer wants on arrival — how many questions they get — was the one thing
 they had to spend a question to learn. An exhausted grant returns
 `remaining: 0` with a 200 rather than a 429: that is a state to display, and the
-person with none left is exactly who needs telling. `/chat` still answers 429
+person with none left is exactly who needs telling. `/chat/stream` still answers 429
 when one is actually attempted.
 
 Revoking is `POST /admin/tokens/{token_id}/revoke` (admin key required). It stamps
@@ -566,7 +566,7 @@ Typical development workflow:
    2. Review it. Autogenerate misses things like server defaults and renames.
    3. Apply it — `docker compose exec backend alembic upgrade head`.
 3. If you edited anything in `backend/resources/`, rebuild the search index, or
-   `/chat` will keep answering from the old one:
+   `/chat/stream` will keep answering from the old one:
    `docker compose run --rm backend python -m app.build_index`
 4. Run the tests on the host — `cd backend && uv run pytest` (see [Testing](#testing)).
 5. Rebuild only when dependencies change — `docker compose build backend`

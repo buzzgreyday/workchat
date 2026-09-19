@@ -1,3 +1,5 @@
+from tests.conftest import ask, done_frame
+
 import os
 
 
@@ -60,11 +62,7 @@ async def test_admin_conversations_requires_key(client):
 
 
 async def test_admin_conversations_lists_what_was_asked(client, issued_token):
-    await client.post(
-        "/chat",
-        headers={"Authorization": f"Bearer {issued_token}"},
-        json={"message": "does he know FastAPI?"},
-    )
+    await ask(client, issued_token, message="does he know FastAPI?")
 
     resp = await client.get(
         "/admin/conversations", headers={"X-Admin-Key": os.environ["ADMIN_KEY"]}
@@ -81,12 +79,8 @@ async def test_admin_conversations_lists_what_was_asked(client, issued_token):
 
 
 async def test_admin_conversation_detail_returns_transcript(client, issued_token):
-    chat = await client.post(
-        "/chat",
-        headers={"Authorization": f"Bearer {issued_token}"},
-        json={"message": "what about Pyramid?"},
-    )
-    conversation_id = chat.json()["conversation_id"]
+    chat = await ask(client, issued_token, message="what about Pyramid?")
+    conversation_id = done_frame(chat)["conversation_id"]
 
     resp = await client.get(
         f"/admin/conversations/{conversation_id}",
@@ -110,12 +104,8 @@ async def test_admin_conversation_detail_404s_for_unknown_id(client):
 
 
 async def test_admin_redact_nulls_content_but_keeps_row(client, issued_token):
-    chat = await client.post(
-        "/chat",
-        headers={"Authorization": f"Bearer {issued_token}"},
-        json={"message": "sensitive question"},
-    )
-    conversation_id = chat.json()["conversation_id"]
+    chat = await ask(client, issued_token, message="sensitive question")
+    conversation_id = done_frame(chat)["conversation_id"]
 
     resp = await client.post(
         f"/admin/conversations/{conversation_id}/redact",
