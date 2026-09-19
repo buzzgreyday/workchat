@@ -58,17 +58,31 @@ async def db_session(session_maker):
         yield session
 
 
+def stream_of(*tokens: str):
+    """
+    An OpenAI streaming response carrying these tokens then stopping.
+
+    A fresh generator per call: `create` is awaited once per tool round and a
+    generator is consumed once, so a shared one would come back empty on the
+    second round.
+    """
+    async def chunks():
+        for token in tokens:
+            delta = MagicMock(content=token, tool_calls=None)
+            yield MagicMock(choices=[MagicMock(delta=delta, finish_reason=None)])
+        delta = MagicMock(content=None, tool_calls=None)
+        yield MagicMock(choices=[MagicMock(delta=delta, finish_reason="stop")])
+
+    return chunks()
+
+
 @pytest.fixture
 def openai_mock():
-    """Default: one plain assistant reply, no tool calls."""
+    """Default: one plain assistant reply, streamed, no tool calls."""
     mock = MagicMock()
-    message = MagicMock()
-    message.content = "hi from mock"
-    message.tool_calls = None
-    message.model_dump = MagicMock(return_value={"role": "assistant", "content": "hi from mock"})
-    choice = MagicMock(finish_reason="stop", message=message)
-    completion = MagicMock(choices=[choice])
-    mock.chat.completions.create = AsyncMock(return_value=completion)
+    mock.chat.completions.create = AsyncMock(
+        side_effect=lambda **kwargs: stream_of("hi ", "from ", "mock")
+    )
     return mock
 
 
@@ -108,3 +122,31 @@ async def issued_token(client):
     )
     assert resp.status_code == 200, resp.text
     return resp.json()["token"]
+
+# --- chat streaming helpers ----------------------------------------------
+#
+# The chat surface is SSE-only. These keep the `data: ` parsing in one place
+# rather than in the four tests that used to hand-roll it, and give tests back
+# the shape they previously got from the JSON endpoint.
+
+def sse_frames(response) -> list[dict]:
+    """Every frame in a completed stream, decoded."""
+    return [
+        json.loads(line.removeprefix("data: "))
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+
+
+def done_frame(response) -> dict:
+    """The terminal frame, which carries reply/history/usage/conversation_id."""
+    return next(f for f in sse_frames(response) if f["type"] == "done")
+
+
+async def ask(client, token: str, **body):
+    """POST one question to the only chat endpoint."""
+    return await client.post(
+        "/chat/stream",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"message": "hi", **body},
+    )

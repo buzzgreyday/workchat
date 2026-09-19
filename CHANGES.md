@@ -7,6 +7,48 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.4.0] - 2026-09-19
+
+### Removed
+
+- `POST /chat` is gone; chat is streaming-only. Nothing in the browser used it —
+  the client has always called `/chat/stream` — and keeping a second endpoint
+  meant keeping a second implementation of the same tool-calling loop, which is
+  where the duplication this release removes came from. The eval harness now
+  reads the stream, and the dead `send()` path went with it.
+
+### Changed
+
+- The chat service is a pipeline of generators rather than a class. A turn
+  yields domain events; a recorder passes them through and writes the
+  transcript; the route encodes them as SSE frames. Nothing in the service
+  mentions SSE and nothing in the route mentions OpenAI — which is what makes
+  one loop enough where there were two.
+
+  Everything a turn accumulates now lives in generator locals, so a second turn
+  cannot inherit the first one's reply or tool counts. The previous class kept
+  them on the instance and relied on a fresh one being built per request.
+
+- Searching the CV no longer imports the OpenAI SDK. What the model is shown and
+  told about the results — the schemas, the JSON encoding, the prose steering it
+  toward opening an entry rather than answering from a summary — moved to an
+  adapter beside the chat service. The index and the markdown it reads are now
+  cached rather than re-read on every search.
+
+### Fixed
+
+- A reply that fails mid-stream now says so. The client receives an error frame
+  instead of a stream that simply stops, which was indistinguishable from a
+  dropped connection; the reason is logged server-side rather than shown.
+
+- An empty assistant message is no longer stored and echoed back, so a turn that
+  produced no text stops appearing as a blank entry in the next question's
+  history.
+
+- A tool call the service cannot run is dropped rather than assembled. The
+  non-streaming path filtered these and warned; the streaming path never looked,
+  and there is only one path now.
+
 ## [0.3.0] - 2026-09-19
 
 ### Changed
