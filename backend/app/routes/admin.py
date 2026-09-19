@@ -3,12 +3,10 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response, JSONResponse
 from starlette.status import HTTP_200_OK
 
 from app.common.config import BASE_URL
-from app.common.db import get_db
 from app.common.models import (
     ChatMessageOut,
     ConversationDetail,
@@ -16,17 +14,20 @@ from app.common.models import (
     IssueTokenRequest,
 )
 from app.helpers.qr_code import get_qr_code
-from app.repositories import get_token_repository, get_user_repository
-from app.repositories.base import TokenRepositoryBase, UserRepositoryBase
+from app.repositories import (
+    get_conversation_repository,
+    get_session_repository,
+    get_token_repository,
+    get_user_repository,
+)
+from app.repositories.base import (
+    ConversationRepositoryBase,
+    SessionRepositoryBase,
+    TokenRepositoryBase,
+    UserRepositoryBase,
+)
 from app.services import admin
 from app.services.auth import require_admin
-from app.common.schemas import DatabaseToken
-from app.services.db import (
-    get_conversation_messages,
-    list_conversations,
-    redact_conversation,
-    revoke_grant,
-)
 from app.common.logging import logging
 
 router = APIRouter(prefix="/admin", tags=['Admin'], include_in_schema=False)
@@ -86,16 +87,14 @@ async def issue_token(
 )
 async def revoke_token(
     token_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    tokens: TokenRepositoryBase = Depends(get_token_repository),
+    sessions: SessionRepositoryBase = Depends(get_session_repository),
 ) -> JSONResponse:
-    # Revoking the grant, not merely its sessions, is the point: with a v2 grant
-    # the claim link is the durable credential, and cutting sessions alone would
-    # leave anyone still holding that link able to open a fresh one.
-    grant = await db.get(DatabaseToken, token_id)
+    grant = await tokens.get(token_id)
     if grant is None:
         raise HTTPException(status_code=404, detail="Token not found")
 
-    already_revoked, sessions_cut = await revoke_grant(token_id, db)
+    already_revoked, sessions_cut = await admin.revoke_grant(token_id, tokens, sessions)
     logger.warning(
         "Grant revoked by admin",
         extra={
@@ -125,9 +124,12 @@ async def get_conversations(
     offset: int = Query(0, ge=0),
     company: str | None = None,
     since: datetime | None = None,
-    db: AsyncSession = Depends(get_db),
-) -> list[dict[str, Any]]:
-    return await list_conversations(db=db, limit=limit, offset=offset, company=company, since=since)
+    conversations: ConversationRepositoryBase = Depends(get_conversation_repository),
+) -> list[ConversationSummary]:
+    previews = await conversations.list_previews(
+        limit=limit, offset=offset, company=company, since=since
+    )
+    return [ConversationSummary.model_validate(p, from_attributes=True) for p in previews]
 
 
 @router.get(
@@ -138,9 +140,9 @@ async def get_conversations(
 )
 async def get_conversation(
     conversation_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    conversations: ConversationRepositoryBase = Depends(get_conversation_repository),
 ) -> ConversationDetail:
-    conversation, messages = await get_conversation_messages(conversation_id, db)
+    conversation, messages = await conversations.get_with_messages(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -170,13 +172,14 @@ async def get_conversation(
 )
 async def redact(
     conversation_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    conversations: ConversationRepositoryBase = Depends(get_conversation_repository),
 ) -> JSONResponse:
-    conversation, _ = await get_conversation_messages(conversation_id, db)
-    if conversation is None:
+    # An existence check, not a load: the transcript this used to fetch was
+    # discarded, and every message body came back with it.
+    if not await conversations.exists(conversation_id):
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    redacted = await redact_conversation(conversation_id, db)
+    redacted = await conversations.redact(conversation_id)
     return JSONResponse(
         content={"conversation_id": str(conversation_id), "messages_redacted": redacted},
         status_code=HTTP_200_OK,

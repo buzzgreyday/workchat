@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.common.models.utc import UTCDateTime
+
 
 class Grant(BaseModel):
     """
@@ -21,12 +23,12 @@ class Grant(BaseModel):
     subject: str = Field(max_length=255)
     token_hash: str
     max_queries: int
-    expires_at: datetime
+    expires_at: UTCDateTime
     company: str | None = None
     job_title: str | None = None
     used_queries: int = 0
-    revoked_at: datetime | None = None
-    claimed_at: datetime | None = None
-    owner_notified_at: datetime | None = None
+    revoked_at: UTCDateTime | None = None
+    claimed_at: UTCDateTime | None = None
+    owner_notified_at: UTCDateTime | None = None
     version: int = 1
-    created_at: datetime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    created_at: UTCDateTime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))

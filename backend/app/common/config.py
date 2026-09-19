@@ -136,7 +136,18 @@ CORS_ORIGINS = _dev_cors_origins() if DEV_MODE else ALLOWED_HOSTS
 # long" in every arm tried; mini gets it right most runs. Roughly 4x nano's
 # input price and about a second slower per answer, which at a 20-query token
 # per hiring manager is a latency decision rather than a cost one.
-OPENAI_MODEL = "gpt-4.1-mini"
+#
+# So mini is what a hirer gets, and nano is the default while DEV_MODE is on.
+# That is not a reversal of the measurement above — locally the question being
+# asked is "does the tool round-trip work", not "is the answer good", and a
+# reload loop against a paid endpoint is an easy way to spend real money on
+# answers nobody reads.
+#
+# Set OPENAI_MODEL to override either default. That is also how to run an eval
+# arm against a specific model: run_eval.py drives the running server and only
+# reads this value to label its report, so the arm is whatever the server was
+# started with.
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL") or ("gpt-4.1-nano" if DEV_MODE else "gpt-4.1-mini")
 # Cap on tool-call round trips per user message. Each round is a paid API call, so an
 # unbounded loop on a model that keeps requesting tools would burn quota indefinitely.
 MAX_TOOL_ROUNDS = 5

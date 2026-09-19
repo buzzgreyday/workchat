@@ -2,11 +2,15 @@ import time
 import uuid
 from datetime import datetime, timezone
 
+from app.common.crypto import hash_token
 from app.common.logging.logging import logger
 from app.common.models import Grant, IssueTokenRequest
-from app.repositories.base import TokenRepositoryBase, UserRepositoryBase
+from app.repositories.base import (
+    SessionRepositoryBase,
+    TokenRepositoryBase,
+    UserRepositoryBase,
+)
 from app.services.auth import auth
-from app.services.db import hash_token
 
 
 async def issue_token(
@@ -100,3 +104,26 @@ async def issue_token(
         }
     )
     return raw_token
+
+async def revoke_grant(
+        token_id: uuid.UUID,
+        tokens: TokenRepositoryBase,
+        sessions: SessionRepositoryBase,
+) -> tuple[bool, int]:
+    """
+    The kill switch: revoke the grant, then cut every session under it.
+
+    Revoking the grant, not merely its sessions, is the point — with a v2 grant
+    the claim link is the durable credential, and cutting sessions alone would
+    leave anyone still holding that link able to open a fresh one.
+
+    Two calls rather than one because a grant and its sessions are separate
+    aggregates. That is not a weakening: this was always two transactions, and
+    the grant is revoked first, so the half that matters lands even if the
+    second call never happens.
+
+    Returns (already_revoked, sessions_cut).
+    """
+    already_revoked = await tokens.revoke(token_id)
+    sessions_cut = await sessions.revoke_all_for_grant(token_id)
+    return already_revoked, sessions_cut

@@ -21,15 +21,26 @@ exist, the branch belongs here and nowhere else.
 # Storage repository configuration
 from app.repositories import sql as _backend
 from app.repositories.base import (
+    ConversationRepositoryBase,
+    ReplyOutcome,
     RepositoryBase,
+    SessionRepositoryBase,
     TokenRepositoryBase,
+    TranscriptRepositoryBase,
     UserRepositoryBase,
 )
 
 __all__ = [
+    "ConversationRepositoryBase",
+    "ReplyOutcome",
     "RepositoryBase",
+    "SessionRepositoryBase",
     "TokenRepositoryBase",
+    "TranscriptRepositoryBase",
     "UserRepositoryBase",
+    "get_conversation_repository",
+    "get_session_repository",
+    "get_transcript_repository",
     "get_token_repository",
     "get_user_repository",
 ]
@@ -39,3 +50,6 @@ __all__ = [
 # which is exactly what a route asking for a repository should not have to know.
 get_user_repository = _backend.provide_user_repository
 get_token_repository = _backend.provide_token_repository
+get_session_repository = _backend.provide_session_repository
+get_transcript_repository = _backend.provide_transcript_repository
+get_conversation_repository = _backend.provide_conversation_repository

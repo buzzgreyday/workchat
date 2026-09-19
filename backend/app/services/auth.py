@@ -17,18 +17,19 @@ Versions are told apart by the `ver` claim, and its *absence* is what marks v1 �
 that is the only signal an already-issued token can offer. The chat endpoints
 stay unversioned and accept either kind; only the auth endpoints are under /v2.
 
-Per-grant usage is enforced by an atomic UPDATE in the tokens table
-(see services/db.update_token_used_query_count), not in-memory, so it
-survives restarts and works across replicas.
+Per-grant usage is enforced by an atomic write in the store
+(see TokenRepositoryBase.consume_query), not in-memory, so it survives restarts
+and works across replicas.
 
 Why this is a dependency and not middleware, since it comes up: middleware would
 be the usual way to make an auth check impossible to forget, and it is the wrong
 tool here for three reasons.
 
-  - It has no dependency injection. verify_and_consume takes a session from
-    get_db, and tests/conftest.py swaps that out through app.dependency_overrides
-    — a mechanism that only exists for dependencies. Auth in middleware means the
-    suite can no longer point the app at its in-memory database.
+  - It has no dependency injection. verify_and_consume takes its repositories
+    from Depends, and tests/conftest.py swaps the session under them through
+    app.dependency_overrides — a mechanism that only exists for dependencies.
+    Auth in middleware means the suite can no longer point the app at its
+    in-memory database.
   - verify_and_consume *spends a query*, which is a business action rather than an
     authentication one. Middleware runs on whatever matches a path, so depending
     on where it sat in the stack a CORS preflight could cost a hirer a question.
@@ -49,7 +50,6 @@ from datetime import datetime, timezone
 import jwt
 from fastapi import Depends, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.config import (
     ACCESS_TOKEN_TTL_SECONDS,
@@ -58,7 +58,6 @@ from app.common.config import (
     REFRESH_TOKEN_TTL_SECONDS,
     SECRET_KEY,
 )
-from app.common.db import get_db
 from app.common.exceptions import (
     AdminForbidden,
     ClaimAlreadyUsed,
@@ -71,21 +70,14 @@ from app.common.exceptions import (
     RefreshTokenReplayed,
     SessionRevoked,
     TokenExpired,
+    TokenRevoked,
     UnsupportedTokenVersion,
 )
+from app.common.crypto import hash_token
 from app.common.logging.logging import logger
-from app.common.models import JWT, TokenContext, TokenPair
-from app.common.schemas import DatabaseToken
-from app.services.db import (
-    claim_grant_once,
-    create_refresh_token,
-    get_active_grant,
-    get_refresh_token,
-    hash_token,
-    rotate_refresh_token,
-    should_notify_owner,
-    update_token_used_query_count,
-)
+from app.common.models import JWT, Grant, RefreshSession, TokenContext, TokenPair
+from app.repositories import get_session_repository, get_token_repository
+from app.repositories.base import SessionRepositoryBase, TokenRepositoryBase
 from app.services.notify import notifier
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -159,10 +151,6 @@ class Auth:
         takes the old token out of service."""
         return hmac.compare_digest(hash_token(raw_token), stored_hash)
 
-    @staticmethod
-    def _as_utc(value: datetime) -> datetime:
-        return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
-
     # --- minting -------------------------------------------------------------
 
     def _clamped_exp(self, now_ts: int, ttl_seconds: int, grant_expires_at: datetime) -> int:
@@ -173,7 +161,7 @@ class Auth:
         would still be rotating a week later, quietly extending an access
         window that was supposed to have a hard end date.
         """
-        grant_exp_ts = int(self._as_utc(grant_expires_at).timestamp())
+        grant_exp_ts = int(grant_expires_at.timestamp())
         return min(now_ts + ttl_seconds, grant_exp_ts)
 
     def mint_grant_token(
@@ -212,7 +200,7 @@ class Auth:
             tid=str(token_id),
         ).generate(self.secret_key, self.algorithm)
 
-    def _mint_access(self, grant: DatabaseToken, session_id: uuid.UUID) -> tuple[str, int]:
+    def _mint_access(self, grant: Grant, session_id: uuid.UUID) -> tuple[str, int]:
         now_ts = int(time.time())
         exp_ts = self._clamped_exp(now_ts, self.access_ttl_seconds, grant.expires_at)
         token = JWT(
@@ -229,7 +217,7 @@ class Auth:
         return token, exp_ts - now_ts
 
     def _mint_refresh(
-            self, grant: DatabaseToken, session_id: uuid.UUID
+            self, grant: Grant, session_id: uuid.UUID
     ) -> tuple[str, datetime, int]:
         now_ts = int(time.time())
         exp_ts = self._clamped_exp(now_ts, self.refresh_ttl_seconds, grant.expires_at)
@@ -249,7 +237,48 @@ class Auth:
 
     # --- v2 endpoints --------------------------------------------------------
 
-    async def claim(self, raw_claim: str, db: AsyncSession) -> TokenPair:
+    async def _active_grant(
+            self,
+            tokens: TokenRepositoryBase,
+            token_id: uuid.UUID,
+            expected_version: int | None = None,
+    ) -> Grant:
+        """
+        The grant behind a claim, refresh or access token, if it is still usable.
+
+        Here rather than in the repository because "usable" is policy, not
+        storage: `verify` deliberately tolerates a grant with no quota left, and
+        reads a spent one as zero rather than raising. Read-only and quota-free
+        on purpose — exchanging a claim, rotating a refresh token or asking how
+        many questions are left must not cost the hirer one of them.
+
+        Note what is *not* checked: whether any quota remains. A grant with none
+        left is still a valid grant.
+        """
+        grant = await tokens.get(token_id)
+        if grant is None:
+            logger.warning("Invalid token", extra={"token_id": token_id})
+            raise InvalidToken()
+        if grant.revoked_at is not None:
+            logger.warning("Revoked token", extra={"token_id": token_id})
+            raise TokenRevoked()
+        if expected_version is not None and grant.version != expected_version:
+            logger.warning(
+                "Token version does not match its grant",
+                extra={"token_id": token_id, "expected_version": expected_version, "version": grant.version},
+            )
+            raise InvalidToken()
+        if grant.expires_at <= datetime.now(timezone.utc):
+            logger.warning("Expired token", extra={"token_id": token_id})
+            raise TokenExpired()
+        return grant
+
+    async def claim(
+            self,
+            raw_claim: str,
+            tokens: TokenRepositoryBase,
+            sessions: SessionRepositoryBase,
+    ) -> TokenPair:
         """
         Exchange a claim token for a session. Once, and only once.
 
@@ -268,27 +297,28 @@ class Auth:
             raise NotAClaimToken()
 
         grant_id = self._uuid(payload.get("tid"), "tid")
-        grant = await get_active_grant(grant_id, db)
+        grant = await self._active_grant(tokens, grant_id)
 
         if grant.version != 2 or not self._matches(raw_claim, grant.token_hash):
             logger.warning("Claim token does not match its grant", extra={"token_id": grant_id})
             raise InvalidToken()
 
-        if not await claim_grant_once(grant_id, db):
+        if not await tokens.claim_once(grant_id):
             await self._notify_owner(
-                grant.id, grant.subject, grant.company, db,
+                grant.id, grant.subject, grant.company, tokens,
                 event="claim_reuse", reason="claim link presented after it was spent",
             )
             raise ClaimAlreadyUsed()
 
         session_id = uuid.uuid4()
         refresh_token, refresh_expires_at, refresh_expires_in = self._mint_refresh(grant, session_id)
-        await create_refresh_token(
-            token_id=grant.id,
-            raw_token=refresh_token,
-            expires_at=refresh_expires_at,
-            db=db,
-            refresh_id=session_id,
+        await sessions.add(
+            RefreshSession(
+                id=session_id,
+                token_id=grant.id,
+                token_hash=hash_token(refresh_token),
+                expires_at=refresh_expires_at,
+            )
         )
         access_token, expires_in = self._mint_access(grant, session_id)
 
@@ -303,13 +333,18 @@ class Auth:
             refresh_expires_in=refresh_expires_in,
         )
 
-    async def refresh(self, raw_refresh: str, db: AsyncSession) -> TokenPair:
+    async def refresh(
+            self,
+            raw_refresh: str,
+            tokens: TokenRepositoryBase,
+            sessions: SessionRepositoryBase,
+    ) -> TokenPair:
         """
         Rotate a session: one refresh token in, a fresh pair out.
 
         The old token dies on use, which is what makes a replay detectable — see
-        rotate_refresh_token, which cuts every session on the grant when it sees
-        one outside the grace window, and answers 409 inside it. Like claim, this
+        SessionRepositoryBase.rotate, which cuts every session on the grant when
+        it sees one outside the grace window, and answers 409 inside it. Like claim, this
         costs no quota.
         """
         payload = self.decode(raw_refresh)
@@ -319,9 +354,9 @@ class Auth:
 
         session_id = self._uuid(payload.get("jti"), "jti")
         grant_id = self._uuid(payload.get("tid"), "tid")
-        grant = await get_active_grant(grant_id, db)
+        grant = await self._active_grant(tokens, grant_id)
 
-        session = await get_refresh_token(session_id, db)
+        session = await sessions.get(session_id)
         # The token_id check stops a refresh token being spent against a grant
         # it does not belong to, which is what would let one hirer's session
         # mint access to another hirer's quota.
@@ -334,25 +369,25 @@ class Auth:
 
         successor_id = uuid.uuid4()
         refresh_token, refresh_expires_at, refresh_expires_in = self._mint_refresh(grant, successor_id)
-        # Snapshot who this grant belongs to before rotating. The replay branch
-        # rolls back, which expires every object loaded in this session, and
-        # reading grant.subject afterwards would attempt lazy IO outside the
-        # async context and raise MissingGreenlet instead of notifying anyone.
-        owner = (grant.id, grant.subject, grant.company)
         try:
-            successor = await rotate_refresh_token(
-                refresh_id=session_id,
-                raw_new_token=refresh_token,
-                new_expires_at=refresh_expires_at,
-                db=db,
-                new_refresh_id=successor_id,
+            successor = await sessions.rotate(
+                session_id,
+                RefreshSession(
+                    id=successor_id,
+                    token_id=grant.id,
+                    token_hash=hash_token(refresh_token),
+                    expires_at=refresh_expires_at,
+                ),
             )
         except RefreshTokenReplayed:
             # The sessions are already cut by the time this lands. All that is
             # left is telling the operator, because a single-use claim leaves the
             # hirer no way back in on their own.
+            # `grant` is a domain model, so reading it here is safe no matter
+            # what the rotation did to the session underneath.
             await self._notify_owner(
-                *owner, db, event="sessions_cut", reason="refresh token replayed after rotation"
+                grant.id, grant.subject, grant.company, tokens,
+                event="sessions_cut", reason="refresh token replayed after rotation",
             )
             raise
 
@@ -370,20 +405,20 @@ class Auth:
             token_id: uuid.UUID,
             subject: str,
             company: str | None,
-            db: AsyncSession,
+            tokens: TokenRepositoryBase,
             event: str,
             reason: str,
     ) -> None:
         """
         Tell the operator a hirer is locked out, at most once per grant per window.
 
-        Takes plain values rather than the grant row because one caller reaches
-        here after a rollback, where that row's attributes are no longer safe to
-        touch. Never raises: nothing about notifying anyone may change what the
-        caller returns, and the hirer's answer is already decided by this point.
+        Takes plain values rather than a grant because that is all it needs to
+        say anything useful. Never raises: nothing about notifying anyone may
+        change what the caller returns, and the hirer's answer is already decided
+        by this point.
         """
         try:
-            if not await should_notify_owner(token_id, db):
+            if not await tokens.mark_owner_notified(token_id):
                 return
             if event == "claim_reuse":
                 await notifier.claim_link_reused(token_id, subject, company)
@@ -397,7 +432,7 @@ class Auth:
     async def _authenticate(
             self,
             credentials: HTTPAuthorizationCredentials | None,
-            db: AsyncSession,
+            sessions: SessionRepositoryBase,
     ) -> tuple[uuid.UUID, int, uuid.UUID | None]:
         """
         Everything both dependencies do before they diverge: prove the bearer,
@@ -430,44 +465,44 @@ class Auth:
             # for replay is rejected without costing the hirer a question. The
             # cost is one extra read per v2 request; the alternative is honouring
             # a stolen access token for the rest of its lifetime.
-            await self._require_live_session(session_id, grant_id, db)
+            await self._require_live_session(session_id, grant_id, sessions)
             return grant_id, version, session_id
 
         logger.warning("Unknown token version", extra={"ver": payload.get("ver")})
         raise UnsupportedTokenVersion()
 
     @staticmethod
-    def _context(row: DatabaseToken, version: int, session_id: uuid.UUID | None) -> TokenContext:
+    def _context(grant: Grant, version: int, session_id: uuid.UUID | None) -> TokenContext:
         return TokenContext(
-            sub=row.subject,
-            jti=str(row.id),
-            max_queries=row.max_queries,
-            used_queries=row.used_queries,
-            remaining_queries=max(row.max_queries - row.used_queries, 0),
+            sub=grant.subject,
+            jti=str(grant.id),
+            max_queries=grant.max_queries,
+            used_queries=grant.used_queries,
+            remaining_queries=max(grant.max_queries - grant.used_queries, 0),
             version=version,
             session_id=str(session_id) if session_id else None,
-            expires_at=Auth._as_utc(row.expires_at),
+            expires_at=grant.expires_at,
         )
 
     async def verify_and_consume(
             self,
             credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-            db: AsyncSession = Depends(get_db),
+            tokens: TokenRepositoryBase = Depends(get_token_repository),
+            sessions: SessionRepositoryBase = Depends(get_session_repository),
     ) -> TokenContext:
         """
         The chat endpoints' dependency. Accepts a v1 or a v2 access token and
         spends one query from the grant either way.
         """
-        grant_id, version, session_id = await self._authenticate(credentials, db)
-        row = await update_token_used_query_count(
-            token_id=grant_id, db=db, expected_version=version
-        )
-        return self._context(row, version, session_id)
+        grant_id, version, session_id = await self._authenticate(credentials, sessions)
+        grant = await tokens.consume_query(grant_id, expected_version=version)
+        return self._context(grant, version, session_id)
 
     async def verify(
             self,
             credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-            db: AsyncSession = Depends(get_db),
+            tokens: TokenRepositoryBase = Depends(get_token_repository),
+            sessions: SessionRepositoryBase = Depends(get_session_repository),
     ) -> TokenContext:
         """
         Same checks, no spending. What /session is built on.
@@ -476,14 +511,14 @@ class Auth:
         left still has a valid session and is precisely the person who needs to
         be told how many they have. Reporting zero is the answer, not a 429.
         """
-        grant_id, version, session_id = await self._authenticate(credentials, db)
-        row = await get_active_grant(grant_id, db, expected_version=version)
-        return self._context(row, version, session_id)
+        grant_id, version, session_id = await self._authenticate(credentials, sessions)
+        grant = await self._active_grant(tokens, grant_id, expected_version=version)
+        return self._context(grant, version, session_id)
 
     async def _require_live_session(
-            self, session_id: uuid.UUID, grant_id: uuid.UUID, db: AsyncSession
+            self, session_id: uuid.UUID, grant_id: uuid.UUID, sessions: SessionRepositoryBase
     ) -> None:
-        session = await get_refresh_token(session_id, db)
+        session = await sessions.get(session_id)
         if session is None or session.token_id != grant_id:
             logger.warning("Access token names an unknown session", extra={"session_id": session_id})
             raise InvalidToken()
@@ -497,7 +532,7 @@ class Auth:
             # costs it nothing but a retry on an in-flight request.
             logger.warning("Access token belongs to a revoked session", extra={"session_id": session_id})
             raise SessionRevoked()
-        if self._as_utc(session.expires_at) <= datetime.now(timezone.utc):
+        if session.expires_at <= datetime.now(timezone.utc):
             logger.warning("Access token belongs to an expired session", extra={"session_id": session_id})
             raise SessionRevoked("Session expired")
 

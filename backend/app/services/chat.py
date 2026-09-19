@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from openai import AsyncOpenAI
-from sqlalchemy.ext.asyncio import async_sessionmaker
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessageFunctionToolCall,
@@ -24,7 +23,7 @@ from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 from app.common.config import LOG_CHAT_CONTENT, MAX_TOOL_ROUNDS, OPENAI_MODEL, SYSTEM_PROMPT
 from app.common.context import conversation_id_var, current_request_id, token_sub_var
 from app.common.models import ChatRequest, ChatResponse, TokenContext, Usage
-from app.services.db import record_assistant_message, record_user_message
+from app.repositories.base import ReplyOutcome, TranscriptRepositoryBase
 from app.services.sse import sse_event
 from app.services.tools import ChatToolService, ToolCall, ToolCallFunction
 from app.common.logging.logging import logger
@@ -59,7 +58,7 @@ class Chat:
             self,
             client: AsyncOpenAI,
             tools: ChatToolService,
-            session_factory: async_sessionmaker | None = None,
+            transcripts: TranscriptRepositoryBase | None = None,
             endpoint: str = "/chat",
     ) -> None:
         self.client: AsyncOpenAI = client
@@ -67,7 +66,7 @@ class Chat:
         self.messages: list[ChatCompletionMessageParam] = []
         self.usage: Usage | None = None
 
-        self.session_factory = session_factory
+        self.transcripts = transcripts
         self.endpoint = endpoint
         self.token: TokenContext | None = None
         self.conversation_id: uuid.UUID | None = None
@@ -104,13 +103,13 @@ class Chat:
         # Persist the question before the model is called. This commit is the
         # durability guarantee: everything after it is enrichment, and a failure
         # here is swallowed rather than surfaced to the hirer.
-        if self.session_factory is not None:
-            # Belt as well as braces: the recorder swallows its own failures, but
-            # the guarantee is that *nothing* about capturing a transcript can
-            # cost the hirer a reply — including a malformed jti reaching UUID().
+        if self.transcripts is not None:
+            # The swallow lives here rather than in the repository: *nothing*
+            # about capturing a transcript may cost the hirer a reply, and this
+            # is the layer that knows a reply is at stake. It also covers what a
+            # repository could not — a malformed jti reaching UUID().
             try:
-                self.conversation_id = await record_user_message(
-                    session_factory=self.session_factory,
+                self.conversation_id = await self.transcripts.record_question(
                     token_id=uuid.UUID(token.jti),
                     conversation_id=request.conversation_id,
                     message=request.message,
@@ -144,22 +143,29 @@ class Chat:
                 error = f"{type(exc).__name__}: {exc}"
             raise
         finally:
-            if self.session_factory is not None and self.token is not None:
+            # No conversation means record_question failed, so there is
+            # nothing to attach the reply to.
+            if (
+                self.transcripts is not None
+                and self.token is not None
+                and self.conversation_id is not None
+            ):
                 try:
-                    await record_assistant_message(
-                        session_factory=self.session_factory,
+                    await self.transcripts.record_reply(
                         token_id=uuid.UUID(self.token.jti),
                         conversation_id=self.conversation_id,
                         reply=self._reply,
                         endpoint=self.endpoint,
                         request_id=self.request_id,
-                        status=status,
-                        finish_reason=self._finish_reason,
-                        tool_names=self._tool_names,
-                        tool_calls_count=self._tool_calls_count,
-                        model=OPENAI_MODEL,
-                        latency_ms=int((time.monotonic() - self._started_at) * 1000),
-                        error=error,
+                        outcome=ReplyOutcome(
+                            status=status,
+                            finish_reason=self._finish_reason,
+                            tool_names=self._tool_names,
+                            tool_calls_count=self._tool_calls_count,
+                            model=OPENAI_MODEL,
+                            latency_ms=int((time.monotonic() - self._started_at) * 1000),
+                            error=error,
+                        ),
                     )
                 except Exception:
                     logger.exception(
