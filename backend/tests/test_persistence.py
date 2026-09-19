@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import select
 
 from app.common.schemas import DatabaseChatMessage, DatabaseConversation, DatabaseToken
+from app.repositories.sql import SQLTranscriptRepository
 
 
 async def _messages(db_session, role: str | None = None):
@@ -101,7 +102,7 @@ async def test_chat_stream_persists_on_client_abort(
     chat = Chat(
         openai_mock,
         tools=get_chat_tool(),
-        session_factory=session_maker,
+        transcripts=SQLTranscriptRepository(session_maker),
         endpoint="/chat/stream",
     )
     await chat.prepare(ChatRequest(message="tell me everything"), token)
@@ -146,7 +147,9 @@ async def test_persistence_failure_does_not_break_chat(client, issued_token, mon
     async def _boom(*args, **kwargs):
         raise RuntimeError("database on fire")
 
-    monkeypatch.setattr("app.services.chat.record_user_message", _boom)
+    monkeypatch.setattr(
+        "app.repositories.sql.SQLTranscriptRepository.record_question", _boom
+    )
 
     resp = await client.post(
         "/chat",

@@ -32,7 +32,7 @@ async def test_issue_token_happy_path(client):
 
 
 async def test_issue_second_token_for_existing_company(client):
-    """Re-issuing for a company already in the DB hits the get_or_create_user
+    """Re-issuing for a company already in the DB takes the service's
     'user exists' branch — regression test for a logger.info(extra=<ORM obj>)
     bug that raised TypeError on this path."""
     headers = {"X-Admin-Key": os.environ["ADMIN_KEY"]}

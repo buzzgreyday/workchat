@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Depends
 from openai import AsyncOpenAI
-from sqlalchemy.ext.asyncio import async_sessionmaker
 from starlette.responses import StreamingResponse
 
 from app.common.config import LOG_CHAT_CONTENT
-from app.common.db import get_session_factory
 from app.services.auth import verify_and_consume
 from app.common.models import ChatRequest, TokenContext, ChatResponse
 from app.common.logging.logging import logger
 from app.services.chat import Chat
 from app.openai.client import get_openai_client
+from app.repositories import get_transcript_repository
+from app.repositories.base import TranscriptRepository
 from app.services.tools import get_chat_tool, ChatToolService
 
 router = APIRouter(tags=["Chat"])
@@ -34,7 +34,7 @@ async def chat_stream(
     token: TokenContext = Depends(verify_and_consume),
     client: AsyncOpenAI = Depends(get_openai_client),
     tools: ChatToolService = Depends(get_chat_tool),
-    session_factory: async_sessionmaker = Depends(get_session_factory),
+    transcripts: TranscriptRepository = Depends(get_transcript_repository),
 ) -> StreamingResponse:
     """
     Getting client and tools as dependencies (with lru_cache) will make this easy to test and still ensure that
@@ -56,7 +56,7 @@ async def chat_stream(
             extra={"user_message": req.message, "history": req.history}
         )
 
-    chat = Chat(client, tools=tools, session_factory=session_factory, endpoint="/chat/stream")
+    chat = Chat(client, tools=tools, transcripts=transcripts, endpoint="/chat/stream")
     await chat.prepare(req, token)
 
     return StreamingResponse(
@@ -76,7 +76,7 @@ async def chat(
     token: TokenContext = Depends(verify_and_consume),
     client: AsyncOpenAI = Depends(get_openai_client),
     tools: ChatToolService = Depends(get_chat_tool),
-    session_factory: async_sessionmaker = Depends(get_session_factory),
+    transcripts: TranscriptRepository = Depends(get_transcript_repository),
 ) -> ChatResponse:
     """
     Getting client and tools as dependencies (with lru_cache) will make this easy to test and still ensure that
@@ -93,7 +93,7 @@ async def chat(
         }
     )
 
-    chat = Chat(client, tools=tools, session_factory=session_factory, endpoint="/chat")
+    chat = Chat(client, tools=tools, transcripts=transcripts, endpoint="/chat")
     await chat.prepare(req, token)
 
     return await chat.json_response()

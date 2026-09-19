@@ -21,6 +21,13 @@ services:
     restart: unless-stopped
     env_file:
       - ./backend/.env
+    environment:
+      # Listed without a value on purpose. Compose then forwards it only when it
+      # is set in the shell, so `OPENAI_MODEL=gpt-4.1-mini docker compose up -d
+      # backend` pins an eval arm without editing anything, and an unset one
+      # leaves whatever backend/.env says intact. Writing `${OPENAI_MODEL:-}`
+      # instead would inject an empty string and silently override the env file.
+      - OPENAI_MODEL
     # Dev only. entrypoint.sh runs `alembic upgrade head` and then execs "$@",
     # so this replaces its default uvicorn invocation. --reload-dir keeps the
     # watcher on the application package instead of the whole bind mount, which
