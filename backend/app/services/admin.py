@@ -6,17 +6,17 @@ from app.common.crypto import hash_token
 from app.common.logging.logging import logger
 from app.common.models import Grant, IssueTokenRequest
 from app.repositories.base import (
-    SessionRepositoryBase,
-    TokenRepositoryBase,
-    UserRepositoryBase,
+    RefreshSessionRepository,
+    TokenRepository,
+    UserRepository,
 )
 from app.services.auth import auth
 
 
 async def issue_token(
         req: IssueTokenRequest,
-        users: UserRepositoryBase,
-        tokens: TokenRepositoryBase,
+        users: UserRepository,
+        tokens: TokenRepository,
 ) -> str:
     """
     Mint the token that goes in the user's link.
@@ -107,8 +107,8 @@ async def issue_token(
 
 async def revoke_grant(
         token_id: uuid.UUID,
-        tokens: TokenRepositoryBase,
-        sessions: SessionRepositoryBase,
+        tokens: TokenRepository,
+        sessions: RefreshSessionRepository,
 ) -> tuple[bool, int]:
     """
     The kill switch: revoke the grant, then cut every session under it.

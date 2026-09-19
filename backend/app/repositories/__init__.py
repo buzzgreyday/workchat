@@ -3,7 +3,7 @@ Persistence, as its own layer — and the one place that names a backend.
 
 Services depend on the abstractions in `base`; nothing here depends on a
 service, and nothing here knows that HTTP exists. The bindings below are the
-composition root: to move to another store, write a module shaped like `sql`
+composition root: to move to another store, write a package shaped like `sql`
 and change which one is imported here. No route and no service mentions a
 backend, so nothing else has to change.
 
@@ -18,30 +18,29 @@ branch guarding a module that does not exist yet; when a second backend does
 exist, the branch belongs here and nowhere else.
 """
 
-# Storage repository configuration
 from app.repositories import sql as _backend
 from app.repositories.base import (
-    ConversationRepositoryBase,
+    ConversationRepository,
+    RefreshSessionRepository,
     ReplyOutcome,
     RepositoryBase,
-    SessionRepositoryBase,
-    TokenRepositoryBase,
-    TranscriptRepositoryBase,
-    UserRepositoryBase,
+    TokenRepository,
+    TranscriptRepository,
+    UserRepository,
 )
 
 __all__ = [
-    "ConversationRepositoryBase",
+    "ConversationRepository",
+    "RefreshSessionRepository",
     "ReplyOutcome",
     "RepositoryBase",
-    "SessionRepositoryBase",
-    "TokenRepositoryBase",
-    "TranscriptRepositoryBase",
-    "UserRepositoryBase",
+    "TokenRepository",
+    "TranscriptRepository",
+    "UserRepository",
     "get_conversation_repository",
-    "get_session_repository",
-    "get_transcript_repository",
+    "get_refresh_session_repository",
     "get_token_repository",
+    "get_transcript_repository",
     "get_user_repository",
 ]
 
@@ -50,6 +49,6 @@ __all__ = [
 # which is exactly what a route asking for a repository should not have to know.
 get_user_repository = _backend.provide_user_repository
 get_token_repository = _backend.provide_token_repository
-get_session_repository = _backend.provide_session_repository
+get_refresh_session_repository = _backend.provide_refresh_session_repository
 get_transcript_repository = _backend.provide_transcript_repository
 get_conversation_repository = _backend.provide_conversation_repository

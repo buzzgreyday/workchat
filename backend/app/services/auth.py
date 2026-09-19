@@ -18,7 +18,7 @@ that is the only signal an already-issued token can offer. The chat endpoints
 stay unversioned and accept either kind; only the auth endpoints are under /v2.
 
 Per-grant usage is enforced by an atomic write in the store
-(see TokenRepositoryBase.consume_query), not in-memory, so it survives restarts
+(see TokenRepository.consume_query), not in-memory, so it survives restarts
 and works across replicas.
 
 Why this is a dependency and not middleware, since it comes up: middleware would
@@ -76,8 +76,8 @@ from app.common.exceptions import (
 from app.common.crypto import hash_token
 from app.common.logging.logging import logger
 from app.common.models import JWT, Grant, RefreshSession, TokenContext, TokenPair
-from app.repositories import get_session_repository, get_token_repository
-from app.repositories.base import SessionRepositoryBase, TokenRepositoryBase
+from app.repositories import get_refresh_session_repository, get_token_repository
+from app.repositories.base import RefreshSessionRepository, TokenRepository
 from app.services.notify import notifier
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -239,7 +239,7 @@ class Auth:
 
     async def _active_grant(
             self,
-            tokens: TokenRepositoryBase,
+            tokens: TokenRepository,
             token_id: uuid.UUID,
             expected_version: int | None = None,
     ) -> Grant:
@@ -276,8 +276,8 @@ class Auth:
     async def claim(
             self,
             raw_claim: str,
-            tokens: TokenRepositoryBase,
-            sessions: SessionRepositoryBase,
+            tokens: TokenRepository,
+            sessions: RefreshSessionRepository,
     ) -> TokenPair:
         """
         Exchange a claim token for a session. Once, and only once.
@@ -336,14 +336,14 @@ class Auth:
     async def refresh(
             self,
             raw_refresh: str,
-            tokens: TokenRepositoryBase,
-            sessions: SessionRepositoryBase,
+            tokens: TokenRepository,
+            sessions: RefreshSessionRepository,
     ) -> TokenPair:
         """
         Rotate a session: one refresh token in, a fresh pair out.
 
         The old token dies on use, which is what makes a replay detectable — see
-        SessionRepositoryBase.rotate, which cuts every session on the grant when
+        RefreshSessionRepository.rotate, which cuts every session on the grant when
         it sees one outside the grace window, and answers 409 inside it. Like claim, this
         costs no quota.
         """
@@ -405,7 +405,7 @@ class Auth:
             token_id: uuid.UUID,
             subject: str,
             company: str | None,
-            tokens: TokenRepositoryBase,
+            tokens: TokenRepository,
             event: str,
             reason: str,
     ) -> None:
@@ -432,7 +432,7 @@ class Auth:
     async def _authenticate(
             self,
             credentials: HTTPAuthorizationCredentials | None,
-            sessions: SessionRepositoryBase,
+            sessions: RefreshSessionRepository,
     ) -> tuple[uuid.UUID, int, uuid.UUID | None]:
         """
         Everything both dependencies do before they diverge: prove the bearer,
@@ -487,8 +487,8 @@ class Auth:
     async def verify_and_consume(
             self,
             credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-            tokens: TokenRepositoryBase = Depends(get_token_repository),
-            sessions: SessionRepositoryBase = Depends(get_session_repository),
+            tokens: TokenRepository = Depends(get_token_repository),
+            sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
     ) -> TokenContext:
         """
         The chat endpoints' dependency. Accepts a v1 or a v2 access token and
@@ -501,8 +501,8 @@ class Auth:
     async def verify(
             self,
             credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-            tokens: TokenRepositoryBase = Depends(get_token_repository),
-            sessions: SessionRepositoryBase = Depends(get_session_repository),
+            tokens: TokenRepository = Depends(get_token_repository),
+            sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
     ) -> TokenContext:
         """
         Same checks, no spending. What /session is built on.
@@ -516,7 +516,7 @@ class Auth:
         return self._context(grant, version, session_id)
 
     async def _require_live_session(
-            self, session_id: uuid.UUID, grant_id: uuid.UUID, sessions: SessionRepositoryBase
+            self, session_id: uuid.UUID, grant_id: uuid.UUID, sessions: RefreshSessionRepository
     ) -> None:
         session = await sessions.get(session_id)
         if session is None or session.token_id != grant_id:

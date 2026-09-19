@@ -23,7 +23,7 @@ from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 from app.common.config import LOG_CHAT_CONTENT, MAX_TOOL_ROUNDS, OPENAI_MODEL, SYSTEM_PROMPT
 from app.common.context import conversation_id_var, current_request_id, token_sub_var
 from app.common.models import ChatRequest, ChatResponse, TokenContext, Usage
-from app.repositories.base import ReplyOutcome, TranscriptRepositoryBase
+from app.repositories.base import ReplyOutcome, TranscriptRepository
 from app.services.sse import sse_event
 from app.services.tools import ChatToolService, ToolCall, ToolCallFunction
 from app.common.logging.logging import logger
@@ -58,7 +58,7 @@ class Chat:
             self,
             client: AsyncOpenAI,
             tools: ChatToolService,
-            transcripts: TranscriptRepositoryBase | None = None,
+            transcripts: TranscriptRepository | None = None,
             endpoint: str = "/chat",
     ) -> None:
         self.client: AsyncOpenAI = client

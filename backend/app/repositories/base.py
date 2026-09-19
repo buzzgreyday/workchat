@@ -66,7 +66,7 @@ class RepositoryBase(ABC):
         self.logger = logger
 
 
-class UserRepositoryBase(RepositoryBase):
+class UserRepository(RepositoryBase):
     """
     What the rest of the app is allowed to know about storing users.
 
@@ -91,7 +91,7 @@ class UserRepositoryBase(RepositoryBase):
         """Store a new user and return it, with its assigned id populated."""
 
 
-class TokenRepositoryBase(RepositoryBase):
+class TokenRepository(RepositoryBase):
     """
     What the rest of the app is allowed to know about storing grants.
 
@@ -163,7 +163,7 @@ class TokenRepositoryBase(RepositoryBase):
 
 
 
-class SessionRepositoryBase(RepositoryBase):
+class RefreshSessionRepository(RepositoryBase):
     """
     What the rest of the app is allowed to know about storing refresh sessions.
 
@@ -215,7 +215,7 @@ class SessionRepositoryBase(RepositoryBase):
         """
 
 
-class TranscriptRepositoryBase(RepositoryBase):
+class TranscriptRepository(RepositoryBase):
     """
     What the rest of the app is allowed to know about capturing a transcript.
 
@@ -269,11 +269,11 @@ class TranscriptRepositoryBase(RepositoryBase):
         """
 
 
-class ConversationRepositoryBase(RepositoryBase):
+class ConversationRepository(RepositoryBase):
     """
     What the rest of the app is allowed to know about reading transcripts back.
 
-    The same two tables as TranscriptRepositoryBase, deliberately split from it:
+    The same two tables as TranscriptRepository, deliberately split from it:
     these run inside a request like every other repository, while the recorders
     have to outlive one. Session ownership is the whole difference, and one
     abstraction claiming both would have to lie about it somewhere.

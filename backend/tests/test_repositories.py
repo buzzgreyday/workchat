@@ -25,14 +25,14 @@ from app.common.exceptions import (
 )
 from app.common.models import Grant, RefreshSession, User
 from app.repositories.base import (
+    RefreshSessionRepository,
     ReplyOutcome,
-    SessionRepositoryBase,
-    TokenRepositoryBase,
-    UserRepositoryBase,
+    TokenRepository,
+    UserRepository,
 )
 from app.repositories.sql import (
     SQLConversationRepository,
-    SQLSessionRepository,
+    SQLRefreshSessionRepository,
     SQLTokenRepository,
     SQLTranscriptRepository,
     SQLUserRepository,
@@ -51,7 +51,7 @@ def tokens(db_session):
 
 @pytest.fixture
 def sessions(db_session):
-    return SQLSessionRepository(db=db_session)
+    return SQLRefreshSessionRepository(db=db_session)
 
 
 @pytest.fixture
@@ -324,7 +324,7 @@ async def test_both_repositories_share_one_transaction(users, tokens, db_session
 # --- the seam ------------------------------------------------------------
 
 
-class FakeUserRepository(UserRepositoryBase):
+class FakeUserRepository(UserRepository):
     """A complete user repository with no database behind it."""
 
     def __init__(self) -> None:
@@ -340,7 +340,7 @@ class FakeUserRepository(UserRepositoryBase):
         return user
 
 
-class FakeTokenRepository(TokenRepositoryBase):
+class FakeTokenRepository(TokenRepository):
     """A complete grant repository with no database behind it."""
 
     def __init__(self) -> None:
@@ -403,7 +403,7 @@ class FakeTokenRepository(TokenRepositoryBase):
         return False
 
 
-class FakeSessionRepository(SessionRepositoryBase):
+class FakeSessionRepository(RefreshSessionRepository):
     """Enough of a session repository to run the auth service without a database."""
 
     def __init__(self) -> None:

@@ -22,8 +22,8 @@ from app.common.config import (
 from app.common.exceptions import MissingRefreshToken
 from app.common.logging.logging import logger
 from app.common.models import ClaimRequest, RefreshRequest, SessionOut, TokenPair
-from app.repositories import get_session_repository, get_token_repository
-from app.repositories.base import SessionRepositoryBase, TokenRepositoryBase
+from app.repositories import get_refresh_session_repository, get_token_repository
+from app.repositories.base import RefreshSessionRepository, TokenRepository
 from app.services.auth import auth
 
 router = APIRouter(prefix="/v2/auth", tags=["Auth"])
@@ -69,8 +69,8 @@ def _set_refresh_cookie(response: Response, pair: TokenPair) -> SessionOut:
 async def claim(
     req: ClaimRequest,
     response: Response,
-    tokens: TokenRepositoryBase = Depends(get_token_repository),
-    sessions: SessionRepositoryBase = Depends(get_session_repository),
+    tokens: TokenRepository = Depends(get_token_repository),
+    sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
 ) -> SessionOut:
     logger.info("Claim token presented")
     pair = await auth.claim(req.claim_token, tokens=tokens, sessions=sessions)
@@ -96,8 +96,8 @@ async def refresh(
     response: Response,
     req: RefreshRequest | None = None,
     refresh_cookie: str | None = Cookie(default=None, alias=REFRESH_COOKIE_NAME),
-    tokens: TokenRepositoryBase = Depends(get_token_repository),
-    sessions: SessionRepositoryBase = Depends(get_session_repository),
+    tokens: TokenRepository = Depends(get_token_repository),
+    sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
 ) -> SessionOut:
     # Cookie first: that is where a browser keeps it. The body is the escape
     # hatch for callers that have no cookie jar.

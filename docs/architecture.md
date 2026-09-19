@@ -51,15 +51,34 @@ to know what the storage engine is.
 
 A repository speaks in the domain models from `app/common/models/`, never the
 ORM rows in `app/common/schemas.py`, and takes no session in its abstract
-methods — so a service that depends on `UserRepositoryBase` can be exercised
+methods — so a service that depends on `UserRepository` can be exercised
 against an in-memory implementation with no database in the process.
 
 ```
 app/repositories/
-├── base.py     UserRepositoryBase, TokenRepositoryBase
-├── sql.py      the SQLAlchemy backend — the one module that names a session
-└── __init__.py the composition root: binds a backend, exports the providers
+├── base.py       the contract: UserRepository, TokenRepository,
+│                 RefreshSessionRepository, TranscriptRepository,
+│                 ConversationRepository
+├── sql/          the SQLAlchemy backend — the only package naming a session
+│   ├── __init__.py    its providers, and the package's front door
+│   ├── _shared.py     private: result and column helpers
+│   ├── user.py        one module per aggregate, named for the table
+│   ├── token.py       it owns rather than the class inside it
+│   ├── refresh_session.py
+│   ├── transcript.py  the write half of the chat tables
+│   └── conversation.py  and the read half
+└── __init__.py   the composition root: binds a backend, exports the providers
 ```
+
+The abstraction takes the plain name and the implementation is qualified —
+`TokenRepository` is what a caller annotates, `SQLTokenRepository` is one way of
+being one. `RefreshSessionRepository` is spelled out because `session` already
+means a SQLAlchemy `AsyncSession` in these files, and the two appear together.
+
+`transcript` and `conversation` cover the same two tables on purpose. They are
+split by session ownership, not by data: the recorders have to outlive the
+request that started them, the admin reads run inside one, and a single
+abstraction claiming both would have to lie about that somewhere.
 
 **There is deliberately no `commit` anywhere in `base`, and no unit of work.**
 SQLAlchemy's `Session` is already a unit of work, so wrapping it in another one
@@ -79,7 +98,7 @@ but as a property of that backend, never something a service claims.
 *own* dependencies are whatever the chosen backend declares. The SQL providers
 ask for `Depends(get_db)`; a backend needing something else, or nothing, says so
 there, and the route asking for a repository is unaffected either way. That is
-what makes another store a new module plus a one-line change in `__init__.py`,
+what makes another store a new package plus a one-line change in `__init__.py`,
 rather than an edit to every route and service.
 
 Only the issue-token path has moved so far. The free functions in

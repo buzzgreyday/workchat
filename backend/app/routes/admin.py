@@ -16,15 +16,15 @@ from app.common.models import (
 from app.helpers.qr_code import get_qr_code
 from app.repositories import (
     get_conversation_repository,
-    get_session_repository,
+    get_refresh_session_repository,
     get_token_repository,
     get_user_repository,
 )
 from app.repositories.base import (
-    ConversationRepositoryBase,
-    SessionRepositoryBase,
-    TokenRepositoryBase,
-    UserRepositoryBase,
+    ConversationRepository,
+    RefreshSessionRepository,
+    TokenRepository,
+    UserRepository,
 )
 from app.services import admin
 from app.services.auth import require_admin
@@ -47,8 +47,8 @@ logger = logging.logger
 )
 async def issue_token(
     req: IssueTokenRequest,
-    users: UserRepositoryBase = Depends(get_user_repository),
-    tokens: TokenRepositoryBase = Depends(get_token_repository),
+    users: UserRepository = Depends(get_user_repository),
+    tokens: TokenRepository = Depends(get_token_repository),
 ) -> Response:
     logger.info(
         "Issuing a new access token",
@@ -87,8 +87,8 @@ async def issue_token(
 )
 async def revoke_token(
     token_id: uuid.UUID,
-    tokens: TokenRepositoryBase = Depends(get_token_repository),
-    sessions: SessionRepositoryBase = Depends(get_session_repository),
+    tokens: TokenRepository = Depends(get_token_repository),
+    sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
 ) -> JSONResponse:
     grant = await tokens.get(token_id)
     if grant is None:
@@ -124,7 +124,7 @@ async def get_conversations(
     offset: int = Query(0, ge=0),
     company: str | None = None,
     since: datetime | None = None,
-    conversations: ConversationRepositoryBase = Depends(get_conversation_repository),
+    conversations: ConversationRepository = Depends(get_conversation_repository),
 ) -> list[ConversationSummary]:
     previews = await conversations.list_previews(
         limit=limit, offset=offset, company=company, since=since
@@ -140,7 +140,7 @@ async def get_conversations(
 )
 async def get_conversation(
     conversation_id: uuid.UUID,
-    conversations: ConversationRepositoryBase = Depends(get_conversation_repository),
+    conversations: ConversationRepository = Depends(get_conversation_repository),
 ) -> ConversationDetail:
     conversation, messages = await conversations.get_with_messages(conversation_id)
     if conversation is None:
@@ -172,7 +172,7 @@ async def get_conversation(
 )
 async def redact(
     conversation_id: uuid.UUID,
-    conversations: ConversationRepositoryBase = Depends(get_conversation_repository),
+    conversations: ConversationRepository = Depends(get_conversation_repository),
 ) -> JSONResponse:
     # An existence check, not a load: the transcript this used to fetch was
     # discarded, and every message body came back with it.
