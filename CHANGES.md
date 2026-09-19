@@ -7,6 +7,44 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.3.0] - 2026-09-19
+
+### Changed
+
+- Persistence moved behind a repository layer. `app/services/db.py` — which had
+  grown to hold every query in the app — is gone, replaced by
+  `app/repositories/`: a contract stated in domain terms, and an `sql/` package
+  that is the only place naming SQLAlchemy. `AsyncSession` now appears in two
+  files rather than nine, and no ORM row crosses into a route or a service.
+
+  There is deliberately no unit of work and no `commit` in any abstraction. A
+  SQLAlchemy `Session` is already one, and a store without transactions could
+  only stub a `commit` while implying a guarantee it cannot keep. Instead the
+  request owns its transaction and repositories flush — except for a named few
+  that are durable on return, because a spend a later failure could undo is a
+  free question.
+
+- The chat model is configurable per environment. Development defaults to
+  gpt-4.1-nano, where the question is whether the tool round-trip works rather
+  than whether the answer is good; production still gets gpt-4.1-mini, which
+  measurably answers depth questions better. `OPENAI_MODEL` overrides either.
+
+### Fixed
+
+- Conversation message counts no longer lose turns. The count was incremented in
+  Python against a stale read, so two turns arriving together both wrote the same
+  value and one was lost — five concurrent questions recorded two. The database
+  computes the increment now.
+
+- Listing conversations stopped issuing a query per row. A page of fifty cost a
+  hundred and one round trips, all to fetch two truncated preview strings; it is
+  one windowed query now.
+
+- Refreshing a token can no longer fail while notifying the operator. Replay
+  detection rolled back a session whose rows the caller still held, so reading
+  the grant's owner afterwards risked lazy IO outside the async context; the
+  caller now holds a plain value that no rollback can expire.
+
 ## [0.1.13] - 2026-08-14
 
 ### Changed
