@@ -7,6 +7,72 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.6.0] - 2026-09-20
+
+### Fixed
+
+- A reply that fails mid-stream no longer leaves the page unusable. 0.4.0 added
+  an error frame so a failure would be distinguishable from a dropped
+  connection; the frontend logged it to the console and did nothing else. No
+  terminal frame follows a failure, so the bubble stayed in its streaming state
+  — and because the composer is shut while a reply streams, it stayed shut. The
+  only way out was a reload, with nothing on screen saying why. The failure is
+  now shown where the answer would have been, and the allowance is re-read,
+  since the question was spent before the model was ever called.
+
+- A reload keeps the conversation. The session already survived one — a
+  single-use claim link would be a cruel thing to lose to F5 — but the
+  transcript and the conversation id did not, so the agent lost every turn of
+  context and the backend opened a second conversation row for the same person.
+  Both are kept for the life of the tab now, keyed to the grant so a different
+  link opened in the same tab starts clean. The access token is deliberately
+  not kept: it lives in memory so that script on the page cannot read it, which
+  is the whole reason the refresh half is an httpOnly cookie.
+
+- Scrolling up to re-read an answer no longer drags you back down. The
+  transcript followed every change to the message list, which during a streamed
+  reply is every token, so the one moment you might want to look back was the
+  one moment you could not. It follows only when you are already at the bottom.
+
+### Changed
+
+- The chat says it is opening a session instead of greeting nobody. A claim
+  link costs a round trip before it knows who is reading, and that gap was
+  filled with a bare "Hi! 👋" that then flipped to a name. It shows the same
+  typing indicator every reply uses. A `?token=` link is the access token
+  itself, so that hirer is still greeted immediately.
+
+- The header and the browser tab name whoever the deployment belongs to, from
+  `OWNER_NAME`, `OWNER_GITHUB_URL` and `OWNER_LINKEDIN_URL`. They had been
+  hardcoded to the author — something 0.1.11 admitted and deferred — and the
+  tab still read "Create Next App". Read on the server per request rather than
+  through `NEXT_PUBLIC_`, which `next build` would freeze into the bundle: one
+  image serves any owner, and changing a name is a restart. A variable set but
+  empty means there is no such link and hides it; unset means use the default.
+
+- The composer is a textarea. Enter still sends, Shift+Enter opens a second
+  line, which a two-sentence question needs. Links in an answer open in a new
+  tab rather than navigating away from the chat.
+
+- Screen readers are told what is happening: the transcript is a log, the
+  composer and the send button are labelled, and a hidden status line says when
+  a reply is being generated. Deliberately not a live region around the reply —
+  that reads a streamed answer out one token at a time.
+
+### Added
+
+- Playwright tests for the chat page, and CI runs them. This was the first
+  frontend test in the project: the three fixes above are exactly the kind no
+  type checker sees, and every one of them had been reasoned about rather than
+  observed. Each test is named for what broke, and the two that matter most
+  were checked by putting the bug back. The backend is mocked at the network
+  boundary, so they need no database, no key and no stack.
+
+- `docs/architecture.md` records what a request actually costs, measured rather
+  than estimated — which statements each endpoint makes, why only one of them
+  is a question a token claim could answer, and why the session read that
+  remains is worth keeping.
+
 ## [0.5.0] - 2026-09-20
 
 ### Removed
