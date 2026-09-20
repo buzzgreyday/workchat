@@ -70,7 +70,11 @@ jobs:
         run: uv run pytest -q
 
   frontend:
-    name: Frontend — types, lint, build and tests
+    # The name is a contract, not a label: branch protection on development and
+    # main both require a status check called exactly this. Renaming the job
+    # retires that check, which leaves it permanently pending and every pull
+    # request blocked — change the protection rules first, or not at all.
+    name: Frontend — types, lint and build
     runs-on: ubuntu-latest
     defaults:
       run:
