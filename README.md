@@ -210,7 +210,7 @@ docker compose down
 # Build new skills
 
 ```bash
-cd backend && uv run --env-file .env -m app.build_index
+cd backend && uv run --env-file .env -m app.build_skills
 ```
 
 ---
@@ -565,9 +565,9 @@ Typical development workflow:
       --autogenerate -m "…"`.
    2. Review it. Autogenerate misses things like server defaults and renames.
    3. Apply it — `docker compose exec backend alembic upgrade head`.
-3. If you edited anything in `backend/resources/`, rebuild the search index, or
-   `/chat/stream` will keep answering from the old one:
-   `docker compose run --rm backend python -m app.build_index`
+3. If you edited the tags on anything in `backend/resources/`, regenerate the
+   skills list — `cd backend && uv run -m app.build_skills` — and commit it.
+   The search index needs nothing: it is rebuilt when the backend reloads.
 4. Run the tests on the host — `cd backend && uv run pytest` (see [Testing](#testing)).
 5. Rebuild only when dependencies change — `docker compose build backend`
    after `pyproject.toml`/`uv.lock`, or `frontend` after `package.json`.

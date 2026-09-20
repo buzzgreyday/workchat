@@ -63,6 +63,13 @@ is shown and told about those results — the schemas, the JSON encoding, the
 prose steering it toward opening an entry rather than answering from a summary —
 is the adapter's, in `app/services/chat/tooling.py`.
 
+Where the records come from is a third thing again, in `app/services/indexing.py`:
+the backend scans `backend/resources/` at startup, parses each file's frontmatter
+and holds the corpus in memory. There is no build step and no artifact — twenty
+files and ~46 KB of markdown cost milliseconds to read, and an index that only
+exists in the process that serves it cannot go stale against one. A scan that
+finds no records stops the server before it binds a port.
+
 ## Layering
 
 | layer | may raise | knows about HTTP |

@@ -14,10 +14,23 @@ from unittest.mock import AsyncMock, MagicMock
 # --- env setup: must happen before any `from app import ...` below ---
 _TEST_RESOURCES = Path(tempfile.mkdtemp(prefix="cv-test-"))
 (_TEST_RESOURCES / "system-prompt.md").write_text("test system prompt")
-(_TEST_RESOURCES / "index.json").write_text(json.dumps([]))
+# One real record rather than an empty corpus. ChatTooling.schemas() builds the
+# tag enum from the index and every chat turn calls it, so a corpus with nothing
+# in it would 500 each of those tests for a reason that has nothing to do with
+# what they assert.
+(_TEST_RESOURCES / "iedi.md").write_text(
+    "---\n"
+    "title: Software Developer @ iEDI\n"
+    "type: experience\n"
+    "tags: [python]\n"
+    'dates: "2025"\n'
+    "summary: Backend work.\n"
+    "---\n"
+    "The main engine is a monolith.\n"
+)
 
 os.environ["SYSTEM_PROMPT_PATH"] = str(_TEST_RESOURCES / "system-prompt.md")
-os.environ["INDEX_PATH"] = str(_TEST_RESOURCES / "index.json")
+os.environ["RESOURCES_DIR"] = str(_TEST_RESOURCES)
 # setdefault so a caller can override via a real env, but tests default to sane values.
 os.environ.setdefault("DEV_MODE", "1")
 os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")

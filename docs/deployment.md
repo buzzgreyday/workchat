@@ -72,30 +72,20 @@ git clone https://github.com/buzzgreyday/workchat.git && cd workchat
       $EDITOR backend/resources/*.md
       ```
 
-- [ ] **6. Ownership.** `backend/resources` is bind-mounted rather than baked
-      into the image, and the container runs as UID/GID 1000, which needs write
-      access to it.
-      ```bash
-      sudo chown -R 1000:1000 backend/resources
-      ```
-
-- [ ] **7. Build the index.** Generates `backend/resources/index.json`
-      (gitignored) from the markdown. It is read per request rather than at
-      startup, so the backend boots and `/health` passes without it — but
-      `/chat/stream` cannot answer until it exists.
-      ```bash
-      docker compose -f docker-compose.prod.yaml run --rm backend python -m app.build_index
-      ```
-
-- [ ] **8. Bring the stack up.** The first run also builds `caddy/` from source
+- [ ] **6. Bring the stack up.** The first run also builds `caddy/` from source
       (adding the rate-limit module via `xcaddy`), which pulls a fair amount of
       Go modules — expect this to take a few minutes longer than the rest.
       ```bash
       docker compose -f docker-compose.prod.yaml up -d --build
       ```
+      The backend scans `backend/resources` into memory as it starts. There is
+      no index to build and no ownership to fix: the mount is read-only and
+      nothing in the container writes to it. If the scan finds no records the
+      backend exits rather than serving, so `--wait` fails here instead of the
+      site going live with nothing to answer from.
 
-- [ ] **9. Verify** — see below.
-- [ ] **10. Mint your first access token** — see "Issue an access token".
+- [ ] **7. Verify** — see below.
+- [ ] **8. Mint your first access token** — see "Issue an access token".
 - [ ] *(Optional)* Set up a nightly `pg_dump` cron — see "Backups".
 
 Caddy provisions a Let's Encrypt certificate on the first request to your
@@ -118,33 +108,29 @@ curl    https://chat.example.com/api/health
 
 ```bash
 git pull
-sudo chown -R 1000:1000 backend/resources
 docker compose -f docker-compose.prod.yaml up -d --build
-docker compose -f docker-compose.prod.yaml run --rm backend python -m app.build_index
 ```
 
-The order matters, and none of the four steps is optional:
+That is the whole procedure, and it is what the GitHub deploy workflow already
+runs on a push to `main`.
 
-- **The ownership step is not a one-off from first deployment.** `git pull`
-  writes the files it updates as whichever user runs it, and the container needs
-  `backend/resources` owned by UID/GID 1000 (see step 6). Otherwise
-  `build_index` fails part-way with a permission error on `skills.md`, after it
-  has already rewritten `index.json` — leaving a fresh index beside a stale
-  skills list.
-- **Rebuild the image before building the index.** Only `backend/resources` is
-  bind-mounted; the application code, `build_index.py` included, is baked into
-  the image. Running the index build first would run the *previous* release's
-  indexer over the new content.
-- **`build_index` does not run itself.** `index.json` is gitignored and read per
-  request, so a release that changes any CV record leaves the site answering
-  from the old index until this runs — `/health` keeps passing throughout, so
-  nothing surfaces the staleness for you.
+It used to be four commands whose order was load-bearing, because the index was
+a gitignored artifact built by hand after the restart. A release that changed a
+CV record left the site answering from the previous index until someone
+remembered — and `/health` passed throughout, so nothing surfaced it. The
+backend scans the markdown at startup now, so the restart *is* the rebuild. The
+`chown` went with it: the container no longer writes to `backend/resources`, and
+the mount is read-only.
 
-Afterwards `git status` should be clean. `skills.md` is tracked but rewritten by
-`build_index`; since ranking ties break on the tag name, regenerating it on the
-server reproduces the committed file byte for byte. If it shows as modified, the
-committed copy was generated from different content — regenerate it locally and
-commit that, rather than leaving the working tree dirty for the next `git pull`
+**Editing a record on the server still needs a restart.** The corpus is read
+once, at startup, so a typo fixed in `bio.md` reaches the site on
+`docker compose -f docker-compose.prod.yaml restart backend` and not before.
+
+Afterwards `git status` should be clean. `skills.md` is tracked and generated —
+by `python -m app.build_skills`, run locally and committed like any other
+source. The server never runs it. If it shows as modified after a pull, the
+committed copy was generated from different content; regenerate it locally and
+commit that rather than leaving the working tree dirty for the next `git pull`
 to collide with.
 
 ## Issue an access token

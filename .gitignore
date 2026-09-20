@@ -28,7 +28,6 @@ Thumbs.db
 # Private CV content (kept locally / on the server, not in the public repo)
 backend/resources/contact.md
 backend/resources/system-prompt.md
-backend/resources/index.json
 
 # Eval transcripts. One JSON per run, holding the model's replies — a run
 # artifact, not source. The question set itself is tracked.

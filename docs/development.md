@@ -21,14 +21,15 @@ docker compose up -d
 The dev stack exposes the backend on `:8000` and the frontend on `:3000`
 directly; Caddy is production-only.
 
-`/chat/stream` additionally needs the search index, which is generated from the
-markdown in `backend/resources/`:
+The CV index is built from the markdown in `backend/resources/` when the backend
+starts — there is no build step and no artifact. The dev stack watches that
+directory, so editing a record reloads the app and rebuilds the index with no
+command to run. A resources directory that yields no records stops the server
+rather than leaving it answering nothing.
 
-```bash
-docker compose run --rm backend python -m app.build_index
-```
-
-Re-run that whenever you add or edit a file there.
+`skills.md` is the one file still generated, and it is tracked: regenerate it
+locally with `python -m app.build_skills` (from `backend/`) after editing the
+tags on any record, and commit the result.
 
 ## Branches
 

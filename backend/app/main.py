@@ -21,11 +21,17 @@ from app.routes.auth import router as auth_router
 from app.routes.chat import router as chat_router
 from app.routes.health import router as health_router
 from app.routes.session import router as session_router
+from app.services.search import get_search
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f'Starting chat server, in {"DEV" if DEV_MODE else "PROD"} mode.', extra={"app": app})
+    # Before the socket is bound, so a server with no CV never gets the chance
+    # to answer from nothing. Raising here makes uvicorn exit rather than serve,
+    # which is what turns a broken resources mount into a failed deploy instead
+    # of a live site that denies everything it is asked.
+    await get_search().load()
     yield
     logger.info("Stopping chat server.", extra={"app": app})
     logger.debug("Closing chat client.", extra={"client": get_openai_client()})

@@ -15,16 +15,15 @@ from app.services.search import CVSearch
 
 @pytest.fixture
 def tooling(tmp_path, monkeypatch):
-    (tmp_path / "iedi.md").write_text("---\ntitle: iEDI\n---\nA monolith, not microservices.\n")
-    (tmp_path / "bio.md").write_text("---\ntitle: Bio\n---\nBackground in philosophy.\n")
-    index = [
-        {"file": "iedi.md", "type": "experience", "title": "iEDI",
-         "tags": ["monolith"], "dates": "2025", "summary": "Backend work.", "skill_notes": {}},
-        {"file": "bio.md", "type": "bio", "title": "Bio",
-         "tags": ["philosophy"], "dates": None, "summary": "Background.", "skill_notes": {}},
-    ]
-    (tmp_path / "index.json").write_text(json.dumps(index))
-    monkeypatch.setattr(search_module, "INDEX_PATH", tmp_path / "index.json")
+    (tmp_path / "iedi.md").write_text(
+        "---\ntitle: iEDI\ntype: experience\ntags: [monolith]\n"
+        'dates: "2025"\nsummary: Backend work.\n---\n'
+        "A monolith, not microservices.\n"
+    )
+    (tmp_path / "bio.md").write_text(
+        "---\ntitle: Bio\ntype: bio\ntags: [philosophy]\nsummary: Background.\n---\n"
+        "Background in philosophy.\n"
+    )
     monkeypatch.setattr(search_module, "RESOURCES_DIR", tmp_path)
     return ChatTooling(search=CVSearch())
 

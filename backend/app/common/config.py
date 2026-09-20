@@ -27,9 +27,12 @@ def env_bool(name: str, default: bool = False) -> bool:
 ## Paths
 # config.py lives at backend/app/common/config.py, so three parents up is backend/.
 BACKEND_DIR = Path(__file__).parent.parent.parent.resolve()
-RESOURCES_DIR = BACKEND_DIR / "resources"
-# Env overrides let tests point these at fixture files.
-INDEX_PATH = Path(os.environ.get("INDEX_PATH") or (RESOURCES_DIR / "index.json"))
+# Env overrides let tests point these at fixture files. Resolved rather than
+# taken as given: CVSearch._within_resources guards traversal by asking whether
+# RESOURCES_DIR is among a path's resolved parents, and an env-supplied path
+# with a symlink in it would fail that test for every record in the corpus —
+# leaving search working while every attempt to open an entry returned nothing.
+RESOURCES_DIR = Path(os.environ.get("RESOURCES_DIR") or (BACKEND_DIR / "resources")).resolve()
 SYSTEM_PROMPT_PATH = Path(os.environ.get("SYSTEM_PROMPT_PATH") or (RESOURCES_DIR / "system-prompt.md"))
 
 # Load environment

@@ -30,9 +30,13 @@ services:
       - OPENAI_MODEL
     # Dev only. entrypoint.sh runs `alembic upgrade head` and then execs "$@",
     # so this replaces its default uvicorn invocation. --reload-dir keeps the
-    # watcher on the application package instead of the whole bind mount, which
-    # would otherwise include /app/.venv and alembic/.
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
+    # watcher off the whole bind mount, which would otherwise include
+    # /app/.venv and alembic/. resources/ is watched because the CV index is
+    # built at startup: editing a record reloads the app and rebuilds it, with
+    # no command to remember. --reload-include is needed with it — uvicorn's
+    # watcher matches *.py only by default, so the markdown would be watched
+    # in name and ignored in fact.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app --reload-dir resources --reload-include '*.py' --reload-include '*.md'
     healthcheck:
       # python, not curl: the python:3.13-slim base image ships no curl, so the
       # previous probe could only ever fail with "executable file not found".
