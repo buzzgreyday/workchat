@@ -202,6 +202,61 @@ orphan — the atomicity is internal to one repository method, which owns it
 privately with whatever its backend has. Nothing needs two repositories to
 share a transaction beyond the shared-session property above.
 
+### What a request costs
+
+Counted, not estimated — `SQL_ECHO=1` and the correlation id that every log line
+already carries. Connection setup is excluded; these are steady-state figures.
+
+| path | statements | commits |
+|---|---|---|
+| `POST /chat/stream` — v2, continuing a conversation | 7 | 3 |
+| `POST /chat/stream` — v1, continuing a conversation | 6 | 3 |
+| `POST /chat/stream` — first message of a conversation | +1 | 3 |
+| `POST /v2/auth/refresh` | 5 | 1 |
+| `POST /v2/auth/claim` | 3 | 2 |
+| `GET /session` — v2 | 2 | 1 |
+
+A v2 chat message is one session read, one atomic spend, and five transcript
+statements. **Only the first is a question a token claim could answer** — the
+transcript is the product, not authentication, and no token design removes it.
+
+This comes up because a JWT is supposed to avoid lookups, and at a glance the
+backend seems to do a lot of them anyway. The short answer is that the lookups
+which remain are state a token cannot hold: how many questions are left, whether
+this conversation belongs to you, what was asked.
+
+**The spend does four checks for free.** `consume_query` puts
+`revoked_at IS NULL`, `expires_at > now`, `used_queries < max_queries` and
+`version = expected` into the predicate of the `UPDATE … RETURNING` it had to
+run anyway. The obvious implementation — read the grant, check in Python, write
+— is three statements and a lost-update race. Revocation, expiry, quota and
+version therefore cost nothing extra.
+
+**The claims earn their place.** `ver` separates v1 from v2 with no lookup;
+`typ` rejects the wrong kind of token before any query; `tid` carries the grant
+id so nothing has to search for it; and a refresh token's `jti` *is* its row id,
+so rotation is a primary-key update rather than a lookup by token hash. The one
+piece of vestige is `max_queries`, minted into v1 tokens and never read — the
+quota always comes from the grant row.
+
+**The session read is the only discretionary call**, and it buys less than it
+looks. Grant revocation is already caught by the spend, so `_require_live_session`
+only makes a *session*-level cut — the kind replay detection triggers — take
+effect immediately rather than within the access token's remaining ≤15 minutes.
+It stays: it is a primary-key read on a path where the same request spends one
+to six OpenAI round trips at roughly a second each.
+
+**Three transactions is not an accident.** The spend commits before the answer
+streams, or an aborted stream hands back free questions. The question commits
+before the model runs, or a crashed turn loses what was asked. The reply cannot
+commit before the stream ends, because that is when it exists.
+
+**`refresh` reads `refresh_tokens` twice.** The caller loads the session to check
+its hash, and `rotate` loads it again to check it exists. That is
+`RefreshSessionRepository.rotate` declining to trust that its caller checked —
+the contract says it owns the race — and it costs one primary-key read per
+rotation, which is once per access-token lifetime per client.
+
 ## Where to read next
 
 - **Token flow** — the v1/v2 split, claim and refresh, quota: the
