@@ -4,16 +4,13 @@ Searching the CV.
 Nothing here imports OpenAI, which is the point of the split: how the corpus is
 ranked is arguable on its own terms, without a model or a tool schema involved.
 """
-from pathlib import Path
-
 import pytest
 
-from app.services import search as search_module
 from app.services.search import CVSearch
 
 
 @pytest.fixture
-def cv(tmp_path, monkeypatch):
+def cv(tmp_path):
     """A two-record corpus on disk. The metadata is frontmatter now rather than
     a separate index.json, because that is where the records come from."""
     (tmp_path / "iedi.md").write_text(
@@ -33,8 +30,7 @@ def cv(tmp_path, monkeypatch):
         "Background in philosophy.\n"
     )
 
-    monkeypatch.setattr(search_module, "RESOURCES_DIR", tmp_path)
-    return CVSearch()
+    return CVSearch(resources_dir=tmp_path)
 
 
 async def test_search_returns_hits(cv):
@@ -119,12 +115,13 @@ async def test_empty_query_returns_everything(cv):
     assert len(await cv.search()) == 2
 
 
-async def test_the_corpus_is_scanned_once(cv, monkeypatch):
+async def test_the_corpus_is_scanned_once(cv, tmp_path):
     """Cached for the life of the process: the corpus is read at startup, and a
     change to it needs a restart to be seen."""
     await cv.search(query="monolith")
-    monkeypatch.setattr(search_module, "RESOURCES_DIR", gone := Path("/nonexistent"))
-    assert await cv.search(query="monolith"), f"a second search must not re-read {gone}"
+    for record in tmp_path.glob("*.md"):
+        record.unlink()
+    assert await cv.search(query="monolith"), "a second search must not re-read the corpus"
 
 
 async def test_frontmatter_is_searchable(cv):
@@ -139,30 +136,26 @@ async def test_frontmatter_is_searchable(cv):
     assert [h.file for h in await cv.search(query="backend")] == ["iedi.md"]
 
 
-async def test_a_record_that_will_not_parse_is_skipped(tmp_path, monkeypatch):
+async def test_a_record_that_will_not_parse_is_skipped(tmp_path):
     """One bad file must not cost the rest of the corpus."""
     (tmp_path / "good.md").write_text("---\ntitle: Good\ntype: bio\n---\nFine.\n")
     (tmp_path / "broken.md").write_text("---\ntitle: [unclosed\n---\nBroken.\n")
-    monkeypatch.setattr(search_module, "RESOURCES_DIR", tmp_path)
-
-    hits = await CVSearch().search()
+    hits = await CVSearch(resources_dir=tmp_path).search()
     assert [h.file for h in hits] == ["good.md"]
 
 
-async def test_an_empty_corpus_refuses_to_load(tmp_path, monkeypatch):
+async def test_an_empty_corpus_refuses_to_load(tmp_path):
     """A server with no CV cannot answer anything, so it does not start."""
-    monkeypatch.setattr(search_module, "RESOURCES_DIR", tmp_path)
     with pytest.raises(RuntimeError):
-        await CVSearch().load()
+        await CVSearch(resources_dir=tmp_path).load()
 
 
-async def test_load_warms_every_body(tmp_path, monkeypatch):
+async def test_load_warms_every_body(tmp_path):
     """After load, a search touches no disk — proven by removing the corpus."""
     (tmp_path / "iedi.md").write_text(
         "---\ntitle: iEDI\ntype: experience\ntags: [python]\n---\nA monolith.\n"
     )
-    monkeypatch.setattr(search_module, "RESOURCES_DIR", tmp_path)
-    cv = CVSearch()
+    cv = CVSearch(resources_dir=tmp_path)
     await cv.load()
 
     (tmp_path / "iedi.md").unlink()

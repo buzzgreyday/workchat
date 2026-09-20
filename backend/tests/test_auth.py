@@ -18,6 +18,7 @@ from sqlalchemy import select, update
 
 from app.common.config import ALGORITHM, REFRESH_COOKIE_NAME, SECRET_KEY
 from app.common.schemas import DatabaseRefreshToken, DatabaseToken
+from app.services.auth import auth
 
 ADMIN_HEADERS = {"X-Admin-Key": os.environ["ADMIN_KEY"]}
 
@@ -81,7 +82,11 @@ def notifications(monkeypatch):
         async def sessions_cut(self, token_id, subject, company, reason):
             sent.append(("sessions_cut", str(token_id), subject))
 
-    monkeypatch.setattr("app.services.auth.notifier", Recorder())
+    # Set on the instance, not on the module. `app/routes/auth.py` does
+    # `from app.services.auth import auth`, so it holds the object rather than
+    # the name — rebinding the name here would leave the routes on the real
+    # notifier. Commit 2's provider makes this a dependency_overrides entry.
+    monkeypatch.setattr(auth, "notifier", Recorder())
     return sent
 
 

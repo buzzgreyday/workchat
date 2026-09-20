@@ -62,7 +62,13 @@ class CVSearch:
     first use otherwise — and kept for the life of the process.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, resources_dir: Path | None = None) -> None:
+        # Resolved here rather than trusted from the caller: `_within_resources`
+        # guards traversal by asking whether this directory is among a path's
+        # resolved parents, so an unresolved path with a symlink in it — a
+        # pytest tmp_path on macOS, a symlinked deploy directory — would fail
+        # containment for every record while search itself kept working.
+        self._resources_dir = (resources_dir or RESOURCES_DIR).resolve()
         self._index: list[dict[str, Any]] | None = None
         self._bodies: dict[str, str] = {}
 
@@ -84,9 +90,9 @@ class CVSearch:
         Cached for the life of the process. The corpus is read at startup, so
         editing a record on a running server needs a restart to be seen.
         """
-        records, bodies = await asyncio.to_thread(scan, RESOURCES_DIR)
+        records, bodies = await asyncio.to_thread(scan, self._resources_dir)
         if not records:
-            raise RuntimeError(f"No CV records found under {RESOURCES_DIR}")
+            raise RuntimeError(f"No CV records found under {self._resources_dir}")
         self._index, self._bodies = records, bodies
         logger.info("Built the CV index", extra={"records": len(records)})
         return records
@@ -110,7 +116,7 @@ class CVSearch:
         CVSearch built by hand — a test, mostly — rather than the normal path.
         """
         if file not in self._bodies:
-            async with aiofiles.open(RESOURCES_DIR / file, mode="r") as f:
+            async with aiofiles.open(self._resources_dir / file, mode="r") as f:
                 self._bodies[file] = (await f.read()).lower()
         return self._bodies[file]
 
@@ -185,7 +191,7 @@ class CVSearch:
         caller's business, and a search service that returns prose for the model
         to read would be deciding it here.
         """
-        path = RESOURCES_DIR / file
+        path = self._resources_dir / file
         if not path.exists():
             # A caller retypes the filename from a search result and sometimes
             # changes its case — "iEDI.md" for "iedi.md". On a case-sensitive
@@ -193,17 +199,16 @@ class CVSearch:
             # model sits, from the record not existing: it fell back to the
             # summary and answered from that.
             wanted = file.strip().lower()
-            path = next((p for p in RESOURCES_DIR.glob("*.md") if p.name.lower() == wanted), path)
+            path = next((p for p in self._resources_dir.glob("*.md") if p.name.lower() == wanted), path)
         if not self._within_resources(path):
             logger.warning("Rejected an entry outside the resources directory", extra={"file": file})
             return None
         async with aiofiles.open(path, mode="r") as f:
             return await f.read()
 
-    @staticmethod
-    def _within_resources(path: Path) -> bool:
+    def _within_resources(self, path: Path) -> bool:
         """Guards the traversal `file` would otherwise allow."""
-        return path.exists() and RESOURCES_DIR in path.resolve().parents
+        return path.exists() and self._resources_dir in path.resolve().parents
 
 
 @lru_cache

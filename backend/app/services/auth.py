@@ -79,7 +79,7 @@ from app.common.logging.logging import logger
 from app.common.models import JWT, Grant, RefreshSession, TokenClaims, TokenContext, TokenPair
 from app.repositories import get_refresh_session_repository, get_token_repository
 from app.repositories.base import RefreshSessionRepository, TokenRepository
-from app.services.notify import notifier
+from app.services.notify import Notifier, notifier as default_notifier
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -107,12 +107,17 @@ class Auth:
             admin_key: str = ADMIN_KEY,
             access_ttl_seconds: int = ACCESS_TOKEN_TTL_SECONDS,
             refresh_ttl_seconds: int = REFRESH_TOKEN_TTL_SECONDS,
+            notifier: Notifier = default_notifier,
     ) -> None:
         self.secret_key = secret_key
         self.algorithm = algorithm
         self.admin_key = admin_key
         self.access_ttl_seconds = access_ttl_seconds
         self.refresh_ttl_seconds = refresh_ttl_seconds
+        # Taken like every other collaborator above rather than reached for at
+        # the call site. It was the one this class imported as a module global,
+        # which is why telling it apart in a test meant patching this module.
+        self.notifier = notifier
 
     # --- decoding primitives -------------------------------------------------
 
@@ -422,9 +427,9 @@ class Auth:
             if not await tokens.mark_owner_notified(token_id):
                 return
             if event == "claim_reuse":
-                await notifier.claim_link_reused(token_id, subject, company)
+                await self.notifier.claim_link_reused(token_id, subject, company)
             else:
-                await notifier.sessions_cut(token_id, subject, company, reason)
+                await self.notifier.sessions_cut(token_id, subject, company, reason)
         except Exception:
             logger.exception("Failed to notify owner", extra={"token_id": token_id, "event": event})
 
