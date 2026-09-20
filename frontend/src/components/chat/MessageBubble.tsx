@@ -41,13 +41,32 @@ export default function MessageBubble({
         }`}
       >
         {isTyping ? (
-          <div className="flex items-center gap-1 py-1">
+          <div
+            className="flex items-center gap-1 py-1"
+            aria-label="Generating a reply"
+          >
             <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-slate-400" />
             <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-slate-400" />
             <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-slate-400" />
           </div>
         ) : (
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // An answer citing a repository or a profile should open beside
+              // the chat, not replace it. Navigating away drops the access
+              // token, which is held in memory on purpose.
+              a: ({ children, ...props }) => (
+                <a
+                  {...props}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {children}
+                </a>
+              ),
+            }}
+          >
             {message.content}
           </ReactMarkdown>
         )}
