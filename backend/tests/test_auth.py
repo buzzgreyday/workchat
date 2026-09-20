@@ -218,6 +218,7 @@ async def test_repeated_claim_reuse_notifies_once(client, notifications):
     assert len(notifications) == 1
 
 
+@pytest.mark.concurrent
 async def test_racing_claims_open_exactly_one_session(client):
     """Two requests arriving together cannot both pass the claimed_at gate."""
     claim = await issue(client, version=2)
@@ -255,6 +256,7 @@ async def test_rotation_retires_the_previous_access_token(client):
 
 # --- the rotation grace window -----------------------------------------------
 
+@pytest.mark.concurrent
 async def test_concurrent_refresh_does_not_lock_the_hirer_out(client):
     """
     The failure this window exists for.

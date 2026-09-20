@@ -56,5 +56,8 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = [
+    "concurrent: fires more than one request at a time, so it needs a database that can serve more than one connection — see the engine fixture in conftest.py",
+]
 testpaths = ["tests"]
 pythonpath = ["."]
