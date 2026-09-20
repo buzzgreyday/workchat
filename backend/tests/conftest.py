@@ -1,9 +1,11 @@
 """
-Shared pytest fixtures.
+Shared fixtures.
 
-Test env vars are set at module load, *before* the app is imported, so
-config.py picks up the fixture SYSTEM_PROMPT / INDEX paths and doesn't
-demand real values for the mandatory ones.
+Note what is *not* here any more: an env-setup block above the imports, and a
+`# noqa: E402` on every import below it. Nothing in `app` reads the environment
+at import now — `get_settings()` is called on first use and `create_app()` is
+called by `app/main.py` rather than by the factory module — so these imports are
+in the ordinary place and the environment is arranged underneath them.
 """
 import json
 import os
@@ -11,7 +13,18 @@ import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
-# --- env setup: must happen before any `from app import ...` below ---
+import httpx
+import pytest
+from httpx import ASGITransport
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+from app.common.config import get_settings
+from app.common.db import Base, get_db, get_session_factory, transaction
+from app.factory import create_app
+from app.openai.client import get_openai_client
+from app.services.auth import get_auth
+from app.services.search import get_search
+
 _TEST_RESOURCES = Path(tempfile.mkdtemp(prefix="cv-test-"))
 (_TEST_RESOURCES / "system-prompt.md").write_text("test system prompt")
 # One real record rather than an empty corpus. ChatTooling.schemas() builds the
@@ -41,14 +54,26 @@ os.environ.setdefault("POSTGRES_USER", "test")
 os.environ.setdefault("POSTGRES_PASSWORD", "test")
 os.environ.setdefault("POSTGRES_DB", "test")
 
-import httpx  # noqa: E402
-import pytest  # noqa: E402
-from httpx import ASGITransport  # noqa: E402
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
+# Everything the application caches for the life of a process. The suite is one
+# process, so a value built against an earlier test's environment would outlive
+# it; clearing here is what keeps the settings above authoritative.
+for _cache in (get_settings, get_auth, get_search, get_openai_client, get_session_factory):
+    _cache.cache_clear()
 
-from app.common.db import Base, get_db, get_session_factory, transaction  # noqa: E402
-from app.main import app  # noqa: E402
-from app.openai.client import get_openai_client  # noqa: E402
+
+@pytest.fixture(scope="session")
+def app():
+    """The application under test.
+
+    A fixture rather than a module global, which is not fussiness: pytest
+    imports this file as `conftest`, and a test module writing
+    `from tests.conftest import app` imports it *again* as `tests.conftest` —
+    two module objects, two `create_app()` calls, two apps. An override
+    registered on one would then be invisible to a client driving the other,
+    which is exactly as confusing to debug as it sounds. Requesting a fixture
+    can only ever yield the one pytest built.
+    """
+    return create_app()
 
 
 @pytest.fixture
@@ -100,7 +125,7 @@ def openai_mock():
 
 
 @pytest.fixture
-async def client(session_maker, openai_mock):
+async def client(app, session_maker, openai_mock):
     # Bound to the test engine, but through the same `transaction` helper the
     # real get_db uses — so a request here commits and rolls back exactly as it
     # does in production, rather than testing a looser definition of one.

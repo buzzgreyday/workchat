@@ -158,8 +158,9 @@ async def test_injected_system_text_is_gender_neutral(client, issued_token, open
     system = next(m for m in sent if m["role"] == "system")
     # Only the portion this codebase appends; the prompt file itself is the
     # author's own content and out of scope here.
-    from app.common.config import SYSTEM_PROMPT
-    appended = system["content"].replace(SYSTEM_PROMPT, "")
+    from app.common.config import get_settings
+
+    appended = system["content"].replace(get_settings().system_prompt, "")
 
     gendered = re.findall(r"\b(he|him|his|she|her|hers|himself|herself)\b", appended, re.I)
     assert not gendered, f"gendered pronouns hardcoded in appended system text: {gendered}"

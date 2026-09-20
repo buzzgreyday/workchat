@@ -55,7 +55,7 @@ git clone https://github.com/buzzgreyday/workchat.git && cd workchat
       ```
 
 - [ ] **4. The system prompt.** Gitignored, and the backend **will not start**
-      without it — `config.py` reads it at import and raises if it is missing or
+      without it — `Settings` reads it at startup and raises if it is missing or
       empty.
       ```bash
       cp backend/resources/system-prompt.md.example backend/resources/system-prompt.md

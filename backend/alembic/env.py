@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from app.common.config import DATABASE_URL
+from app.common.config import get_settings
 from app.common.db import Base
 from app.common.schemas import *
 
@@ -25,7 +25,7 @@ config = context.config
 # os.environ.
 config.set_main_option(
     "sqlalchemy.url",
-    DATABASE_URL
+    get_settings().database_url
 )
 
 # Interpret the config file for Python logging.

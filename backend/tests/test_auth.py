@@ -16,9 +16,9 @@ import jwt
 import pytest
 from sqlalchemy import select, update
 
-from app.common.config import ALGORITHM, REFRESH_COOKIE_NAME, SECRET_KEY
+from app.common.config import ALGORITHM, REFRESH_COOKIE_NAME, get_settings
 from app.common.schemas import DatabaseRefreshToken, DatabaseToken
-from app.services.auth import auth
+from app.services.auth import Auth, get_auth
 
 ADMIN_HEADERS = {"X-Admin-Key": os.environ["ADMIN_KEY"]}
 
@@ -67,12 +67,18 @@ async def chat(client, access_token, message="hi"):
 
 
 def decode(token):
-    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    return jwt.decode(token, get_settings().secret_key, algorithms=[ALGORITHM])
 
 
 @pytest.fixture
-def notifications(monkeypatch):
-    """Records what the operator would have been told."""
+def notifications(app, client):
+    """Records what the operator would have been told.
+
+    An override rather than a patch: Auth is a dependency now, so the seam the
+    framework already provides reaches every endpoint — where setting an
+    attribute on a module-level instance only reached the modules that had not
+    already bound it by value.
+    """
     sent = []
 
     class Recorder:
@@ -82,12 +88,10 @@ def notifications(monkeypatch):
         async def sessions_cut(self, token_id, subject, company, reason):
             sent.append(("sessions_cut", str(token_id), subject))
 
-    # Set on the instance, not on the module. `app/routes/auth.py` does
-    # `from app.services.auth import auth`, so it holds the object rather than
-    # the name — rebinding the name here would leave the routes on the real
-    # notifier. Commit 2's provider makes this a dependency_overrides entry.
-    monkeypatch.setattr(auth, "notifier", Recorder())
-    return sent
+    recording_auth = Auth(notifier=Recorder())
+    app.dependency_overrides[get_auth] = lambda: recording_auth
+    yield sent
+    app.dependency_overrides.pop(get_auth, None)
 
 
 async def backdate_rotation(session_maker, minutes=10):
@@ -409,7 +413,7 @@ async def test_refresh_token_cannot_be_spent_against_another_grant(client):
     session = await claim_session(client, mine["token"])
     payload = decode(session["refresh_token"])
     payload["tid"] = decode(theirs["token"])["tid"]
-    forged = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    forged = jwt.encode(payload, get_settings().secret_key, algorithm=ALGORITHM)
 
     assert (await refresh_with(client, forged)).status_code == 401
 
@@ -422,7 +426,7 @@ async def test_claim_token_bound_to_its_grant_row(client):
 
     payload = decode(mine["token"])
     payload["tid"] = decode(theirs["token"])["tid"]
-    forged = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    forged = jwt.encode(payload, get_settings().secret_key, algorithm=ALGORITHM)
 
     resp = await client.post("/v2/auth/claim", json={"claim_token": forged})
     assert resp.status_code == 401
@@ -436,7 +440,7 @@ async def test_v1_shaped_token_rejected_against_a_v2_grant(client):
     forged = jwt.encode(
         {"sub": payload["sub"], "iat": payload["iat"], "exp": payload["exp"],
          "jti": payload["tid"], "max_queries": 5},
-        SECRET_KEY,
+        get_settings().secret_key,
         algorithm=ALGORITHM,
     )
 
@@ -451,7 +455,7 @@ async def test_unknown_token_version_rejected(client):
     claim = await issue(client, version=2)
     payload = decode(claim["token"])
     payload["ver"] = 99
-    forged = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    forged = jwt.encode(payload, get_settings().secret_key, algorithm=ALGORITHM)
 
     resp = await chat(client, forged)
     assert resp.status_code == 401
@@ -470,7 +474,7 @@ async def test_boolean_version_is_not_read_as_version_one(client):
     claim = await issue(client, version=2)
     payload = decode(claim["token"])
     payload["ver"] = True
-    forged = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    forged = jwt.encode(payload, get_settings().secret_key, algorithm=ALGORITHM)
 
     resp = await chat(client, forged)
     assert resp.status_code == 401
@@ -488,7 +492,7 @@ async def test_unrecognised_token_type_is_refused_not_unparseable(client):
     session = await claim_session(client, claim["token"])
     payload = decode(session["access_token"])
     payload["typ"] = "not-a-real-type"
-    forged = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    forged = jwt.encode(payload, get_settings().secret_key, algorithm=ALGORITHM)
 
     resp = await chat(client, forged)
     assert resp.status_code == 401
@@ -499,7 +503,7 @@ async def test_claim_for_an_unknown_grant_rejected(client):
     claim = await issue(client, version=2)
     payload = decode(claim["token"])
     payload["tid"] = str(uuid.uuid4())
-    forged = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    forged = jwt.encode(payload, get_settings().secret_key, algorithm=ALGORITHM)
 
     resp = await client.post("/v2/auth/claim", json={"claim_token": forged})
     assert resp.status_code == 401

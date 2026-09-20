@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.config import OWNER_NOTIFY_THROTTLE_SECONDS
+from app.common.config import get_settings
 from app.common.exceptions import (
     InvalidToken,
     QuotaExhausted,
@@ -174,7 +174,7 @@ class SQLTokenRepository(TokenRepository):
         # hit in a loop must produce one message, not one per request. The
         # window predicate lives in SQL so concurrent requests cannot both win.
         now = datetime.now(timezone.utc)
-        cutoff = now - timedelta(seconds=OWNER_NOTIFY_THROTTLE_SECONDS)
+        cutoff = now - timedelta(seconds=get_settings().owner_notify_throttle_seconds)
         result = await self.db.execute(
             update(DatabaseToken)
             .where(

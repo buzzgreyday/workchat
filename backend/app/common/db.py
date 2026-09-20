@@ -1,13 +1,29 @@
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
+from functools import lru_cache
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase
 
-from app.common.config import DATABASE_URL, SQL_ECHO
+from app.common.config import get_settings
 
-engine = create_async_engine(DATABASE_URL, echo=SQL_ECHO)
-async_session = async_sessionmaker(engine, expire_on_commit=False)
+
+@lru_cache
+def get_engine() -> AsyncEngine:
+    """
+    The engine, built on first use rather than at import.
+
+    Module-level, it made importing anything that reaches this file open a
+    connection pool against whatever DATABASE_URL happened to be set — and fail
+    at import if nothing was. One per process, which is what an engine is for.
+    """
+    settings = get_settings()
+    return create_async_engine(settings.database_url, echo=settings.sql_echo)
 
 
 @asynccontextmanager
@@ -52,11 +68,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     transcript recorder still needs get_session_factory, because it has to
     outlive even that.
     """
-    async with transaction(async_session) as session:
+    async with transaction(get_session_factory()) as session:
         yield session
 
 
-def get_session_factory() -> async_sessionmaker:
+@lru_cache
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
     """
     The factory itself, not a session.
 
@@ -64,8 +81,11 @@ def get_session_factory() -> async_sessionmaker:
     exit stack, so this stays usable after the request has torn down. The chat
     transcript recorder needs exactly that — on client abort it runs after the
     request-scoped session from get_db is already closed.
+
+    Cached, so every caller shares one factory over one engine — which is what
+    the module-level binding used to provide before it moved behind a call.
     """
-    return async_session
+    return async_sessionmaker(get_engine(), expire_on_commit=False)
 
 class Base(DeclarativeBase):
     pass

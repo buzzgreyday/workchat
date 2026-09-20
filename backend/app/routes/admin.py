@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.responses import Response, JSONResponse
 from starlette.status import HTTP_200_OK
 
-from app.common.config import BASE_URL
+from app.common.config import get_settings
 from app.common.models import (
     ChatMessageOut,
     ConversationDetail,
@@ -28,7 +28,7 @@ from app.repositories.base import (
     UserRepository,
 )
 from app.services import admin
-from app.services.auth import auth
+from app.services.auth import Auth, get_auth, require_admin
 from app.common.logging import logging
 
 router = APIRouter(prefix="/admin", tags=['Admin'], include_in_schema=False)
@@ -36,7 +36,7 @@ logger = logging.logger
 
 @router.post(
     "/issue-token",
-    dependencies=[Depends(auth.require_admin)],
+    dependencies=[Depends(require_admin)],
     response_class=JSONResponse,
     summary="Mint a new access token",
     description="Mint a new access token for a hirer. Requires your admin key in the X-Admin-Key header.",
@@ -50,17 +50,18 @@ async def issue_token(
     req: IssueTokenRequest,
     users: UserRepository = Depends(get_user_repository),
     tokens: TokenRepository = Depends(get_token_repository),
+    auth: Auth = Depends(get_auth),
 ) -> Response:
     # The issuance is logged by the service, which is the layer that knows what
     # actually happened. Logging the request here too said the same thing twice,
     # in two places that could drift.
-    token = await admin.issue_token(req, users=users, tokens=tokens)
+    token = await admin.issue_token(req, users=users, tokens=tokens, auth=auth)
     # v1 puts the access token straight in the link; v2 puts a claim token there
     # instead, so the query parameter has to change with it. The frontend reads
     # whichever one it finds — ?token= is still what every issued link carries.
     param = "token" if req.version == 1 else "claim"
     if req.type == "qr":
-        qr = get_qr_code(url=f"{BASE_URL}/?{param}={token}")
+        qr = get_qr_code(url=f"{get_settings().base_url}/?{param}={token}")
         return Response(content=bytes(qr), media_type="image/png", status_code=HTTP_200_OK)
     # The one endpoint here that builds its own response, because it is the one
     # that answers in two media types. A response_model cannot cover both, and
@@ -77,7 +78,7 @@ async def issue_token(
 
 @router.post(
     "/tokens/{token_id}/revoke",
-    dependencies=[Depends(auth.require_admin)],
+    dependencies=[Depends(require_admin)],
     response_model=GrantRevoked,
     summary="Revoke a grant and every session under it",
     description=(
@@ -112,7 +113,7 @@ async def revoke_token(
 
 @router.get(
     "/conversations",
-    dependencies=[Depends(auth.require_admin)],
+    dependencies=[Depends(require_admin)],
     response_model=list[ConversationSummary],
     summary="List chat conversations",
     description="What hirers have been asking. Requires your admin key in the X-Admin-Key header.",
@@ -132,7 +133,7 @@ async def get_conversations(
 
 @router.get(
     "/conversations/{conversation_id}",
-    dependencies=[Depends(auth.require_admin)],
+    dependencies=[Depends(require_admin)],
     response_model=ConversationDetail,
     summary="Read one conversation in full",
 )
@@ -159,7 +160,7 @@ async def get_conversation(
 
 @router.post(
     "/conversations/{conversation_id}/redact",
-    dependencies=[Depends(auth.require_admin)],
+    dependencies=[Depends(require_admin)],
     response_model=ConversationRedacted,
     summary="Erase the content of one conversation",
     description=(

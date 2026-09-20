@@ -15,7 +15,7 @@ from typing import Any
 
 import aiofiles
 
-from app.common.config import RESOURCES_DIR
+from app.common.config import get_settings
 from app.common.logging.logging import logger
 from app.services.indexing import scan
 
@@ -68,7 +68,7 @@ class CVSearch:
         # resolved parents, so an unresolved path with a symlink in it — a
         # pytest tmp_path on macOS, a symlinked deploy directory — would fail
         # containment for every record while search itself kept working.
-        self._resources_dir = (resources_dir or RESOURCES_DIR).resolve()
+        self._resources_dir = (resources_dir or get_settings().resources_dir).resolve()
         self._index: list[dict[str, Any]] | None = None
         self._bodies: dict[str, str] = {}
 

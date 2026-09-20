@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.main import app, lifespan
+from app.factory import create_app, lifespan
 from app.services.search import CVSearch, get_search
 
 
@@ -29,13 +29,19 @@ def corpus(tmp_path, monkeypatch):
         for name, text in records.items():
             (tmp_path / f"{name}.md").write_text(text)
         search = CVSearch(resources_dir=tmp_path)
-        monkeypatch.setattr("app.main.get_search", lambda: search)
+        monkeypatch.setattr("app.factory.get_search", lambda: search)
         return search
 
     get_search.cache_clear()
-    monkeypatch.setattr("app.main.get_openai_client", lambda: AsyncMock())
+    monkeypatch.setattr("app.factory.get_openai_client", lambda: AsyncMock())
     yield _corpus
     get_search.cache_clear()
+
+
+@pytest.fixture
+def app():
+    """An application of this test's own, which is what the factory is for."""
+    return create_app()
 
 
 async def test_startup_refuses_an_empty_corpus(corpus):

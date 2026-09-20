@@ -23,7 +23,7 @@ from openai.types.chat import (
 )
 from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 
-from app.common.config import MAX_TOOL_ROUNDS, OPENAI_MODEL
+from app.common.config import MAX_TOOL_ROUNDS, get_settings
 from app.common.logging.logging import logger
 from app.common.models import Usage
 from app.services.chat.events import (
@@ -59,7 +59,7 @@ async def run_turn(
         pending: dict[int, dict[str, Any]] = {}
 
         response = await client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model=get_settings().openai_model,
             messages=messages,
             tools=await tooling.schemas(),
             stream=True,
@@ -93,7 +93,7 @@ async def run_turn(
         logger.warning("Tool-call rounds exhausted without a final reply", extra={"max_rounds": max_rounds})
         content = ""
         response = await client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model=get_settings().openai_model,
             messages=messages,
             tools=await tooling.schemas(),
             tool_choice="none",

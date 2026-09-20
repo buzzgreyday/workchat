@@ -225,7 +225,7 @@ consumers:
 
 | Consumer | How it reads the file |
 | --- | --- |
-| Backend outside Docker (local dev) | `load_dotenv(BACKEND_DIR / ".env")` in `app/common/config.py` |
+| Backend outside Docker (local dev) | `load_dotenv(BACKEND_DIR / ".env")` in `Settings.from_env()` |
 | The `backend` and `db` containers | `env_file: ./backend/.env` in both compose files |
 | Compose itself, for `${POSTGRES_USER}` etc. in `docker-compose.prod.yaml` | only ever reads a `.env` sitting next to the compose file |
 

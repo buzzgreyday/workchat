@@ -12,7 +12,7 @@ cp backend/.env.example backend/.env
 ln -s backend/.env .env
 
 # Add your OPENAI_API_KEY to backend/.env, then provide the system prompt --
-# app/common/config.py reads it at import and raises if missing or empty.
+# Settings reads it when the application starts and raises if missing or empty.
 cp backend/resources/system-prompt.md.example backend/resources/system-prompt.md
 
 docker compose up -d

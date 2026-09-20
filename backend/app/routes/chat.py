@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from openai import AsyncOpenAI
 from starlette.responses import StreamingResponse
 
-from app.common.config import LOG_CHAT_CONTENT
+from app.common.config import get_settings
 from app.common.logging.logging import logger
 from app.common.models import ChatRequest, TokenContext
 from app.common import sse
@@ -13,7 +13,7 @@ from app.openai.client import get_openai_client
 from app.repositories import get_transcript_repository
 from app.repositories.base import TranscriptRepository
 from app.services import chat as chat_service
-from app.services.auth import auth
+from app.services.auth import verify_and_consume
 from app.services.chat import ChatTooling, TokenProduced, TurnEvent, TurnFailed, TurnFinished
 from app.services.chat.tooling import get_tooling
 
@@ -65,7 +65,7 @@ async def frames(events: AsyncIterator[TurnEvent]) -> AsyncIterator[bytes]:
 )
 async def chat_stream(
     req: ChatRequest,
-    token: TokenContext = Depends(auth.verify_and_consume),
+    token: TokenContext = Depends(verify_and_consume),
     client: AsyncOpenAI = Depends(get_openai_client),
     tooling: ChatTooling = Depends(get_tooling),
     transcripts: TranscriptRepository = Depends(get_transcript_repository),
@@ -87,7 +87,7 @@ async def chat_stream(
             }
         },
     )
-    if LOG_CHAT_CONTENT:
+    if get_settings().log_chat_content:
         logger.debug(
             "Chat message content",
             extra={"user_message": req.message, "history": req.history},

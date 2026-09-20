@@ -14,18 +14,23 @@ same-origin — hence CORS being configured at all.
 
 ## A request through the backend
 
-`app/main.py` wires four routers and one exception handler. Middleware is thin on
-purpose: `RequestContextMiddleware` is pure ASGI so a correlation id survives a
-streaming response, and CORS sits inside it.
+`app/factory.py` wires four routers and one exception handler; `app/main.py` is
+the ASGI entrypoint that calls it, and nothing else. The split is what keeps
+importing the application free of configuration — building a `FastAPI` reads
+`DEV_MODE` and the CORS list, so a module that built one at import demanded a
+configured environment from anything that touched it, tests included.
+
+Middleware is thin on purpose: `RequestContextMiddleware` is pure ASGI so a
+correlation id survives a streaming response, and CORS sits inside it.
 
 ```
 route handler
-  └─ Depends(auth.verify_and_consume)   /chat/stream — authenticate, spend one query
-     Depends(auth.verify)               /session            — authenticate, spend nothing
-     Depends(auth.require_admin)        /admin/*            — static header secret
+  └─ Depends(verify_and_consume)  /chat/stream  — authenticate, spend one query
+     Depends(verify)              /session      — authenticate, spend nothing
+     Depends(require_admin)       /admin/*      — static header secret
         └─ services/  business logic, raising domain errors
              └─ common/exceptions.py    typed, each carrying its own status
-                  └─ main.py handler    the one place an error becomes a response
+                  └─ factory.py handler  the one place an error becomes a response
 ```
 
 Auth is a **dependency, not middleware** — deliberately, and the reasoning is
@@ -33,6 +38,11 @@ recorded in the `app/services/auth.py` module docstring rather than repeated her
 The short version: middleware has no dependency injection, `verify_and_consume`
 spends a query and so must not run on a preflight, and the three protected
 surfaces need three different checks.
+
+Those three are the adapter for `Auth`, which itself takes plain arguments and
+declares no `Depends`. That is what makes `dependency_overrides[get_auth]` reach
+every endpoint at once — and what lets `Auth` be built and called in a test with
+no request in flight.
 
 ## A chat turn
 
@@ -69,6 +79,20 @@ and holds the corpus in memory. There is no build step and no artifact — twent
 files and ~46 KB of markdown cost milliseconds to read, and an index that only
 exists in the process that serves it cannot go stale against one. A scan that
 finds no records stops the server before it binds a port.
+
+### Configuration
+
+`Settings` is a frozen dataclass built by `get_settings()`, cached for the
+process. Nothing reads the environment at import: `require_env` raising is what
+a missing secret looks like, and it should happen where a server is being
+started rather than where a module is being imported.
+
+Values that consult no environment stay module constants in `app/common/config.py`,
+because they are facts about the application rather than settings — the signing
+algorithm, the tool-round cap, the cookie path. `REFRESH_COOKIE_NAME` is there
+too for a different reason: `/v2/auth/refresh` declares it as a `Cookie` alias,
+and FastAPI builds a route's parameter model when the route is declared, so the
+name has to exist at import or not at all.
 
 ## Layering
 

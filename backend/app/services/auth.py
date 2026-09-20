@@ -45,6 +45,7 @@ app.routes asserting each is either public or guarded catches more than either.
 import hmac
 import time
 import uuid
+from functools import lru_cache
 from datetime import datetime, timezone
 
 import jwt
@@ -52,13 +53,7 @@ from fastapi import Depends, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import ValidationError
 
-from app.common.config import (
-    ACCESS_TOKEN_TTL_SECONDS,
-    ADMIN_KEY,
-    ALGORITHM,
-    REFRESH_TOKEN_TTL_SECONDS,
-    SECRET_KEY,
-)
+from app.common.config import ALGORITHM, Settings, get_settings
 from app.common.exceptions import (
     AdminForbidden,
     ClaimAlreadyUsed,
@@ -94,26 +89,37 @@ class Auth:
     claim shape exactly. Tests construct one with a short TTL instead of
     monkeypatching module globals.
 
-    The bound methods are used directly as FastAPI dependencies — routes write
-    `Depends(auth.verify_and_consume)` against the instance at the bottom of this
-    module. FastAPI reads a bound method's signature with `self` already applied,
-    so they are usable exactly as the plain functions they replaced were.
+    Its methods take plain arguments and know nothing about FastAPI. The three
+    dependency functions at the bottom of this module are the adapter that wires
+    them to a request, which is what lets this class be built and exercised with
+    no request in flight.
     """
 
     def __init__(
             self,
-            secret_key: str = SECRET_KEY,
+            settings: Settings | None = None,
+            *,
+            secret_key: str | None = None,
             algorithm: str = ALGORITHM,
-            admin_key: str = ADMIN_KEY,
-            access_ttl_seconds: int = ACCESS_TOKEN_TTL_SECONDS,
-            refresh_ttl_seconds: int = REFRESH_TOKEN_TTL_SECONDS,
+            admin_key: str | None = None,
+            access_ttl_seconds: int | None = None,
+            refresh_ttl_seconds: int | None = None,
             notifier: Notifier = default_notifier,
     ) -> None:
-        self.secret_key = secret_key
+        # Resolved in the body rather than as default arguments. A default is
+        # evaluated once, when the class is defined, so the previous signature
+        # read every secret at import — which is what made importing this module
+        # require a fully configured environment.
+        settings = settings or get_settings()
+        self.secret_key = secret_key if secret_key is not None else settings.secret_key
         self.algorithm = algorithm
-        self.admin_key = admin_key
-        self.access_ttl_seconds = access_ttl_seconds
-        self.refresh_ttl_seconds = refresh_ttl_seconds
+        self.admin_key = admin_key if admin_key is not None else settings.admin_key
+        self.access_ttl_seconds = (
+            access_ttl_seconds if access_ttl_seconds is not None else settings.access_token_ttl_seconds
+        )
+        self.refresh_ttl_seconds = (
+            refresh_ttl_seconds if refresh_ttl_seconds is not None else settings.refresh_token_ttl_seconds
+        )
         # Taken like every other collaborator above rather than reached for at
         # the call site. It was the one this class imported as a module global,
         # which is why telling it apart in a test meant patching this module.
@@ -492,13 +498,13 @@ class Auth:
 
     async def verify_and_consume(
             self,
-            credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-            tokens: TokenRepository = Depends(get_token_repository),
-            sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+            credentials: HTTPAuthorizationCredentials | None,
+            tokens: TokenRepository,
+            sessions: RefreshSessionRepository,
     ) -> TokenContext:
         """
-        The chat endpoints' dependency. Accepts a v1 or a v2 access token and
-        spends one query from the grant either way.
+        What the chat endpoints are built on. Accepts a v1 or a v2 access token
+        and spends one query from the grant either way.
         """
         grant_id, version, session_id = await self._authenticate(credentials, sessions)
         grant = await tokens.consume_query(grant_id, expected_version=version)
@@ -506,9 +512,9 @@ class Auth:
 
     async def verify(
             self,
-            credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-            tokens: TokenRepository = Depends(get_token_repository),
-            sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+            credentials: HTTPAuthorizationCredentials | None,
+            tokens: TokenRepository,
+            sessions: RefreshSessionRepository,
     ) -> TokenContext:
         """
         Same checks, no spending. What /session is built on.
@@ -544,12 +550,62 @@ class Auth:
 
     # --- admin ---------------------------------------------------------------
 
-    def require_admin(self, x_admin_key: str = Header(...)) -> None:
-        """FastAPI dependency for the token-issuing endpoint. Only you should
-        be able to mint tokens — protect this with a secret only you know."""
+    def require_admin(self, x_admin_key: str) -> None:
+        """Guards the token-issuing endpoint. Only you should be able to mint
+        tokens — protect this with a secret only you know."""
         # compare_digest avoids leaking key length / prefix through response timing.
         if not hmac.compare_digest(x_admin_key.encode(), self.admin_key.encode()):
             raise AdminForbidden()
 
 
-auth = Auth()
+@lru_cache
+def get_auth() -> Auth:
+    """
+    The Auth everything else depends on, built on first use.
+
+    A provider rather than a module-level instance. FastAPI evaluates a
+    `Depends(...)` argument when the route is *declared*, so a module-level
+    `auth = Auth()` meant importing a route module read the signing key — which
+    is exactly what stopped this application being importable without a fully
+    configured environment.
+
+    It is also what makes Auth swappable: `dependency_overrides[get_auth]` now
+    reaches every endpoint, where patching a module-level instance reached only
+    the modules that had not already bound it by value.
+    """
+    return Auth()
+
+
+# --- FastAPI adapter ---------------------------------------------------------
+#
+# The methods above take plain arguments and know nothing about `Depends`. These
+# three are where the framework's wiring lives, so that `Auth` stays a service
+# that can be built and called with no request in flight — the same split the
+# rest of this codebase keeps between a service and its adapter.
+
+async def verify_and_consume(
+        credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+        tokens: TokenRepository = Depends(get_token_repository),
+        sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+        auth: Auth = Depends(get_auth),
+) -> TokenContext:
+    """The chat endpoints' dependency: authenticate, and spend one query."""
+    return await auth.verify_and_consume(credentials, tokens, sessions)
+
+
+async def verify(
+        credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+        tokens: TokenRepository = Depends(get_token_repository),
+        sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+        auth: Auth = Depends(get_auth),
+) -> TokenContext:
+    """`/session`'s dependency: the same checks, spending nothing."""
+    return await auth.verify(credentials, tokens, sessions)
+
+
+def require_admin(
+        x_admin_key: str = Header(...),
+        auth: Auth = Depends(get_auth),
+) -> None:
+    """The admin endpoints' dependency: a static header secret."""
+    auth.require_admin(x_admin_key)

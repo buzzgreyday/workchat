@@ -12,10 +12,8 @@ is nothing to build and nothing to forget to build.
 import re
 from collections import defaultdict
 
-from app.common.config import RESOURCES_DIR
+from app.common.config import get_settings
 from app.services.indexing import scan
-
-SKILLS_PATH = RESOURCES_DIR / "skills.md"
 
 # How much each source type contributes to a skill's ranking.
 # Experience counts more than side/hobby projects.
@@ -68,21 +66,23 @@ def update_skills_section(records):
             lines.append(f"  - Scope: {notes[tag]}")
     generated_block = "\n".join(lines)
 
-    if not SKILLS_PATH.exists():
+    skills_path = get_settings().resources_dir / "skills.md"
+    if not skills_path.exists():
         print("skills.md not found, skipping auto-skills update")
         return
 
-    content = SKILLS_PATH.read_text()
+    content = skills_path.read_text()
     replacement = f"{START_MARKER}\n\n{generated_block}\n\n{END_MARKER}"
 
     if BLOCK.search(content):
-        SKILLS_PATH.write_text(BLOCK.sub(replacement, content))
-        print(f"Updated auto-generated skills section in {SKILLS_PATH}")
+        skills_path.write_text(BLOCK.sub(replacement, content))
+        print(f"Updated auto-generated skills section in {skills_path}")
     else:
         print("Markers not found in skills.md, skipping auto-skills update")
 
 
 if __name__ == "__main__":
-    records, _bodies = scan(RESOURCES_DIR)
-    print(f"Scanned {len(records)} records from {RESOURCES_DIR}")
+    resources_dir = get_settings().resources_dir
+    records, _bodies = scan(resources_dir)
+    print(f"Scanned {len(records)} records from {resources_dir}")
     update_skills_section(records)

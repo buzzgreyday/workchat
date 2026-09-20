@@ -10,13 +10,14 @@ from app.repositories.base import (
     TokenRepository,
     UserRepository,
 )
-from app.services.auth import auth
+from app.services.auth import Auth
 
 
 async def issue_token(
         req: IssueTokenRequest,
         users: UserRepository,
         tokens: TokenRepository,
+        auth: Auth,
 ) -> str:
     """
     Mint the token that goes in the user's link.
