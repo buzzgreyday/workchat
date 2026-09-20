@@ -49,14 +49,9 @@ async def issue_token(
     users: UserRepository = Depends(get_user_repository),
     tokens: TokenRepository = Depends(get_token_repository),
 ) -> Response:
-    logger.info(
-        "Issuing a new access token",
-        extra={
-            "subject": req.subject, "job_title": req.job_title, "company": req.company,
-            "email": req.email, "phone": req.phone, "expires_in_seconds": req.expires_in_seconds,
-            "max_queries": req.max_queries, "type": req.type, "version": req.version
-        }
-    )
+    # The issuance is logged by the service, which is the layer that knows what
+    # actually happened. Logging the request here too said the same thing twice,
+    # in two places that could drift.
     token = await admin.issue_token(req, users=users, tokens=tokens)
     # v1 puts the access token straight in the link; v2 puts a claim token there
     # instead, so the query parameter has to change with it. The frontend reads

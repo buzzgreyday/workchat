@@ -50,11 +50,14 @@ async def issue_token(
         max_queries=req.max_queries,
         version=req.version,
     )
+    # Identifiers, not the hirer's details. Who they are and how to reach them
+    # is in the database, which has a retention policy and a redaction endpoint;
+    # the log has neither, and the token_id is what a later line correlates on.
     logger.info(
         "New access token generated",
         extra={
-            "subject": req.subject, "job_title": req.job_title, "company": req.company,
-            "email": req.email, "phone": req.phone, "expires_in_seconds": req.expires_in_seconds,
+            "token_id": token_id, "company": req.company,
+            "expires_in_seconds": req.expires_in_seconds,
             "max_queries": req.max_queries, "type": req.type, "version": req.version
         }
     )
@@ -80,27 +83,17 @@ async def issue_token(
         )
     )
 
+    # Never the token_hash. It is what `Auth._matches` authenticates a bearer
+    # against, so a log holding it holds the verifier for every token on the
+    # grant — and logs are the one store here with no retention policy at all.
     logger.info(
         "Stored token and user",
         extra={
-            "token": {
-                "user_id": grant.user_id,
-                "token_hash": grant.token_hash,
-                "subject": grant.subject,
-                "company": grant.company,
-                "job_title": grant.job_title,
-                "created_at": grant.created_at,
-                "max_queries": grant.max_queries,
-                "expires_at": grant.expires_at,
-                "version": grant.version
-            },
-            "user": {
-                "id": user.id,
-                "company (name)": user.name,
-                "email": user.email,
-                "phone": user.phone,
-                "created_at": user.created_at
-            }
+            "token_id": grant.id,
+            "user_id": grant.user_id,
+            "company": grant.company,
+            "expires_at": grant.expires_at,
+            "version": grant.version,
         }
     )
     return raw_token

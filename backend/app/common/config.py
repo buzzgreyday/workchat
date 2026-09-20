@@ -43,6 +43,14 @@ DEV_MODE = env_bool("DEV_MODE", default=False)
 # local debugging.
 LOG_CHAT_CONTENT = env_bool("LOG_CHAT_CONTENT", default=False)
 
+# SQLAlchemy's echo writes every statement and its bound parameters to the log,
+# which on the issue-token path means a hirer's email and phone and the grant's
+# token_hash. Those are values the rest of this codebase keeps out of logs, and
+# echo puts them in the log *message* rather than in extra={}, where
+# RedactionFilter cannot reach them. So it is its own opt-in rather than riding
+# on DEV_MODE, which had every local session logging them by default.
+SQL_ECHO = env_bool("SQL_ECHO", default=False)
+
 ## Retention
 # Days before chat message content is scrubbed by scripts/purge-chat-content.sh.
 # The row, its counts and its timings survive; only the text is nulled.

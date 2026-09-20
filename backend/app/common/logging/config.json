@@ -4,6 +4,9 @@
   "filters": {
     "correlation": {
       "()": "app.common.logging.filters.CorrelationFilter"
+    },
+    "redaction": {
+      "()": "app.common.logging.filters.RedactionFilter"
     }
   },
   "formatters": {
@@ -15,7 +18,7 @@
     "console": {
       "class": "logging.StreamHandler",
       "formatter": "json",
-      "filters": ["correlation"],
+      "filters": ["correlation", "redaction"],
       "stream": "ext://sys.stdout"
     }
   },

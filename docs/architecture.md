@@ -22,7 +22,7 @@ streaming response, and CORS sits inside it.
 route handler
   └─ Depends(auth.verify_and_consume)   /chat/stream — authenticate, spend one query
      Depends(auth.verify)               /session            — authenticate, spend nothing
-     Depends(require_admin)             /admin/*            — static header secret
+     Depends(auth.require_admin)        /admin/*            — static header secret
         └─ services/  business logic, raising domain errors
              └─ common/exceptions.py    typed, each carrying its own status
                   └─ main.py handler    the one place an error becomes a response
@@ -130,13 +130,46 @@ there, and the route asking for a repository is unaffected either way. That is
 what makes another store a new package plus a one-line change in `__init__.py`,
 rather than an edit to every route and service.
 
-Only the issue-token path has moved so far. The free functions in
-`app/services/db.py` are the same job done the previous way. Where those are
-genuinely transactional — `rotate_refresh_token` inserts a successor and
-conditionally revokes its predecessor, rolling back so a lost race leaves no
-orphan — the atomicity is internal to one operation, so a repository method can
-own it privately with whatever its backend has. None of them needs two
-repositories to share a transaction.
+### When the transaction actually ends
+
+Nothing in a service commits, which is worth tracing once because the answer is
+spread across three files. Issuing a token is the example: `issue_token`
+(`app/services/admin.py`) writes a user and a grant and never mentions
+durability.
+
+```
+route  Depends(get_user_repository)  ─┐
+       Depends(get_token_repository) ─┤  both providers declare
+                                      └─ Depends(get_db)   ← resolved ONCE
+                                           └─ transaction(async_session)
+                                                yield  → the request runs
+                                                else:  → session.commit()
+                                                except:→ session.rollback()
+```
+
+FastAPI caches a dependency for the life of a request, so `get_db` resolves once
+and every repository is handed the *same* `AsyncSession`, and therefore the same
+transaction. `users.add` and `tokens.add` only `flush()` — which is what assigns
+`user.id` so the grant can reference it — and the commit fires when the request's
+exit stack unwinds, in `transaction` (`app/common/db.py`). If the grant insert
+fails, the user insert rolls back with it, because it was never a separate
+transaction.
+
+Two consequences that are easy to rediscover the hard way:
+
+- **A streaming response still commits.** A dependency with `yield` registers on
+  the request's exit stack, not the handler's, and the response is sent inside
+  that stack — so for `/chat/stream` the session outlives the streamed body.
+- **The transcript recorder cannot use any of this**, which is what
+  `get_session_factory` is for. On client abort it runs *after* the request
+  session is closed, so it opens its own scope; writing through the request's
+  would be a use-after-close.
+
+Where an operation is genuinely transactional on its own — `rotate` inserts a
+successor and conditionally revokes its predecessor, so a lost race leaves no
+orphan — the atomicity is internal to one repository method, which owns it
+privately with whatever its backend has. Nothing needs two repositories to
+share a transaction beyond the shared-session property above.
 
 ## Where to read next
 
