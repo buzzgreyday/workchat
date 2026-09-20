@@ -7,6 +7,126 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.5.0] - 2026-09-20
+
+### Removed
+
+- `python -m app.build_index` is gone, and so is `resources/index.json`. What
+  remains of that script is `python -m app.build_skills`, which only regenerates
+  the skills list inside `skills.md` — a tracked file, produced locally and
+  committed like any other source. The server never runs it.
+
+  Deployment lost two steps with it. There is no index to build after a release,
+  and no `chown -R 1000:1000 backend/resources` to remember beforehand, because
+  nothing in the container writes to that directory any more; in production it
+  is now mounted read-only. Updating is `git pull` and `up -d --build`, which is
+  what the deploy workflow already ran.
+
+### Changed
+
+- The CV index is built by the process that serves it. On startup the backend
+  scans `backend/resources/`, parses the frontmatter of every markdown file and
+  holds the corpus in memory. The records, their order and the ranking are
+  unchanged — what is gone is the step between editing a CV file and the site
+  knowing about it.
+
+  Forgetting that step was the failure. The index was a gitignored artifact
+  built by hand, and the deploy never built it, so a release that changed any CV
+  record left the site answering from the previous one — with `/health` passing
+  throughout, so nothing surfaced the staleness. The index was never expensive
+  enough to be worth an artifact: twenty files and about 46 KB of markdown, with
+  no embeddings and no API calls behind it, read in milliseconds.
+
+  A record that will not parse is skipped with its name in the log rather than
+  taking the other nineteen with it. A resources directory that yields nothing
+  at all stops the server before it binds a port, so the container never reports
+  healthy and a deploy that shipped a broken mount fails instead of going live
+  with nothing to answer from.
+
+  The markdown is read in the same pass that parses the frontmatter, so the
+  first search of a running server touches no disk, and a record nobody can read
+  surfaces at boot rather than on the one question that needed it.
+
+  Editing a record on a running server still needs a restart — the corpus is
+  read once. In development that is automatic: the resources directory is
+  watched, so a saved edit reloads the app and rebuilds the index.
+
+- Decoding a token produces typed claims rather than a bare dict. `decode()`
+  returned `dict`, so the type of every v2 claim was `Any` through the paths
+  that decide who may spend a hirer's quota. The claims are their own model now,
+  deliberately not the one used to mint tokens: that one defaults `max_queries`
+  to 20, which would invent a quota for a token carrying none, and types `typ`
+  as a literal, which would turn an unrecognised token type into a parse failure
+  where the service wants to answer "not an access token".
+
+  Nothing about a v1 token's shape is tightened — every field is optional, and
+  those links are in inboxes and on printed QR codes. A `ver` that is a boolean,
+  a string or a float is now refused rather than read as version 1; no token
+  this service signs carries one, and both answers were already 401.
+
+- The admin write endpoints return response models instead of hand-built JSON,
+  so their output is validated and the ids are serialised rather than converted
+  by hand. Issuing a token still builds its own response, because it is the one
+  endpoint that answers in two media types.
+
+- Configuration is an object built on demand rather than a page of module
+  constants read at import. `app/common/config.py` no longer exports anything
+  environment-derived: `SECRET_KEY` is `get_settings().secret_key`, and a fork
+  carrying local patches against those names will need the same edit. Values
+  that consult no environment — the signing algorithm, the tool-round cap, the
+  cookie path — stay constants, because they are facts about the application
+  rather than settings.
+
+  Importing this application used to require a fully configured environment.
+  Seven secrets were read at module level, the system prompt was loaded from
+  disk, the database engine was opened, a `FastAPI` was constructed, and `Auth`
+  read the signing key when the class was defined — all before anyone had asked
+  for a server. The test suite paid for it in the only currency available: seven
+  environment variables set above its own imports, and a `# noqa` on every
+  import below them. An application is built by `create_app()` now, and
+  `app/main.py` calls it, which is the moment a missing secret should stop
+  everything.
+
+  Logging is the deliberate exception and still reads `DEV_MODE` directly:
+  handlers have to exist before anything logs, and a misconfiguration that could
+  not be logged would be the wrong trade.
+
+- Services take their collaborators instead of reaching for them. `CVSearch`
+  takes the directory it reads, `Auth` takes its notifier, and `Auth`'s methods
+  take plain arguments — the three dependency functions that wire them to a
+  request live at the bottom of that module, the same service-and-adapter split
+  the chat service already keeps. Nothing about what the application does
+  changes; what changes is that overriding any of it in a test is now the
+  mechanism FastAPI already provides rather than reaching into a module.
+
+### Fixed
+
+- A hirer's contact details and a grant's `token_hash` no longer reach the log.
+  Issuing one token wrote the email and phone five times and the hash once, all
+  at INFO and so all of it in production — while the same codebase keeps chat
+  message text behind a flag at debug, because logging that was judged
+  unacceptable. Contact details were held to no standard at all.
+
+  The hash is the worse half: it is what a bearer is authenticated against, so a
+  log holding it holds the verifier for every token on the grant. The issue path
+  logs identifiers now — `token_id`, `user_id`, `company` — and a redaction
+  filter on the log handler drops a deny-list of field names wherever they
+  appear, including nested inside a record-shaped payload. The call sites are
+  already written not to pass them; the filter is what stops the next one, since
+  a log is the only store here with no retention policy and no redaction path.
+
+- SQL echo is its own opt-in rather than following `DEV_MODE`. It writes every
+  statement and its bound parameters to the log, which on the issue path meant
+  the same email, phone and hash again — in the message rather than the
+  structured fields, where the redaction filter cannot reach them. Every local
+  session was doing it by default. `SQL_ECHO=1` turns it back on for debugging a
+  query.
+
+- `RESOURCES_DIR` and `SYSTEM_PROMPT_PATH` can be set in `backend/.env`. Both
+  were computed *above* the `load_dotenv()` call, so neither had ever been
+  readable from that file — only from the real environment, which is not where
+  the documentation says configuration lives.
+
 ## [0.4.0] - 2026-09-19
 
 ### Removed

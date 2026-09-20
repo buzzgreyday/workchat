@@ -45,19 +45,15 @@ app.routes asserting each is either public or guarded catches more than either.
 import hmac
 import time
 import uuid
+from functools import lru_cache
 from datetime import datetime, timezone
 
 import jwt
 from fastapi import Depends, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import ValidationError
 
-from app.common.config import (
-    ACCESS_TOKEN_TTL_SECONDS,
-    ADMIN_KEY,
-    ALGORITHM,
-    REFRESH_TOKEN_TTL_SECONDS,
-    SECRET_KEY,
-)
+from app.common.config import ALGORITHM, Settings, get_settings
 from app.common.exceptions import (
     AdminForbidden,
     ClaimAlreadyUsed,
@@ -75,10 +71,10 @@ from app.common.exceptions import (
 )
 from app.common.crypto import hash_token
 from app.common.logging.logging import logger
-from app.common.models import JWT, Grant, RefreshSession, TokenContext, TokenPair
+from app.common.models import JWT, Grant, RefreshSession, TokenClaims, TokenContext, TokenPair
 from app.repositories import get_refresh_session_repository, get_token_repository
 from app.repositories.base import RefreshSessionRepository, TokenRepository
-from app.services.notify import notifier
+from app.services.notify import Notifier, notifier as default_notifier
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -93,48 +89,64 @@ class Auth:
     claim shape exactly. Tests construct one with a short TTL instead of
     monkeypatching module globals.
 
-    The bound methods are used directly as FastAPI dependencies; see the module
-    level aliases at the bottom, which keep `from app.services.auth import
-    verify_and_consume` working for the callers that already do it.
+    Its methods take plain arguments and know nothing about FastAPI. The three
+    dependency functions at the bottom of this module are the adapter that wires
+    them to a request, which is what lets this class be built and exercised with
+    no request in flight.
     """
 
     def __init__(
             self,
-            secret_key: str = SECRET_KEY,
+            settings: Settings | None = None,
+            *,
+            secret_key: str | None = None,
             algorithm: str = ALGORITHM,
-            admin_key: str = ADMIN_KEY,
-            access_ttl_seconds: int = ACCESS_TOKEN_TTL_SECONDS,
-            refresh_ttl_seconds: int = REFRESH_TOKEN_TTL_SECONDS,
+            admin_key: str | None = None,
+            access_ttl_seconds: int | None = None,
+            refresh_ttl_seconds: int | None = None,
+            notifier: Notifier = default_notifier,
     ) -> None:
-        self.secret_key = secret_key
+        # Resolved in the body rather than as default arguments. A default is
+        # evaluated once, when the class is defined, so the previous signature
+        # read every secret at import — which is what made importing this module
+        # require a fully configured environment.
+        settings = settings or get_settings()
+        self.secret_key = secret_key if secret_key is not None else settings.secret_key
         self.algorithm = algorithm
-        self.admin_key = admin_key
-        self.access_ttl_seconds = access_ttl_seconds
-        self.refresh_ttl_seconds = refresh_ttl_seconds
+        self.admin_key = admin_key if admin_key is not None else settings.admin_key
+        self.access_ttl_seconds = (
+            access_ttl_seconds if access_ttl_seconds is not None else settings.access_token_ttl_seconds
+        )
+        self.refresh_ttl_seconds = (
+            refresh_ttl_seconds if refresh_ttl_seconds is not None else settings.refresh_token_ttl_seconds
+        )
+        # Taken like every other collaborator above rather than reached for at
+        # the call site. It was the one this class imported as a module global,
+        # which is why telling it apart in a test meant patching this module.
+        self.notifier = notifier
 
     # --- decoding primitives -------------------------------------------------
 
-    def decode(self, raw_token: str) -> dict:
-        """Signature and expiry only. What the claims *mean* is decided by the
-        caller, because a claim token and an access token are both validly
-        signed and only one of them may buy a chat message."""
+    def decode(self, raw_token: str) -> TokenClaims:
+        """Signature, expiry and shape only. What the claims *mean* is decided
+        by the caller, because a claim token and an access token are both
+        validly signed and only one of them may buy a chat message.
+
+        A claim set that will not parse is an invalid token rather than a
+        server error: `TokenClaims` holds every field optional, so the only way
+        to fail it is a claim of the wrong type — `ver: true` being the one that
+        matters, since a lax field would read it as version 1."""
         try:
-            return jwt.decode(raw_token, self.secret_key, algorithms=[self.algorithm])
+            payload = jwt.decode(raw_token, self.secret_key, algorithms=[self.algorithm])
         except jwt.ExpiredSignatureError:
             raise TokenExpired()
         except jwt.InvalidTokenError:
             raise InvalidToken()
-
-    @staticmethod
-    def version_of(payload: dict) -> int:
-        """No `ver` means v1. The tokens in the wild predate the claim and can
-        never grow one, so their silence has to keep meaning version 1."""
-        ver = payload.get("ver")
-        # bool is an int in Python, and `ver: true` would otherwise compare equal
-        # to 1 and be waved through as a v1 token.
-        if isinstance(ver, bool) or not isinstance(ver, int):
-            return 1
-        return ver
+        try:
+            return TokenClaims.model_validate(payload)
+        except ValidationError:
+            logger.warning("Token claims will not parse")
+            raise InvalidToken()
 
     @staticmethod
     def _uuid(value: object, field: str) -> uuid.UUID:
@@ -291,12 +303,12 @@ class Auth:
 
         Costs no quota; questions are what quota is for.
         """
-        payload = self.decode(raw_claim)
-        if self.version_of(payload) != 2 or payload.get("typ") != "claim":
-            logger.warning("Non-claim token presented at claim", extra={"typ": payload.get("typ")})
+        claims = self.decode(raw_claim)
+        if claims.version != 2 or claims.typ != "claim":
+            logger.warning("Non-claim token presented at claim", extra={"typ": claims.typ})
             raise NotAClaimToken()
 
-        grant_id = self._uuid(payload.get("tid"), "tid")
+        grant_id = self._uuid(claims.tid, "tid")
         grant = await self._active_grant(tokens, grant_id)
 
         if grant.version != 2 or not self._matches(raw_claim, grant.token_hash):
@@ -347,13 +359,13 @@ class Auth:
         it sees one outside the grace window, and answers 409 inside it. Like claim, this
         costs no quota.
         """
-        payload = self.decode(raw_refresh)
-        if self.version_of(payload) != 2 or payload.get("typ") != "refresh":
-            logger.warning("Non-refresh token presented at refresh", extra={"typ": payload.get("typ")})
+        claims = self.decode(raw_refresh)
+        if claims.version != 2 or claims.typ != "refresh":
+            logger.warning("Non-refresh token presented at refresh", extra={"typ": claims.typ})
             raise NotARefreshToken()
 
-        session_id = self._uuid(payload.get("jti"), "jti")
-        grant_id = self._uuid(payload.get("tid"), "tid")
+        session_id = self._uuid(claims.jti, "jti")
+        grant_id = self._uuid(claims.tid, "tid")
         grant = await self._active_grant(tokens, grant_id)
 
         session = await sessions.get(session_id)
@@ -421,9 +433,9 @@ class Auth:
             if not await tokens.mark_owner_notified(token_id):
                 return
             if event == "claim_reuse":
-                await notifier.claim_link_reused(token_id, subject, company)
+                await self.notifier.claim_link_reused(token_id, subject, company)
             else:
-                await notifier.sessions_cut(token_id, subject, company, reason)
+                await self.notifier.sessions_cut(token_id, subject, company, reason)
         except Exception:
             logger.exception("Failed to notify owner", extra={"token_id": token_id, "event": event})
 
@@ -447,20 +459,20 @@ class Auth:
             raise MissingCredentials()
 
         raw_token = credentials.credentials  # already stripped of "Bearer " prefix
-        payload = self.decode(raw_token)
-        version = self.version_of(payload)
+        claims = self.decode(raw_token)
+        version = claims.version
 
         if version == 1:
-            return self._uuid(payload.get("jti"), "jti"), version, None
+            return self._uuid(claims.jti, "jti"), version, None
 
         if version == 2:
             # A claim or refresh token is validly signed and would otherwise sail
             # through: only typ="access" may buy a message.
-            if payload.get("typ") != "access":
-                logger.warning("Non-access token presented at chat", extra={"typ": payload.get("typ")})
+            if claims.typ != "access":
+                logger.warning("Non-access token presented at chat", extra={"typ": claims.typ})
                 raise NotAnAccessToken()
-            grant_id = self._uuid(payload.get("tid"), "tid")
-            session_id = self._uuid(payload.get("sid"), "sid")
+            grant_id = self._uuid(claims.tid, "tid")
+            session_id = self._uuid(claims.sid, "sid")
             # Checked before the quota is consumed, so a token from a session cut
             # for replay is rejected without costing the hirer a question. The
             # cost is one extra read per v2 request; the alternative is honouring
@@ -468,7 +480,7 @@ class Auth:
             await self._require_live_session(session_id, grant_id, sessions)
             return grant_id, version, session_id
 
-        logger.warning("Unknown token version", extra={"ver": payload.get("ver")})
+        logger.warning("Unknown token version", extra={"ver": claims.ver})
         raise UnsupportedTokenVersion()
 
     @staticmethod
@@ -486,13 +498,13 @@ class Auth:
 
     async def verify_and_consume(
             self,
-            credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-            tokens: TokenRepository = Depends(get_token_repository),
-            sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+            credentials: HTTPAuthorizationCredentials | None,
+            tokens: TokenRepository,
+            sessions: RefreshSessionRepository,
     ) -> TokenContext:
         """
-        The chat endpoints' dependency. Accepts a v1 or a v2 access token and
-        spends one query from the grant either way.
+        What the chat endpoints are built on. Accepts a v1 or a v2 access token
+        and spends one query from the grant either way.
         """
         grant_id, version, session_id = await self._authenticate(credentials, sessions)
         grant = await tokens.consume_query(grant_id, expected_version=version)
@@ -500,9 +512,9 @@ class Auth:
 
     async def verify(
             self,
-            credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-            tokens: TokenRepository = Depends(get_token_repository),
-            sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+            credentials: HTTPAuthorizationCredentials | None,
+            tokens: TokenRepository,
+            sessions: RefreshSessionRepository,
     ) -> TokenContext:
         """
         Same checks, no spending. What /session is built on.
@@ -538,18 +550,62 @@ class Auth:
 
     # --- admin ---------------------------------------------------------------
 
-    def require_admin(self, x_admin_key: str = Header(...)) -> None:
-        """FastAPI dependency for the token-issuing endpoint. Only you should
-        be able to mint tokens — protect this with a secret only you know."""
+    def require_admin(self, x_admin_key: str) -> None:
+        """Guards the token-issuing endpoint. Only you should be able to mint
+        tokens — protect this with a secret only you know."""
         # compare_digest avoids leaking key length / prefix through response timing.
         if not hmac.compare_digest(x_admin_key.encode(), self.admin_key.encode()):
             raise AdminForbidden()
 
 
-auth = Auth()
+@lru_cache
+def get_auth() -> Auth:
+    """
+    The Auth everything else depends on, built on first use.
 
-# Bound-method aliases so existing imports keep working unchanged. FastAPI reads
-# a bound method's signature with `self` already applied, so these are usable as
-# dependencies exactly as the plain functions they replaced were.
-verify_and_consume = auth.verify_and_consume
-require_admin = auth.require_admin
+    A provider rather than a module-level instance. FastAPI evaluates a
+    `Depends(...)` argument when the route is *declared*, so a module-level
+    `auth = Auth()` meant importing a route module read the signing key — which
+    is exactly what stopped this application being importable without a fully
+    configured environment.
+
+    It is also what makes Auth swappable: `dependency_overrides[get_auth]` now
+    reaches every endpoint, where patching a module-level instance reached only
+    the modules that had not already bound it by value.
+    """
+    return Auth()
+
+
+# --- FastAPI adapter ---------------------------------------------------------
+#
+# The methods above take plain arguments and know nothing about `Depends`. These
+# three are where the framework's wiring lives, so that `Auth` stays a service
+# that can be built and called with no request in flight — the same split the
+# rest of this codebase keeps between a service and its adapter.
+
+async def verify_and_consume(
+        credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+        tokens: TokenRepository = Depends(get_token_repository),
+        sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+        auth: Auth = Depends(get_auth),
+) -> TokenContext:
+    """The chat endpoints' dependency: authenticate, and spend one query."""
+    return await auth.verify_and_consume(credentials, tokens, sessions)
+
+
+async def verify(
+        credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+        tokens: TokenRepository = Depends(get_token_repository),
+        sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+        auth: Auth = Depends(get_auth),
+) -> TokenContext:
+    """`/session`'s dependency: the same checks, spending nothing."""
+    return await auth.verify(credentials, tokens, sessions)
+
+
+def require_admin(
+        x_admin_key: str = Header(...),
+        auth: Auth = Depends(get_auth),
+) -> None:
+    """The admin endpoints' dependency: a static header secret."""
+    auth.require_admin(x_admin_key)

@@ -62,7 +62,11 @@ services:
     env_file:
       - ./backend/.env
     volumes:
-      - ./backend/resources:/app/resources
+      # Read-only: the container scans this at startup and never writes to it.
+      # Nothing in the image builds an index or rewrites skills.md any more, so
+      # the mount enforces what was previously only a convention — and the
+      # chown step the old index build needed goes with it.
+      - ./backend/resources:/app/resources:ro
     expose:
       - "8000"
     healthcheck:

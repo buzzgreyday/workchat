@@ -1,4 +1,3 @@
-import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -6,7 +5,7 @@ from fastapi import APIRouter, Depends
 from openai import AsyncOpenAI
 from starlette.responses import StreamingResponse
 
-from app.common.config import LOG_CHAT_CONTENT
+from app.common.config import get_settings
 from app.common.logging.logging import logger
 from app.common.models import ChatRequest, TokenContext
 from app.common import sse
@@ -88,7 +87,7 @@ async def chat_stream(
             }
         },
     )
-    if LOG_CHAT_CONTENT:
+    if get_settings().log_chat_content:
         logger.debug(
             "Chat message content",
             extra={"user_message": req.message, "history": req.history},

@@ -8,25 +8,22 @@ import json
 
 import pytest
 
-from app.services import search as search_module
 from app.services.chat.tooling import ChatTooling
 from app.services.search import CVSearch
 
 
 @pytest.fixture
-def tooling(tmp_path, monkeypatch):
-    (tmp_path / "iedi.md").write_text("---\ntitle: iEDI\n---\nA monolith, not microservices.\n")
-    (tmp_path / "bio.md").write_text("---\ntitle: Bio\n---\nBackground in philosophy.\n")
-    index = [
-        {"file": "iedi.md", "type": "experience", "title": "iEDI",
-         "tags": ["monolith"], "dates": "2025", "summary": "Backend work.", "skill_notes": {}},
-        {"file": "bio.md", "type": "bio", "title": "Bio",
-         "tags": ["philosophy"], "dates": None, "summary": "Background.", "skill_notes": {}},
-    ]
-    (tmp_path / "index.json").write_text(json.dumps(index))
-    monkeypatch.setattr(search_module, "INDEX_PATH", tmp_path / "index.json")
-    monkeypatch.setattr(search_module, "RESOURCES_DIR", tmp_path)
-    return ChatTooling(search=CVSearch())
+def tooling(tmp_path):
+    (tmp_path / "iedi.md").write_text(
+        "---\ntitle: iEDI\ntype: experience\ntags: [monolith]\n"
+        'dates: "2025"\nsummary: Backend work.\n---\n'
+        "A monolith, not microservices.\n"
+    )
+    (tmp_path / "bio.md").write_text(
+        "---\ntitle: Bio\ntype: bio\ntags: [philosophy]\nsummary: Background.\n---\n"
+        "Background in philosophy.\n"
+    )
+    return ChatTooling(search=CVSearch(resources_dir=tmp_path))
 
 
 async def test_search_renders_count_and_matches(tooling):

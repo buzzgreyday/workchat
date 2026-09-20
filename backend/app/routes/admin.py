@@ -1,16 +1,17 @@
 import uuid
 from datetime import datetime
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.responses import Response, JSONResponse
 from starlette.status import HTTP_200_OK
 
-from app.common.config import BASE_URL
+from app.common.config import get_settings
 from app.common.models import (
     ChatMessageOut,
     ConversationDetail,
+    ConversationRedacted,
     ConversationSummary,
+    GrantRevoked,
     IssueTokenRequest,
 )
 from app.helpers.qr_code import get_qr_code
@@ -27,7 +28,7 @@ from app.repositories.base import (
     UserRepository,
 )
 from app.services import admin
-from app.services.auth import require_admin
+from app.services.auth import Auth, get_auth, require_admin
 from app.common.logging import logging
 
 router = APIRouter(prefix="/admin", tags=['Admin'], include_in_schema=False)
@@ -49,23 +50,24 @@ async def issue_token(
     req: IssueTokenRequest,
     users: UserRepository = Depends(get_user_repository),
     tokens: TokenRepository = Depends(get_token_repository),
+    auth: Auth = Depends(get_auth),
 ) -> Response:
-    logger.info(
-        "Issuing a new access token",
-        extra={
-            "subject": req.subject, "job_title": req.job_title, "company": req.company,
-            "email": req.email, "phone": req.phone, "expires_in_seconds": req.expires_in_seconds,
-            "max_queries": req.max_queries, "type": req.type, "version": req.version
-        }
-    )
-    token = await admin.issue_token(req, users=users, tokens=tokens)
+    # The issuance is logged by the service, which is the layer that knows what
+    # actually happened. Logging the request here too said the same thing twice,
+    # in two places that could drift.
+    token = await admin.issue_token(req, users=users, tokens=tokens, auth=auth)
     # v1 puts the access token straight in the link; v2 puts a claim token there
     # instead, so the query parameter has to change with it. The frontend reads
     # whichever one it finds — ?token= is still what every issued link carries.
     param = "token" if req.version == 1 else "claim"
     if req.type == "qr":
-        qr = get_qr_code(url=f"{BASE_URL}/?{param}={token}")
+        qr = get_qr_code(url=f"{get_settings().base_url}/?{param}={token}")
         return Response(content=bytes(qr), media_type="image/png", status_code=HTTP_200_OK)
+    # The one endpoint here that builds its own response, because it is the one
+    # that answers in two media types. A response_model cannot cover both, and
+    # would validate neither: returning a Response directly is what FastAPI
+    # passes through untouched.
+    #
     # "token" stays the key for both so an existing caller reading body["token"]
     # is unaffected; "kind" is what says which flow it belongs to.
     return JSONResponse(
@@ -77,7 +79,7 @@ async def issue_token(
 @router.post(
     "/tokens/{token_id}/revoke",
     dependencies=[Depends(require_admin)],
-    response_class=JSONResponse,
+    response_model=GrantRevoked,
     summary="Revoke a grant and every session under it",
     description=(
         "The kill switch. Stamps `tokens.revoked_at` and cuts every refresh "
@@ -89,7 +91,7 @@ async def revoke_token(
     token_id: uuid.UUID,
     tokens: TokenRepository = Depends(get_token_repository),
     sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
-) -> JSONResponse:
+) -> GrantRevoked:
     grant = await tokens.get(token_id)
     if grant is None:
         raise HTTPException(status_code=404, detail="Token not found")
@@ -102,13 +104,10 @@ async def revoke_token(
             "already_revoked": already_revoked, "sessions_cut": sessions_cut,
         },
     )
-    return JSONResponse(
-        content={
-            "token_id": str(token_id),
-            "already_revoked": already_revoked,
-            "sessions_cut": sessions_cut,
-        },
-        status_code=HTTP_200_OK,
+    return GrantRevoked(
+        token_id=token_id,
+        already_revoked=already_revoked,
+        sessions_cut=sessions_cut,
     )
 
 
@@ -162,7 +161,7 @@ async def get_conversation(
 @router.post(
     "/conversations/{conversation_id}/redact",
     dependencies=[Depends(require_admin)],
-    response_class=JSONResponse,
+    response_model=ConversationRedacted,
     summary="Erase the content of one conversation",
     description=(
         "Nulls the message text and stamps redacted_at, keeping the row so counts "
@@ -173,14 +172,13 @@ async def get_conversation(
 async def redact(
     conversation_id: uuid.UUID,
     conversations: ConversationRepository = Depends(get_conversation_repository),
-) -> JSONResponse:
+) -> ConversationRedacted:
     # An existence check, not a load: the transcript this used to fetch was
     # discarded, and every message body came back with it.
     if not await conversations.exists(conversation_id):
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     redacted = await conversations.redact(conversation_id)
-    return JSONResponse(
-        content={"conversation_id": str(conversation_id), "messages_redacted": redacted},
-        status_code=HTTP_200_OK,
+    return ConversationRedacted(
+        conversation_id=conversation_id, messages_redacted=redacted
     )

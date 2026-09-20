@@ -461,6 +461,7 @@ async def test_issue_token_runs_without_a_database():
     """
     from app.common.models import IssueTokenRequest
     from app.services.admin import issue_token
+    from app.services.auth import Auth
 
     users = FakeUserRepository()
     tokens = FakeTokenRepository()
@@ -469,6 +470,7 @@ async def test_issue_token_runs_without_a_database():
         IssueTokenRequest(subject="Ada", company="Acme", max_queries=3),
         users=users,
         tokens=tokens,
+        auth=Auth(),
     )
 
     assert raw.count(".") == 2  # a JWT
@@ -484,13 +486,15 @@ async def test_issue_token_reuses_an_existing_user():
     """
     from app.common.models import IssueTokenRequest
     from app.services.admin import issue_token
+    from app.services.auth import Auth
 
     users = FakeUserRepository()
     tokens = FakeTokenRepository()
     req = IssueTokenRequest(subject="Ada", company="Acme", max_queries=3)
+    auth = Auth()
 
-    await issue_token(req, users=users, tokens=tokens)
-    await issue_token(req, users=users, tokens=tokens)
+    await issue_token(req, users=users, tokens=tokens, auth=auth)
+    await issue_token(req, users=users, tokens=tokens, auth=auth)
 
     assert len(users.rows) == 1, "the second issue must not create a second user"
     assert len(tokens.rows) == 2
