@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend
 
-## Getting Started
+The chat page a hiring manager lands on. Next.js App Router, one route, talking
+to the FastAPI backend in `../backend`.
 
-First, run the development server:
+Most of the app is `src/hooks/useSession.ts`, which owns the access token and
+how it is renewed, and `src/hooks/useChat.ts`, which owns the transcript. The
+components under `src/components/chat/` render what those two decide.
+
+## Running it
+
+The usual way is the whole stack from the repository root — `docker compose up`
+— which gives you a backend to talk to. See [`../docs/development.md`](../docs/development.md).
+
+On its own:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+You will need `NEXT_PUBLIC_API_URL` pointing at a backend, and a link with a
+`?token=` or `?claim=` on it; without a credential the page says so rather than
+showing a chat box.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tests
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run test:e2e             # everything
+npx playwright test --ui     # pick through them interactively
+```
 
-## Learn More
+Playwright, against the standalone production build — the same server
+`Dockerfile` runs, because some of what is asserted is how that server reads its
+environment. The config builds and starts it for you.
 
-To learn more about Next.js, take a look at the following resources:
+**The backend is mocked at the network boundary** (`e2e/backend.ts`), which is
+the point rather than a shortcut. These tests are about frontend behaviour no
+type checker can see — a composer left dead after a failed reply, a transcript
+that does or does not survive a reload — and producing those states for real
+would need a database, an OpenAI key and a way to make a model fail on command.
+The backend's own contract is covered by its pytest suite.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+What they cover, and why each one exists:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| file | what broke, or could |
+|---|---|
+| `chat.spec.ts` | a failed reply left the composer disabled with nothing on screen saying why |
+| `reload.spec.ts` | F5 kept the session but lost the conversation, and split the transcript in two |
+| `greeting.spec.ts` | "Hi! 👋" addressed to nobody while a claim link was being exchanged |
+| `owner.spec.ts` | the header named the author, and could only be changed by rebuilding the image |
 
-## Deploy on Vercel
+Browsers are not installed by `npm install`:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npx playwright install chromium
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Only chromium. These are behaviour tests, not a compatibility matrix.
+
+## Configuration
+
+`NEXT_PUBLIC_API_URL` is baked in at build time, so it belongs to the image.
+`OWNER_NAME`, `OWNER_GITHUB_URL` and `OWNER_LINKEDIN_URL` are read on the server
+per request, so changing one is a restart — see
+[`../docs/deployment.md`](../docs/deployment.md). An owner variable that is set
+but empty means "there isn't one" and hides the link; unset means "use the
+default".
