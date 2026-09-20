@@ -1,4 +1,5 @@
 import Chat from "@/components/chat/Chat";
+import { readOwner } from "@/lib/owner";
 
 export default async function Home({
   searchParams,
@@ -14,9 +15,19 @@ export default async function Home({
 }) {
   const { token, claim } = await searchParams;
 
+  // Awaiting searchParams above is what makes this render per request, which is
+  // what makes the environment readable here at all — Next only guarantees a
+  // runtime value during dynamic rendering. Handed down as a prop rather than
+  // imported by the client component, so it stays out of the browser bundle.
+  const owner = readOwner();
+
   return (
     <main className="chat-page-bg flex min-h-dvh items-center justify-center p-4">
-      <Chat token={token} claim={claim} />
+      <Chat
+        token={token}
+        claim={claim}
+        owner={owner}
+      />
     </main>
   );
 }

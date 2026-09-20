@@ -99,6 +99,50 @@ const NO_LINK_MESSAGE =
   "You'll need the chat link you were sent to start a session. " +
   "If you had one open, it may just have timed out — ask for a new link.";
 
+/**
+ * What the greeting says, and whether it has anything to say yet.
+ *
+ * One function so the seed and the rewrite cannot drift: they are the same
+ * decision made at two moments. An empty `content` with `status: "streaming"`
+ * is what MessageBubble renders as the typing dots — the session is being
+ * opened, and saying "Hi!" to nobody in particular while that happens is worse
+ * than showing that something is underway.
+ */
+function greeting(
+  status: SessionStatus,
+  accessToken: string,
+): Pick<Message, "content" | "status"> {
+  if (status === "spent") {
+    return {
+      content: SPENT_LINK_MESSAGE,
+      status: "complete",
+    };
+  }
+
+  if (status === "error") {
+    return {
+      content: BROKEN_LINK_MESSAGE,
+      status: "complete",
+    };
+  }
+
+  if (status === "none") {
+    return {
+      content: NO_LINK_MESSAGE,
+      status: "complete",
+    };
+  }
+
+  if (!accessToken) {
+    return { content: "", status: "streaming" };
+  }
+
+  return {
+    content: `Hi ${getUserName(accessToken)}! 👋`,
+    status: "complete",
+  };
+}
+
 export function useChat({
   accessToken,
   status,
@@ -108,40 +152,44 @@ export function useChat({
   status: SessionStatus;
   authFetch: AuthFetch;
 }) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: "Hi! 👋",
-      createdAt: new Date(0),
-      status: "complete",
-    },
-  ]);
+  // Lazy, because the seed matters: a claim link spends a round trip before it
+  // knows who the hirer is, and a bare "Hi!" on the first paint that flips to
+  // "Hi Jane!" a moment later reads as a glitch. An empty streaming message is
+  // what MessageBubble already renders as the typing dots, so the greeting
+  // arrives the way every other reply does.
+  const [messages, setMessages] = useState<Message[]>(
+    () => [
+      {
+        id: "welcome",
+        role: "assistant",
+        // accessToken, not "": a v1 link *is* the token, so it is present on
+        // this first render and the hirer should be greeted by name straight
+        // away. Seeding it empty would show them the typing dots for a session
+        // that was never being opened.
+        ...greeting(status, accessToken),
+        createdAt: new Date(0),
+      },
+    ],
+  );
 
   // The greeting can only be personalised once a token exists, and with a claim
   // link that is one round trip after first paint. Telling the hirer their link
   // is spent goes here too — the agent saying it reads better than a banner.
   useEffect(() => {
-    const content =
-      status === "spent"
-        ? SPENT_LINK_MESSAGE
-        : status === "error"
-          ? BROKEN_LINK_MESSAGE
-          : status === "none"
-            ? NO_LINK_MESSAGE
-            : accessToken
-              ? `Hi ${getUserName(accessToken)}! 👋`
-              : "Hi! 👋";
+    const next = greeting(status, accessToken);
 
     setMessages((prev) => {
       // Only ever rewrites the greeting, and only while it is still the only
       // message — once the hirer has asked something, the transcript is theirs.
       const [first, ...rest] = prev;
 
+      // `status` is spread alongside `content`, not left as it was: a greeting
+      // seeded as "streaming" would otherwise keep the typing dots behind its
+      // own text forever.
       return first &&
         rest.length === 0 &&
         first.id === "welcome"
-        ? [{ ...first, content }]
+        ? [{ ...first, ...next }]
         : prev;
     });
   }, [accessToken, status]);

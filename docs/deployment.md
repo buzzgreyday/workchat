@@ -71,6 +71,16 @@ git clone https://github.com/buzzgreyday/workchat.git && cd workchat
       $EDITOR backend/resources/contact.md
       $EDITOR backend/resources/*.md
       ```
+      The header and the browser tab are the other half of that — they name
+      you, and they default to the author. Set these three in `backend/.env`:
+      ```
+      OWNER_NAME=Your Name
+      OWNER_GITHUB_URL=https://github.com/your-handle
+      OWNER_LINKEDIN_URL=https://linkedin.com/in/your-handle
+      ```
+      The frontend reads them per request, so changing one later is
+      `docker compose -f docker-compose.prod.yaml restart frontend` — no
+      rebuild. A link left empty is omitted rather than rendered dead.
 
 - [ ] **6. Bring the stack up.** The first run also builds `caddy/` from source
       (adding the rate-limit module via `xcaddy`), which pulls a fair amount of

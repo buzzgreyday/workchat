@@ -91,6 +91,17 @@ services:
       args:
         NEXT_PUBLIC_API_URL: /api
     restart: unless-stopped
+    environment:
+      # Whose CV this is. Read on the server per request, so changing one of
+      # these is a restart rather than a rebuild — unlike NEXT_PUBLIC_API_URL
+      # above, which next build inlines into the browser bundle.
+      #
+      # `${VAR-default}`, not `${VAR:-default}`: the colon form also substitutes
+      # when the variable is set but empty, which would make "I have no LinkedIn"
+      # render the author's.
+      OWNER_NAME: ${OWNER_NAME-Michael}
+      OWNER_GITHUB_URL: ${OWNER_GITHUB_URL-https://github.com/buzzgreyday}
+      OWNER_LINKEDIN_URL: ${OWNER_LINKEDIN_URL-https://linkedin.com/in/michael-ringdal}
     expose:
       - "3000"
     depends_on:
