@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.config import REFRESH_ROTATION_GRACE_SECONDS
+from app.common.config import get_settings
 from app.common.exceptions import (
     InvalidRefreshToken,
     RefreshTokenExpired,
@@ -124,7 +124,7 @@ class SQLRefreshSessionRepository(RefreshSessionRepository):
             return SessionRevoked()
 
         rotated_ago = (now - (as_utc(stale.revoked_at) or now)).total_seconds()
-        if rotated_ago <= REFRESH_ROTATION_GRACE_SECONDS:
+        if rotated_ago <= get_settings().refresh_rotation_grace_seconds:
             # This client racing itself, not an attacker: parallel requests that
             # all expired at once, or a retry after a network flake. Rejecting
             # without cutting keeps the winner's session — cutting here would

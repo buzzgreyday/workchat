@@ -4,35 +4,33 @@ Searching the CV.
 Nothing here imports OpenAI, which is the point of the split: how the corpus is
 ranked is arguable on its own terms, without a model or a tool schema involved.
 """
-import json
-
 import pytest
 
-from app.services import search as search_module
 from app.services.search import CVSearch
 
 
 @pytest.fixture
-def cv(tmp_path, monkeypatch):
-    """A two-record corpus on disk, so full-text search has something to read."""
+def cv(tmp_path):
+    """A two-record corpus on disk. The metadata is frontmatter now rather than
+    a separate index.json, because that is where the records come from."""
     (tmp_path / "iedi.md").write_text(
-        "---\ntitle: Software Developer @ iEDI\n---\n"
+        "---\n"
+        "title: Software Developer @ iEDI\n"
+        "type: experience\n"
+        "tags: [monolith, python]\n"
+        # Quoted, or PyYAML hands back an int and the record fails validation —
+        # which the scanner would skip rather than raise, losing it silently.
+        'dates: "2025"\n'
+        "summary: Backend work.\n"
+        "---\n"
         "The main engine is a monolith, not microservices.\n"
     )
-    (tmp_path / "bio.md").write_text("---\ntitle: Bio\n---\nBackground in philosophy.\n")
+    (tmp_path / "bio.md").write_text(
+        "---\ntitle: Bio\ntype: bio\ntags: [philosophy]\nsummary: Background.\n---\n"
+        "Background in philosophy.\n"
+    )
 
-    index = [
-        {"file": "iedi.md", "type": "experience", "title": "Software Developer @ iEDI",
-         "tags": ["monolith", "python"], "dates": "2025", "summary": "Backend work.", "skill_notes": {}},
-        {"file": "bio.md", "type": "bio", "title": "Bio",
-         "tags": ["philosophy"], "dates": None, "summary": "Background.", "skill_notes": {}},
-    ]
-    index_path = tmp_path / "index.json"
-    index_path.write_text(json.dumps(index))
-
-    monkeypatch.setattr(search_module, "INDEX_PATH", index_path)
-    monkeypatch.setattr(search_module, "RESOURCES_DIR", tmp_path)
-    return CVSearch()
+    return CVSearch(resources_dir=tmp_path)
 
 
 async def test_search_returns_hits(cv):
@@ -117,8 +115,48 @@ async def test_empty_query_returns_everything(cv):
     assert len(await cv.search()) == 2
 
 
-async def test_index_is_read_once(cv, monkeypatch):
-    """Cached for the life of the process: resources cannot change without a deploy."""
+async def test_the_corpus_is_scanned_once(cv, tmp_path):
+    """Cached for the life of the process: the corpus is read at startup, and a
+    change to it needs a restart to be seen."""
     await cv.search(query="monolith")
-    monkeypatch.setattr(search_module, "INDEX_PATH", cv_missing := "/nonexistent/index.json")
-    assert await cv.search(query="monolith"), f"a second search must not re-read {cv_missing}"
+    for record in tmp_path.glob("*.md"):
+        record.unlink()
+    assert await cv.search(query="monolith"), "a second search must not re-read the corpus"
+
+
+async def test_frontmatter_is_searchable(cv):
+    """The body cached for matching is the whole file, frontmatter included.
+
+    Summaries, tags and skill_notes are part of what a question matches on —
+    iedi.md's scope notes for helm and rancher live nowhere else — so warming
+    from the parsed content instead would quietly change the ranking.
+
+    "backend" appears only in iedi.md's summary line, never in its body.
+    """
+    assert [h.file for h in await cv.search(query="backend")] == ["iedi.md"]
+
+
+async def test_a_record_that_will_not_parse_is_skipped(tmp_path):
+    """One bad file must not cost the rest of the corpus."""
+    (tmp_path / "good.md").write_text("---\ntitle: Good\ntype: bio\n---\nFine.\n")
+    (tmp_path / "broken.md").write_text("---\ntitle: [unclosed\n---\nBroken.\n")
+    hits = await CVSearch(resources_dir=tmp_path).search()
+    assert [h.file for h in hits] == ["good.md"]
+
+
+async def test_an_empty_corpus_refuses_to_load(tmp_path):
+    """A server with no CV cannot answer anything, so it does not start."""
+    with pytest.raises(RuntimeError):
+        await CVSearch(resources_dir=tmp_path).load()
+
+
+async def test_load_warms_every_body(tmp_path):
+    """After load, a search touches no disk — proven by removing the corpus."""
+    (tmp_path / "iedi.md").write_text(
+        "---\ntitle: iEDI\ntype: experience\ntags: [python]\n---\nA monolith.\n"
+    )
+    cv = CVSearch(resources_dir=tmp_path)
+    await cv.load()
+
+    (tmp_path / "iedi.md").unlink()
+    assert [h.file for h in await cv.search(query="monolith")] == ["iedi.md"]

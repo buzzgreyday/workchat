@@ -15,7 +15,7 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 
-from app.common.config import SYSTEM_PROMPT
+from app.common.config import get_settings
 
 
 def system_content(now: datetime | None = None) -> str:
@@ -29,7 +29,7 @@ def system_content(now: datetime | None = None) -> str:
     """
     today = now or datetime.now(timezone.utc)
     return (
-        f"{SYSTEM_PROMPT}\n\n"
+        f"{get_settings().system_prompt}\n\n"
         f"Today's date is {today.strftime('%A, %d %B %Y')}. Use it whenever a "
         f"question depends on the current date — the length of a role, how "
         f"recent something is, or whether a date is past or future. Never "

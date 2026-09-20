@@ -2,7 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.common.models import JWT, IssueTokenRequest
+from app.common.models import JWT, IssueTokenRequest, TokenClaims
 
 
 def test_issue_token_request_rejects_bad_email():
@@ -63,3 +63,30 @@ def test_chat_request_accepts_conversation_id():
 
     cid = uuid.uuid4()
     assert ChatRequest(message="hi", conversation_id=str(cid)).conversation_id == cid
+
+
+# --- TokenClaims: the decode-side model --------------------------------------
+
+def test_token_claims_invents_nothing():
+    """A v1 token carries none of the v2 claims, and parsing one must not make
+    any up — `JWT`, the minting model, would have defaulted max_queries to 20."""
+    claims = TokenClaims.model_validate({"sub": "hire", "iat": 1, "exp": 2, "jti": "abc"})
+    assert claims.version == 1
+    assert (claims.ver, claims.typ, claims.tid, claims.sid) == (None, None, None, None)
+
+
+def test_token_claims_refuses_a_boolean_version():
+    """`True` is an `int` in Python, and a lax field would coerce it to 1 —
+    reading a boolean as the version that marks the tokens already in the wild."""
+    with pytest.raises(ValidationError):
+        TokenClaims.model_validate({"ver": True})
+
+
+def test_token_claims_keeps_an_unknown_type_parseable():
+    """Not a Literal on purpose: an unrecognised `typ` has to reach the auth
+    service, which answers "not an access token" rather than "unparseable"."""
+    assert TokenClaims.model_validate({"ver": 2, "typ": "nonsense"}).typ == "nonsense"
+
+
+def test_token_claims_ignores_claims_it_does_not_know():
+    assert TokenClaims.model_validate({"ver": 2, "something_new": "x"}).version == 2

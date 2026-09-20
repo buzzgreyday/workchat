@@ -1,7 +1,7 @@
 import hashlib
 import hmac
 
-from app.common.config import TOKEN_HASHING_SECRET
+from app.common.config import get_settings
 
 
 def hash_token(raw_token: str) -> str:
@@ -13,5 +13,5 @@ def hash_token(raw_token: str) -> str:
     storage backend only ever sees the result.
     """
     return hmac.new(
-        TOKEN_HASHING_SECRET.encode(), raw_token.encode(), hashlib.sha256
+        get_settings().token_hashing_secret.encode(), raw_token.encode(), hashlib.sha256
     ).hexdigest()

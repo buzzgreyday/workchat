@@ -246,7 +246,9 @@ def main() -> int:
         sys.exit("no questions selected")
 
     try:
-        from app.common.config import OPENAI_MODEL as model
+        from app.common.config import get_settings
+
+        model = get_settings().openai_model
     except Exception:  # noqa: BLE001 - the harness must run without app config
         model = "unknown"
 

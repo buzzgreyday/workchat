@@ -126,3 +126,18 @@ async def test_admin_redact_nulls_content_but_keeps_row(client, issued_token):
         assert message["content"] is None
         assert message["redacted_at"] is not None
         assert message["content_chars"] > 0
+
+
+async def test_redact_response_identifies_the_conversation(client, issued_token):
+    """The id round-trips as a string. It is a uuid.UUID on the response model
+    now rather than a hand-written str(), and JSON has no UUID either way."""
+    chat = await ask(client, issued_token, message="a question")
+    conversation_id = done_frame(chat)["conversation_id"]
+
+    resp = await client.post(
+        f"/admin/conversations/{conversation_id}/redact",
+        headers={"X-Admin-Key": os.environ["ADMIN_KEY"]},
+    )
+    body = resp.json()
+    assert body == {"conversation_id": conversation_id, "messages_redacted": 2}
+    assert isinstance(body["conversation_id"], str)

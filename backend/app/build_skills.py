@@ -1,46 +1,36 @@
 """
-Scans /data for .md files, parses YAML frontmatter, and writes index.json.
-Run this whenever you add/edit a CV file: `python -m app.build_index` (from backend/)
+Regenerates the skills list inside resources/skills.md.
+
+Run it after editing any CV record: `python -m app.build_skills` (from backend/).
+skills.md is tracked, so the output is committed like any other source — the
+server never runs this and never writes to resources/.
+
+It used to also write resources/index.json, which the backend read at startup.
+That file is gone: the corpus is scanned in the process that serves it, so there
+is nothing to build and nothing to forget to build.
 """
-import json
 import re
-import frontmatter  # pip install python-frontmatter --break-system-packages
 from collections import defaultdict
 
-from app.common.config import INDEX_PATH, RESOURCES_DIR
-from app.common.models import Record
-
-SKILLS_PATH = RESOURCES_DIR / "skills.md"
+from app.common.config import get_settings
+from app.services.indexing import scan
 
 # How much each source type contributes to a skill's ranking.
 # Experience counts more than side/hobby projects.
 TYPE_WEIGHT = {"experience": 3, "project": 1}
 
-START_MARKER = "<!-- AUTO-GENERATED-SKILLS-START: do not hand-edit below this line, run `python -m app.build_index` (from backend/) instead -->"
+START_MARKER = "<!-- AUTO-GENERATED-SKILLS-START: do not hand-edit below this line, run `python -m app.build_skills` (from backend/) instead -->"
 END_MARKER = "<!-- AUTO-GENERATED-SKILLS-END -->"
 
-
-def build_index():
-    records = []
-    for md_file in RESOURCES_DIR.rglob("*.md"):
-        if md_file != RESOURCES_DIR / "system-prompt.md":
-            post = frontmatter.load(md_file)
-            rel_path = str(md_file.relative_to(RESOURCES_DIR))
-            record = Record(
-                file=rel_path,
-                type=post.get("type", "unknown"),
-                title=post.get("title", md_file.stem),
-                tags=post.get("tags", []),
-                dates=post.get("dates"),
-                summary=post.get("summary"),
-                skill_notes=post.get("skill_notes", {}),
-            )
-            records.append(record.model_dump())
-
-    INDEX_PATH.write_text(json.dumps(records, indent=2))
-    print(f"Indexed {len(records)} files -> {INDEX_PATH}")
-
-    update_skills_section(records)
+# Matched loosely on purpose. The previous pattern was re.escape(START_MARKER),
+# so renaming the module changed the constant, the constant stopped matching the
+# text already in skills.md, and the splice became a silent no-op that printed
+# "Markers not found" and exited zero. Only the marker names have to agree now,
+# not the sentence around them.
+BLOCK = re.compile(
+    r"<!-- AUTO-GENERATED-SKILLS-START.*?-->.*?<!-- AUTO-GENERATED-SKILLS-END -->",
+    re.DOTALL,
+)
 
 
 def update_skills_section(records):
@@ -76,24 +66,23 @@ def update_skills_section(records):
             lines.append(f"  - Scope: {notes[tag]}")
     generated_block = "\n".join(lines)
 
-    if not SKILLS_PATH.exists():
+    skills_path = get_settings().resources_dir / "skills.md"
+    if not skills_path.exists():
         print("skills.md not found, skipping auto-skills update")
         return
 
-    content = SKILLS_PATH.read_text()
-    pattern = re.compile(
-        re.escape(START_MARKER) + r".*?" + re.escape(END_MARKER),
-        re.DOTALL,
-    )
+    content = skills_path.read_text()
     replacement = f"{START_MARKER}\n\n{generated_block}\n\n{END_MARKER}"
 
-    if pattern.search(content):
-        content = pattern.sub(replacement, content)
-        SKILLS_PATH.write_text(content)
-        print(f"Updated auto-generated skills section in {SKILLS_PATH}")
+    if BLOCK.search(content):
+        skills_path.write_text(BLOCK.sub(replacement, content))
+        print(f"Updated auto-generated skills section in {skills_path}")
     else:
         print("Markers not found in skills.md, skipping auto-skills update")
 
 
 if __name__ == "__main__":
-    build_index()
+    resources_dir = get_settings().resources_dir
+    records, _bodies = scan(resources_dir)
+    print(f"Scanned {len(records)} records from {resources_dir}")
+    update_skills_section(records)

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends
 
 from app.common.logging.logging import logger
 from app.common.models import SessionInfo, TokenContext, Usage
-from app.services.auth import auth
+from app.services.auth import verify
 
 router = APIRouter(tags=["Session"])
 
@@ -27,7 +27,7 @@ router = APIRouter(tags=["Session"])
         "rather than 429 — that is a state to display, not an error."
     ),
 )
-async def session(token: TokenContext = Depends(auth.verify)) -> SessionInfo:
+async def session(token: TokenContext = Depends(verify)) -> SessionInfo:
     logger.info(
         "Session queried",
         extra={

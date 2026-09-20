@@ -14,17 +14,13 @@ that reason. So an XSS on the page can steal minutes of access, not a week of it
 
 from fastapi import APIRouter, Cookie, Depends, Response
 
-from app.common.config import (
-    REFRESH_COOKIE_NAME,
-    REFRESH_COOKIE_PATH,
-    REFRESH_COOKIE_SECURE,
-)
+from app.common.config import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH, get_settings
 from app.common.exceptions import MissingRefreshToken
 from app.common.logging.logging import logger
 from app.common.models import ClaimRequest, RefreshRequest, SessionOut, TokenPair
 from app.repositories import get_refresh_session_repository, get_token_repository
 from app.repositories.base import RefreshSessionRepository, TokenRepository
-from app.services.auth import auth
+from app.services.auth import Auth, get_auth
 
 router = APIRouter(prefix="/v2/auth", tags=["Auth"])
 
@@ -43,7 +39,7 @@ def _set_refresh_cookie(response: Response, pair: TokenPair) -> SessionOut:
         value=pair.refresh_token,
         max_age=pair.refresh_expires_in,
         httponly=True,
-        secure=REFRESH_COOKIE_SECURE,
+        secure=get_settings().refresh_cookie_secure,
         samesite="strict",
         path=REFRESH_COOKIE_PATH,
     )
@@ -71,6 +67,7 @@ async def claim(
     response: Response,
     tokens: TokenRepository = Depends(get_token_repository),
     sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+    auth: Auth = Depends(get_auth),
 ) -> SessionOut:
     logger.info("Claim token presented")
     pair = await auth.claim(req.claim_token, tokens=tokens, sessions=sessions)
@@ -98,6 +95,7 @@ async def refresh(
     refresh_cookie: str | None = Cookie(default=None, alias=REFRESH_COOKIE_NAME),
     tokens: TokenRepository = Depends(get_token_repository),
     sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+    auth: Auth = Depends(get_auth),
 ) -> SessionOut:
     # Cookie first: that is where a browser keeps it. The body is the escape
     # hatch for callers that have no cookie jar.

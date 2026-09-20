@@ -16,7 +16,7 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import replace
 
-from app.common.config import LOG_CHAT_CONTENT, OPENAI_MODEL
+from app.common.config import get_settings
 from app.common.context import conversation_id_var
 from app.common.logging.logging import logger
 from app.common.models import TokenContext
@@ -121,7 +121,7 @@ async def recorded(
                         finish_reason=finish_reason,
                         tool_names=tool_names,
                         tool_calls_count=len(tool_names),
-                        model=OPENAI_MODEL,
+                        model=get_settings().openai_model,
                         latency_ms=int((asyncio.get_running_loop().time() - started_at) * 1000),
                         error=error,
                     ),
@@ -138,5 +138,5 @@ def _log_completion(event: TurnFinished) -> None:
     see an event named "done", once by the JSON path in its own words.
     """
     logger.info("Chat message sent to user", extra={"usage": event.usage.model_dump()})
-    if LOG_CHAT_CONTENT:
+    if get_settings().log_chat_content:
         logger.debug("Chat message content sent to user", extra={"reply": event.reply})

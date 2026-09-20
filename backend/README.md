@@ -13,7 +13,7 @@ uv run mypy
 
 The settings are strict enough to be worth having — every function in a request
 path declares what it takes and returns, and a value that quietly becomes `Any`
-is an error. `build_index` and the logging package are exempt from the
+is an error. `build_skills` and the logging package are exempt from the
 annotation requirement: both are script-shaped rather than request-shaped.
 
 ## Tests

@@ -7,16 +7,17 @@ tool schema or a vendor SDK in the process. The adapter that turns these results
 into something a model can read lives in `app/services/chat/tooling.py`.
 """
 
-import json
+import asyncio
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import aiofiles
 
-from app.common.config import INDEX_PATH, RESOURCES_DIR
+from app.common.config import get_settings
 from app.common.logging.logging import logger
+from app.services.indexing import scan
 
 # Matching is OR'd and substring-based, so a single function word decides the
 # whole result: "at" alone matches every record in the CV, because it sits inside
@@ -57,39 +58,65 @@ class CVSearch:
     The CV index and the markdown behind it.
 
     Holds no per-conversation state, so one instance is shared across every chat.
+    The corpus is scanned into memory once — at startup by `main.py`, lazily on
+    first use otherwise — and kept for the life of the process.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, resources_dir: Path | None = None) -> None:
+        # Resolved here rather than trusted from the caller: `_within_resources`
+        # guards traversal by asking whether this directory is among a path's
+        # resolved parents, so an unresolved path with a symlink in it — a
+        # pytest tmp_path on macOS, a symlinked deploy directory — would fail
+        # containment for every record while search itself kept working.
+        self._resources_dir = (resources_dir or get_settings().resources_dir).resolve()
         self._index: list[dict[str, Any]] | None = None
         self._bodies: dict[str, str] = {}
 
-    async def index(self) -> list[dict[str, Any]]:
+    async def load(self) -> list[dict[str, Any]]:
         """
-        The index `build_index.py` writes, read once.
+        Scan the markdown into memory. Called at startup, and lazily if not.
 
-        Cached for the life of the process: resources are baked into the image,
-        so the file cannot change under a running server without a deploy — and
-        a deploy restarts it. Re-reading per request bought nothing and cost a
-        file open on every search.
+        Warming the bodies in the same pass is free — the scan has already read
+        each file to parse its frontmatter — and it buys two things: the first
+        search of a running server touches no disk, and a record nobody can read
+        surfaces at boot rather than on the one question that needed it.
+
+        An empty corpus stops the process. That is a boot-time assertion rather
+        than an invariant of this class: a server with no CV cannot answer
+        anything, and failing here means the container never reports healthy, so
+        a deploy that shipped a broken resources mount goes red instead of
+        quietly going live. `search()` on an empty corpus is still just a miss.
+
+        Cached for the life of the process. The corpus is read at startup, so
+        editing a record on a running server needs a restart to be seen.
         """
-        if self._index is None:
-            async with aiofiles.open(INDEX_PATH, mode="r") as f:
-                raw = await f.read()
-            # json.loads is Any by nature. The cast is the assertion that this
-            # file is the index build_index writes; a malformed one fails at the
-            # first use.
-            self._index = cast(list[dict[str, Any]], json.loads(raw))
-            logger.debug("Loaded the CV index", extra={"records": len(self._index)})
-        return self._index
+        records, bodies = await asyncio.to_thread(scan, self._resources_dir)
+        if not records:
+            raise RuntimeError(f"No CV records found under {self._resources_dir}")
+        self._index, self._bodies = records, bodies
+        logger.info("Built the CV index", extra={"records": len(records)})
+        return records
+
+    async def index(self) -> list[dict[str, Any]]:
+        """The corpus, scanned on first use if startup has not already done it."""
+        index = self._index
+        if index is None:
+            index = await self.load()
+        return index
 
     async def tags(self) -> list[str]:
         """Every tag in the corpus, for callers that need to offer a choice."""
         return sorted({t for record in await self.index() for t in record["tags"]})
 
     async def _body(self, file: str) -> str:
-        """The lowercased markdown of one record, read once and kept."""
+        """
+        The lowercased markdown of one record, read once and kept.
+
+        `load` fills these for the whole corpus, so this is the fallback for a
+        CVSearch built by hand — a test, mostly — rather than the normal path.
+        """
         if file not in self._bodies:
-            async with aiofiles.open(RESOURCES_DIR / file, mode="r") as f:
+            async with aiofiles.open(self._resources_dir / file, mode="r") as f:
                 self._bodies[file] = (await f.read()).lower()
         return self._bodies[file]
 
@@ -164,7 +191,7 @@ class CVSearch:
         caller's business, and a search service that returns prose for the model
         to read would be deciding it here.
         """
-        path = RESOURCES_DIR / file
+        path = self._resources_dir / file
         if not path.exists():
             # A caller retypes the filename from a search result and sometimes
             # changes its case — "iEDI.md" for "iedi.md". On a case-sensitive
@@ -172,17 +199,16 @@ class CVSearch:
             # model sits, from the record not existing: it fell back to the
             # summary and answered from that.
             wanted = file.strip().lower()
-            path = next((p for p in RESOURCES_DIR.glob("*.md") if p.name.lower() == wanted), path)
+            path = next((p for p in self._resources_dir.glob("*.md") if p.name.lower() == wanted), path)
         if not self._within_resources(path):
             logger.warning("Rejected an entry outside the resources directory", extra={"file": file})
             return None
         async with aiofiles.open(path, mode="r") as f:
             return await f.read()
 
-    @staticmethod
-    def _within_resources(path: Path) -> bool:
+    def _within_resources(self, path: Path) -> bool:
         """Guards the traversal `file` would otherwise allow."""
-        return path.exists() and RESOURCES_DIR in path.resolve().parents
+        return path.exists() and self._resources_dir in path.resolve().parents
 
 
 @lru_cache
