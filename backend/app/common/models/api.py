@@ -94,6 +94,18 @@ class ConversationDetail(BaseModel):
     redacted_at: datetime | None = None
     messages: list[ChatMessageOut]
 
+class GrantRevoked(BaseModel):
+    """What the kill switch reports. `already_revoked` is what makes it
+    idempotent rather than a 409: revoking twice is a legitimate thing for an
+    operator to do, and the second call says so instead of failing."""
+    token_id: uuid.UUID
+    already_revoked: bool
+    sessions_cut: int
+
+class ConversationRedacted(BaseModel):
+    conversation_id: uuid.UUID
+    messages_redacted: int
+
 class TokenContext(BaseModel):
     sub: str
     jti: str

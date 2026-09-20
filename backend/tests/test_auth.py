@@ -610,3 +610,17 @@ async def test_session_dies_with_a_revoked_grant(client):
     resp = await client.get("/session", headers=headers)
     assert resp.status_code == 401
     assert resp.json()["detail"] in {"Token revoked", "Session revoked"}
+
+
+async def test_revoke_response_identifies_the_grant(client):
+    """The full body, not just the two flags the other revoke tests assert on."""
+    claim = await issue(client, version=2)
+    token_id = decode(claim["token"])["tid"]
+    await claim_session(client, claim["token"])
+
+    resp = await client.post(f"/admin/tokens/{token_id}/revoke", headers=ADMIN_HEADERS)
+    assert resp.json() == {
+        "token_id": token_id,
+        "already_revoked": False,
+        "sessions_cut": 1,
+    }
