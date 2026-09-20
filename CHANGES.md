@@ -69,6 +69,36 @@ tracked independently._
   by hand. Issuing a token still builds its own response, because it is the one
   endpoint that answers in two media types.
 
+- Configuration is an object built on demand rather than a page of module
+  constants read at import. `app/common/config.py` no longer exports anything
+  environment-derived: `SECRET_KEY` is `get_settings().secret_key`, and a fork
+  carrying local patches against those names will need the same edit. Values
+  that consult no environment — the signing algorithm, the tool-round cap, the
+  cookie path — stay constants, because they are facts about the application
+  rather than settings.
+
+  Importing this application used to require a fully configured environment.
+  Seven secrets were read at module level, the system prompt was loaded from
+  disk, the database engine was opened, a `FastAPI` was constructed, and `Auth`
+  read the signing key when the class was defined — all before anyone had asked
+  for a server. The test suite paid for it in the only currency available: seven
+  environment variables set above its own imports, and a `# noqa` on every
+  import below them. An application is built by `create_app()` now, and
+  `app/main.py` calls it, which is the moment a missing secret should stop
+  everything.
+
+  Logging is the deliberate exception and still reads `DEV_MODE` directly:
+  handlers have to exist before anything logs, and a misconfiguration that could
+  not be logged would be the wrong trade.
+
+- Services take their collaborators instead of reaching for them. `CVSearch`
+  takes the directory it reads, `Auth` takes its notifier, and `Auth`'s methods
+  take plain arguments — the three dependency functions that wire them to a
+  request live at the bottom of that module, the same service-and-adapter split
+  the chat service already keeps. Nothing about what the application does
+  changes; what changes is that overriding any of it in a test is now the
+  mechanism FastAPI already provides rather than reaching into a module.
+
 ### Fixed
 
 - A hirer's contact details and a grant's `token_hash` no longer reach the log.
@@ -91,6 +121,11 @@ tracked independently._
   structured fields, where the redaction filter cannot reach them. Every local
   session was doing it by default. `SQL_ECHO=1` turns it back on for debugging a
   query.
+
+- `RESOURCES_DIR` and `SYSTEM_PROMPT_PATH` can be set in `backend/.env`. Both
+  were computed *above* the `load_dotenv()` call, so neither had ever been
+  readable from that file — only from the real environment, which is not where
+  the documentation says configuration lives.
 
 ## [0.4.0] - 2026-09-19
 
