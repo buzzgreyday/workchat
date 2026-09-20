@@ -50,6 +50,7 @@ from datetime import datetime, timezone
 import jwt
 from fastapi import Depends, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import ValidationError
 
 from app.common.config import (
     ACCESS_TOKEN_TTL_SECONDS,
@@ -75,7 +76,7 @@ from app.common.exceptions import (
 )
 from app.common.crypto import hash_token
 from app.common.logging.logging import logger
-from app.common.models import JWT, Grant, RefreshSession, TokenContext, TokenPair
+from app.common.models import JWT, Grant, RefreshSession, TokenClaims, TokenContext, TokenPair
 from app.repositories import get_refresh_session_repository, get_token_repository
 from app.repositories.base import RefreshSessionRepository, TokenRepository
 from app.services.notify import notifier
@@ -93,9 +94,10 @@ class Auth:
     claim shape exactly. Tests construct one with a short TTL instead of
     monkeypatching module globals.
 
-    The bound methods are used directly as FastAPI dependencies; see the module
-    level aliases at the bottom, which keep `from app.services.auth import
-    verify_and_consume` working for the callers that already do it.
+    The bound methods are used directly as FastAPI dependencies — routes write
+    `Depends(auth.verify_and_consume)` against the instance at the bottom of this
+    module. FastAPI reads a bound method's signature with `self` already applied,
+    so they are usable exactly as the plain functions they replaced were.
     """
 
     def __init__(
@@ -114,27 +116,26 @@ class Auth:
 
     # --- decoding primitives -------------------------------------------------
 
-    def decode(self, raw_token: str) -> dict:
-        """Signature and expiry only. What the claims *mean* is decided by the
-        caller, because a claim token and an access token are both validly
-        signed and only one of them may buy a chat message."""
+    def decode(self, raw_token: str) -> TokenClaims:
+        """Signature, expiry and shape only. What the claims *mean* is decided
+        by the caller, because a claim token and an access token are both
+        validly signed and only one of them may buy a chat message.
+
+        A claim set that will not parse is an invalid token rather than a
+        server error: `TokenClaims` holds every field optional, so the only way
+        to fail it is a claim of the wrong type — `ver: true` being the one that
+        matters, since a lax field would read it as version 1."""
         try:
-            return jwt.decode(raw_token, self.secret_key, algorithms=[self.algorithm])
+            payload = jwt.decode(raw_token, self.secret_key, algorithms=[self.algorithm])
         except jwt.ExpiredSignatureError:
             raise TokenExpired()
         except jwt.InvalidTokenError:
             raise InvalidToken()
-
-    @staticmethod
-    def version_of(payload: dict) -> int:
-        """No `ver` means v1. The tokens in the wild predate the claim and can
-        never grow one, so their silence has to keep meaning version 1."""
-        ver = payload.get("ver")
-        # bool is an int in Python, and `ver: true` would otherwise compare equal
-        # to 1 and be waved through as a v1 token.
-        if isinstance(ver, bool) or not isinstance(ver, int):
-            return 1
-        return ver
+        try:
+            return TokenClaims.model_validate(payload)
+        except ValidationError:
+            logger.warning("Token claims will not parse")
+            raise InvalidToken()
 
     @staticmethod
     def _uuid(value: object, field: str) -> uuid.UUID:
@@ -291,12 +292,12 @@ class Auth:
 
         Costs no quota; questions are what quota is for.
         """
-        payload = self.decode(raw_claim)
-        if self.version_of(payload) != 2 or payload.get("typ") != "claim":
-            logger.warning("Non-claim token presented at claim", extra={"typ": payload.get("typ")})
+        claims = self.decode(raw_claim)
+        if claims.version != 2 or claims.typ != "claim":
+            logger.warning("Non-claim token presented at claim", extra={"typ": claims.typ})
             raise NotAClaimToken()
 
-        grant_id = self._uuid(payload.get("tid"), "tid")
+        grant_id = self._uuid(claims.tid, "tid")
         grant = await self._active_grant(tokens, grant_id)
 
         if grant.version != 2 or not self._matches(raw_claim, grant.token_hash):
@@ -347,13 +348,13 @@ class Auth:
         it sees one outside the grace window, and answers 409 inside it. Like claim, this
         costs no quota.
         """
-        payload = self.decode(raw_refresh)
-        if self.version_of(payload) != 2 or payload.get("typ") != "refresh":
-            logger.warning("Non-refresh token presented at refresh", extra={"typ": payload.get("typ")})
+        claims = self.decode(raw_refresh)
+        if claims.version != 2 or claims.typ != "refresh":
+            logger.warning("Non-refresh token presented at refresh", extra={"typ": claims.typ})
             raise NotARefreshToken()
 
-        session_id = self._uuid(payload.get("jti"), "jti")
-        grant_id = self._uuid(payload.get("tid"), "tid")
+        session_id = self._uuid(claims.jti, "jti")
+        grant_id = self._uuid(claims.tid, "tid")
         grant = await self._active_grant(tokens, grant_id)
 
         session = await sessions.get(session_id)
@@ -447,20 +448,20 @@ class Auth:
             raise MissingCredentials()
 
         raw_token = credentials.credentials  # already stripped of "Bearer " prefix
-        payload = self.decode(raw_token)
-        version = self.version_of(payload)
+        claims = self.decode(raw_token)
+        version = claims.version
 
         if version == 1:
-            return self._uuid(payload.get("jti"), "jti"), version, None
+            return self._uuid(claims.jti, "jti"), version, None
 
         if version == 2:
             # A claim or refresh token is validly signed and would otherwise sail
             # through: only typ="access" may buy a message.
-            if payload.get("typ") != "access":
-                logger.warning("Non-access token presented at chat", extra={"typ": payload.get("typ")})
+            if claims.typ != "access":
+                logger.warning("Non-access token presented at chat", extra={"typ": claims.typ})
                 raise NotAnAccessToken()
-            grant_id = self._uuid(payload.get("tid"), "tid")
-            session_id = self._uuid(payload.get("sid"), "sid")
+            grant_id = self._uuid(claims.tid, "tid")
+            session_id = self._uuid(claims.sid, "sid")
             # Checked before the quota is consumed, so a token from a session cut
             # for replay is rejected without costing the hirer a question. The
             # cost is one extra read per v2 request; the alternative is honouring
@@ -468,7 +469,7 @@ class Auth:
             await self._require_live_session(session_id, grant_id, sessions)
             return grant_id, version, session_id
 
-        logger.warning("Unknown token version", extra={"ver": payload.get("ver")})
+        logger.warning("Unknown token version", extra={"ver": claims.ver})
         raise UnsupportedTokenVersion()
 
     @staticmethod
@@ -547,9 +548,3 @@ class Auth:
 
 
 auth = Auth()
-
-# Bound-method aliases so existing imports keep working unchanged. FastAPI reads
-# a bound method's signature with `self` already applied, so these are usable as
-# dependencies exactly as the plain functions they replaced were.
-verify_and_consume = auth.verify_and_consume
-require_admin = auth.require_admin

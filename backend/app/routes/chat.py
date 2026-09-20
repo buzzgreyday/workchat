@@ -1,4 +1,3 @@
-import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -14,7 +13,7 @@ from app.openai.client import get_openai_client
 from app.repositories import get_transcript_repository
 from app.repositories.base import TranscriptRepository
 from app.services import chat as chat_service
-from app.services.auth import verify_and_consume
+from app.services.auth import auth
 from app.services.chat import ChatTooling, TokenProduced, TurnEvent, TurnFailed, TurnFinished
 from app.services.chat.tooling import get_tooling
 
@@ -66,7 +65,7 @@ async def frames(events: AsyncIterator[TurnEvent]) -> AsyncIterator[bytes]:
 )
 async def chat_stream(
     req: ChatRequest,
-    token: TokenContext = Depends(verify_and_consume),
+    token: TokenContext = Depends(auth.verify_and_consume),
     client: AsyncOpenAI = Depends(get_openai_client),
     tooling: ChatTooling = Depends(get_tooling),
     transcripts: TranscriptRepository = Depends(get_transcript_repository),

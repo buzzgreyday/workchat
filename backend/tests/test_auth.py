@@ -453,6 +453,43 @@ async def test_unknown_token_version_rejected(client):
     assert resp.json()["detail"] == "Unsupported token version"
 
 
+async def test_boolean_version_is_not_read_as_version_one(client):
+    """`ver: true` must not buy a chat.
+
+    `True` is an `int` in Python and compares equal to 1, so a version predicate
+    that merely checks the type reads a boolean as a v1 token. The v2 claims are
+    then never looked at: no `typ` check, no live-session check. Nothing signed
+    by this service carries a boolean `ver`, so this is a guard rather than a
+    live hole — but it is a deliberate one, and it had no test.
+    """
+    claim = await issue(client, version=2)
+    payload = decode(claim["token"])
+    payload["ver"] = True
+    forged = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+    resp = await chat(client, forged)
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Invalid token"
+
+
+async def test_unrecognised_token_type_is_refused_not_unparseable(client):
+    """An unknown `typ` is a refusal with a reason, not a decoding failure.
+
+    The reason matters: "Not an access token" tells a client it presented the
+    wrong one of its two tokens, which is recoverable. A parse error would say
+    the token is malformed, which is not.
+    """
+    claim = await issue(client, version=2)
+    session = await claim_session(client, claim["token"])
+    payload = decode(session["access_token"])
+    payload["typ"] = "not-a-real-type"
+    forged = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+    resp = await chat(client, forged)
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Not an access token"
+
+
 async def test_claim_for_an_unknown_grant_rejected(client):
     claim = await issue(client, version=2)
     payload = decode(claim["token"])

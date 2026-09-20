@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.responses import Response, JSONResponse
@@ -27,7 +26,7 @@ from app.repositories.base import (
     UserRepository,
 )
 from app.services import admin
-from app.services.auth import require_admin
+from app.services.auth import auth
 from app.common.logging import logging
 
 router = APIRouter(prefix="/admin", tags=['Admin'], include_in_schema=False)
@@ -35,7 +34,7 @@ logger = logging.logger
 
 @router.post(
     "/issue-token",
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(auth.require_admin)],
     response_class=JSONResponse,
     summary="Mint a new access token",
     description="Mint a new access token for a hirer. Requires your admin key in the X-Admin-Key header.",
@@ -76,7 +75,7 @@ async def issue_token(
 
 @router.post(
     "/tokens/{token_id}/revoke",
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(auth.require_admin)],
     response_class=JSONResponse,
     summary="Revoke a grant and every session under it",
     description=(
@@ -114,7 +113,7 @@ async def revoke_token(
 
 @router.get(
     "/conversations",
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(auth.require_admin)],
     response_model=list[ConversationSummary],
     summary="List chat conversations",
     description="What hirers have been asking. Requires your admin key in the X-Admin-Key header.",
@@ -134,7 +133,7 @@ async def get_conversations(
 
 @router.get(
     "/conversations/{conversation_id}",
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(auth.require_admin)],
     response_model=ConversationDetail,
     summary="Read one conversation in full",
 )
@@ -161,7 +160,7 @@ async def get_conversation(
 
 @router.post(
     "/conversations/{conversation_id}/redact",
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(auth.require_admin)],
     response_class=JSONResponse,
     summary="Erase the content of one conversation",
     description=(
