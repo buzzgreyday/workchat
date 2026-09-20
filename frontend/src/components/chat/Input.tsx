@@ -27,20 +27,39 @@ export default function ChatInput({
   const shut = loading || disabled;
 
   return (
-    <div className="flex gap-3 border-t border-[var(--chat-border)] p-4">
-      <input
-        className="chat-input h-11 flex-1 rounded-xl px-4 py-3 text-sm transition"
+    <div className="flex items-end gap-3 border-t border-[var(--chat-border)] p-4">
+      <textarea
+        // A textarea rather than an input: a question worth asking a CV often
+        // runs to two sentences, and there was no way to break a line — Enter
+        // sent, and nothing else did anything.
+        rows={1}
+        className="chat-input max-h-32 min-h-11 flex-1 resize-none rounded-xl px-4 py-3 text-sm transition"
         placeholder={
           disabled
             ? (disabledReason ??
               "This link can't start a session")
             : "Ask me about work related stuff..."
         }
+        aria-label="Your question"
         value={value}
         disabled={shut}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+
+          // Grow with the question, up to the max-height above, after which it
+          // scrolls. Reset first or the box can only ever get taller.
+          const box = e.currentTarget;
+          box.style.height = "auto";
+          box.style.height = `${box.scrollHeight}px`;
+        }}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
+          // Enter still sends, because that is what a chat box does. Shift
+          // holds it open for a second line.
+          if (
+            e.key === "Enter" &&
+            !e.shiftKey
+          ) {
+            e.preventDefault();
             onSend();
           }
         }}
@@ -50,7 +69,8 @@ export default function ChatInput({
       <Button
         onClick={() => onSend()}
         disabled={shut}
-        className="chat-accent-solid h-11 w-11 rounded-xl shadow-sm transition hover:brightness-110 disabled:opacity-50"
+        aria-label="Send question"
+        className="chat-accent-solid h-11 w-11 shrink-0 rounded-xl shadow-sm transition hover:brightness-110 disabled:opacity-50"
         >
         <Send size={18} />
       </Button>

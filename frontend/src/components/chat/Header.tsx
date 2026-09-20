@@ -1,8 +1,10 @@
 import { Usage } from "@/types/chat";
+import type { Owner } from "@/lib/owner";
 import { Bot } from "lucide-react";
 
 interface Props {
   usage: Usage | null;
+  owner: Owner;
 }
 
 function GithubIcon() {
@@ -21,7 +23,7 @@ function LinkedinIcon() {
   );
 }
 
-export default function ChatHeader({ usage }: Props) {
+export default function ChatHeader({ usage, owner }: Props) {
   return (
     <div className="chat-header px-6 py-5">
       <div className="flex items-center gap-3">
@@ -31,28 +33,35 @@ export default function ChatHeader({ usage }: Props) {
 
         <div>
           <h1 className="chat-text text-xl font-semibold">
-            Workchat with Michael
+            Workchat with {owner.name}
           </h1>
 
+          {/* A link with no URL configured is left out rather than rendered
+              dead — an owner without a GitHub is not an owner with a broken
+              GitHub link. */}
           <div className="mt-1 flex items-center gap-3">
-            <a
-              href="https://github.com/buzzgreyday"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="chat-text-muted flex items-center gap-1.5 text-sm transition hover:text-[var(--chat-accent)]"
-            >
-              <GithubIcon />
-              GitHub
-            </a>
-            <a
-              href="https://linkedin.com/in/michael-ringdal"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="chat-text-muted flex items-center gap-1.5 text-sm transition hover:text-[var(--chat-accent)]"
-            >
-              <LinkedinIcon />
-              LinkedIn
-            </a>
+            {owner.githubUrl && (
+              <a
+                href={owner.githubUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="chat-text-muted flex items-center gap-1.5 text-sm transition hover:text-[var(--chat-accent)]"
+              >
+                <GithubIcon />
+                GitHub
+              </a>
+            )}
+            {owner.linkedinUrl && (
+              <a
+                href={owner.linkedinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="chat-text-muted flex items-center gap-1.5 text-sm transition hover:text-[var(--chat-accent)]"
+              >
+                <LinkedinIcon />
+                LinkedIn
+              </a>
+            )}
           </div>
         </div>
       </div>

@@ -191,6 +191,12 @@ class Auth:
         v1 mints the access token itself, with `jti` doubling as the grant id.
         v2 mints a claim token instead: same delivery, but all it buys is one
         call to /v2/auth/claim.
+
+        `max_queries` on a v1 token is vestigial: nothing reads it back, because
+        the quota that matters is the one in the grant row and a token cannot
+        count. It stays because the v1 claim set is frozen — those links are in
+        inboxes and on printed QR codes, and a token minted today has to be
+        claim-for-claim what one minted last year was.
         """
         if version == 1:
             return JWT(

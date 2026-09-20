@@ -6,13 +6,19 @@ import ChatInput from "./Input";
 
 import { useChat } from "@/hooks/useChat";
 import { useSession } from "@/hooks/useSession";
+import type { Owner } from "@/lib/owner";
 
 export default function Chat({
   token,
   claim,
+  owner,
 }: {
   token?: string;
   claim?: string;
+  // Read on the server and handed down, not imported: `@/lib/owner` reads the
+  // environment at request time, and importing it here would pull it into the
+  // browser bundle where the value would be frozen at build.
+  owner: Owner;
 }) {
   // Owns the access token and, for a claim link, the one-shot exchange that
   // produces it. Dropping the credential out of the address bar happens in
@@ -33,7 +39,7 @@ export default function Chat({
 
   return (
     <div className="chat-card flex h-[calc(100dvh-2rem)] max-h-175 w-full max-w-4xl flex-col overflow-hidden rounded-3xl shadow-2xl">
-      <ChatHeader usage={usage} />
+      <ChatHeader usage={usage} owner={owner} />
 
       <MessageList messages={messages} />
 

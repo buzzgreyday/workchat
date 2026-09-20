@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { chatService, ChatError } from "@/services/chat.service";
 import { sessionService } from "@/services/session.service";
-import { getUserName } from "@/lib/auth";
+import { getGrantId, getUserName } from "@/lib/auth";
+import {
+  loadConversation,
+  saveConversation,
+} from "@/lib/conversation";
 import { Message, ChatHistoryMessage, Usage } from "@/types/chat";
 import { AuthFetch, SessionStatus } from "@/hooks/useSession";
 
@@ -99,6 +103,50 @@ const NO_LINK_MESSAGE =
   "You'll need the chat link you were sent to start a session. " +
   "If you had one open, it may just have timed out — ask for a new link.";
 
+/**
+ * What the greeting says, and whether it has anything to say yet.
+ *
+ * One function so the seed and the rewrite cannot drift: they are the same
+ * decision made at two moments. An empty `content` with `status: "streaming"`
+ * is what MessageBubble renders as the typing dots — the session is being
+ * opened, and saying "Hi!" to nobody in particular while that happens is worse
+ * than showing that something is underway.
+ */
+function greeting(
+  status: SessionStatus,
+  accessToken: string,
+): Pick<Message, "content" | "status"> {
+  if (status === "spent") {
+    return {
+      content: SPENT_LINK_MESSAGE,
+      status: "complete",
+    };
+  }
+
+  if (status === "error") {
+    return {
+      content: BROKEN_LINK_MESSAGE,
+      status: "complete",
+    };
+  }
+
+  if (status === "none") {
+    return {
+      content: NO_LINK_MESSAGE,
+      status: "complete",
+    };
+  }
+
+  if (!accessToken) {
+    return { content: "", status: "streaming" };
+  }
+
+  return {
+    content: `Hi ${getUserName(accessToken)}! 👋`,
+    status: "complete",
+  };
+}
+
 export function useChat({
   accessToken,
   status,
@@ -108,40 +156,44 @@ export function useChat({
   status: SessionStatus;
   authFetch: AuthFetch;
 }) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: "Hi! 👋",
-      createdAt: new Date(0),
-      status: "complete",
-    },
-  ]);
+  // Lazy, because the seed matters: a claim link spends a round trip before it
+  // knows who the hirer is, and a bare "Hi!" on the first paint that flips to
+  // "Hi Jane!" a moment later reads as a glitch. An empty streaming message is
+  // what MessageBubble already renders as the typing dots, so the greeting
+  // arrives the way every other reply does.
+  const [messages, setMessages] = useState<Message[]>(
+    () => [
+      {
+        id: "welcome",
+        role: "assistant",
+        // accessToken, not "": a v1 link *is* the token, so it is present on
+        // this first render and the hirer should be greeted by name straight
+        // away. Seeding it empty would show them the typing dots for a session
+        // that was never being opened.
+        ...greeting(status, accessToken),
+        createdAt: new Date(0),
+      },
+    ],
+  );
 
   // The greeting can only be personalised once a token exists, and with a claim
   // link that is one round trip after first paint. Telling the hirer their link
   // is spent goes here too — the agent saying it reads better than a banner.
   useEffect(() => {
-    const content =
-      status === "spent"
-        ? SPENT_LINK_MESSAGE
-        : status === "error"
-          ? BROKEN_LINK_MESSAGE
-          : status === "none"
-            ? NO_LINK_MESSAGE
-            : accessToken
-              ? `Hi ${getUserName(accessToken)}! 👋`
-              : "Hi! 👋";
+    const next = greeting(status, accessToken);
 
     setMessages((prev) => {
       // Only ever rewrites the greeting, and only while it is still the only
       // message — once the hirer has asked something, the transcript is theirs.
       const [first, ...rest] = prev;
 
+      // `status` is spread alongside `content`, not left as it was: a greeting
+      // seeded as "streaming" would otherwise keep the typing dots behind its
+      // own text forever.
       return first &&
         rest.length === 0 &&
         first.id === "welcome"
-        ? [{ ...first, content }]
+        ? [{ ...first, ...next }]
         : prev;
     });
   }, [accessToken, status]);
@@ -157,35 +209,87 @@ export function useChat({
 
   const [usage, setUsage] = useState<Usage | null>(null);
 
-  // The allowance, fetched once the session can authenticate. Spends nothing, so
-  // the header can show "5 / 5 questions left" on arrival instead of staying
-  // blank until the first answer comes back.
+  // Which hirer this transcript belongs to. Everything cached below is keyed on
+  // it, so a second link opened in the same tab starts clean rather than
+  // showing the previous one's questions.
+  const grantId = accessToken
+    ? getGrantId(accessToken)
+    : "";
+
+  // Restored in an effect rather than in the useState seeds above, and that is
+  // not a style choice: sessionStorage does not exist while the server renders,
+  // so seeding from it would make the first client render disagree with the
+  // HTML and fail hydration.
+  const restored = useRef(false);
+
+  useEffect(() => {
+    if (restored.current || !grantId) {
+      return;
+    }
+
+    restored.current = true;
+
+    const saved = loadConversation(grantId);
+
+    if (!saved || saved.messages.length === 0) {
+      return;
+    }
+
+    setMessages(saved.messages);
+    setHistory(saved.history);
+    setConversationId(saved.conversationId);
+  }, [grantId]);
+
+  // Ask the server what is left. Spends nothing, which is what /session is for
+  // — so it is safe both on arrival and after a turn that failed without ever
+  // reporting its usage.
+  const refreshUsage = useCallback(async () => {
+    try {
+      const info = await sessionService.get(authFetch);
+      setUsage(info.usage);
+    } catch {
+      // Not worth surfacing: the count is a nicety, and any real problem with
+      // the session shows up the moment a question is asked.
+    }
+  }, [authFetch]);
+
+  // The allowance on arrival, so the header can show "5 / 5 questions left"
+  // instead of staying blank until the first answer comes back.
   useEffect(() => {
     if (status !== "ready" || !accessToken) {
       return;
     }
 
-    let cancelled = false;
-
-    sessionService
-      .get(authFetch)
-      .then((info) => {
-        if (!cancelled) setUsage(info.usage);
-      })
-      .catch(() => {
-        // Not worth surfacing: the count is a nicety, and any real problem with
-        // the session shows up the moment a question is asked.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [status, accessToken, authFetch]);
+    void refreshUsage();
+  }, [status, accessToken, refreshUsage]);
 
   const [input, setInput] = useState("");
 
   const loading =
     messages.at(-1)?.status === "streaming";
+
+  // Written when a turn settles rather than as it streams: keying this on
+  // `loading` means one write per answer instead of one per token, and the
+  // thing worth keeping is the finished turn anyway. `history` stays empty
+  // until the first reply lands, which is what keeps the bare greeting out of
+  // storage.
+  useEffect(() => {
+    if (!grantId || loading || history.length === 0) {
+      return;
+    }
+
+    saveConversation(grantId, {
+      conversationId,
+      history,
+      messages,
+    });
+  }, [
+    grantId,
+    loading,
+    messages,
+    history,
+    conversationId,
+  ]);
 
   // Nothing to send with, so the composer stays shut rather than letting the
   // hirer type a question into a 401 — or into a 429, once the allowance is
@@ -295,8 +399,25 @@ export function useChat({
       }));
     },
 
+    // The turn broke. The backend sends this frame rather than just stopping,
+    // precisely so a failure is distinguishable from a dropped connection —
+    // and it carries a string already fit to show someone.
+    //
+    // Marking the bubble `error` is what unsticks the page: no `done` frame
+    // follows a failure, so a bubble left `streaming` keeps `loading` true and
+    // the composer shut, with no way back except a reload.
     onError(message) {
-      console.error(message);
+      updateLastMessage((current) => ({
+        ...current,
+        content:
+          message || GENERIC_FAILURE_MESSAGE,
+        status: "error",
+      }));
+
+      // The question was already paid for — quota is spent before the model is
+      // called — but usage only rides a `done` frame, so the header is a turn
+      // behind until this puts it right.
+      void refreshUsage();
     },
   },
 );
