@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 from httpx import ASGITransport
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.common.config import get_settings
@@ -77,8 +78,48 @@ def app():
 
 
 @pytest.fixture
-async def engine():
-    eng = create_async_engine("sqlite+aiosqlite:///:memory:")
+async def engine(request, tmp_path):
+    """
+    In memory, unless the test fires requests at once.
+
+    SQLAlchemy serves `:memory:` from a StaticPool — one connection shared by
+    every session in the test, because a second connection to `:memory:` would
+    be a second, empty database. That is fine and fast for a test that makes one
+    request at a time, and wrong for a test that does not: two requests then
+    interleave statements on the same connection, and one commits while the
+    other is mid-statement — "cannot commit transaction, SQL statements in
+    progress". It failed about one run in twelve, on whichever concurrent test
+    lost the toss, and it gates the deploy pipeline.
+
+    `@pytest.mark.concurrent` gives that test a database on disk instead, where
+    each session gets its own connection the way each request gets its own in
+    production. WAL lets a reader and a writer coexist; busy_timeout makes a
+    blocked writer wait for the lock rather than raise at once, which is
+    SQLite's version of what Postgres does with row locks.
+
+    Opt-in rather than the default, because separate connections also mean
+    separate transactions: a test that writes through one session and reads
+    through another would stop seeing its own uncommitted rows. That is more
+    faithful, but it is a different change, and not one to make on the way past.
+    """
+    concurrent = (
+        request.node.get_closest_marker("concurrent")
+        is not None
+    )
+    eng = create_async_engine(
+        f"sqlite+aiosqlite:///{tmp_path / 'test.db'}"
+        if concurrent
+        else "sqlite+aiosqlite:///:memory:"
+    )
+
+    if concurrent:
+        @event.listens_for(eng.sync_engine, "connect")
+        def _sqlite_pragmas(dbapi_connection, _record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=5000")
+            cursor.close()
+
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield eng

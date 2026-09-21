@@ -22,7 +22,11 @@ export default async function Home({
   const owner = readOwner();
 
   return (
-    <main className="chat-page-bg flex min-h-dvh items-center justify-center p-4">
+    // `h-full`, taking the height `html` was given rather than asserting one.
+    // That height is the *visual* viewport where the browser reports it, which
+    // is what keeps the composer above an iOS keyboard; three elements each
+    // naming their own `dvh` is how they drift apart when it changes.
+    <main className="bg-canvas chat-shell flex h-full items-center justify-center">
       <Chat
         token={token}
         claim={claim}

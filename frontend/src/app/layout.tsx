@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist } from "next/font/google";
 
 import { readOwner } from "@/lib/owner";
 import "./globals.css";
@@ -10,10 +10,39 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+/**
+ * Why a viewport export exists at all.
+ *
+ * Next's default meta tag is fine for width and scale, but says nothing about
+ * the two things this page needs on a phone. `colorScheme` tells the browser to
+ * paint its own surfaces — the canvas behind the document, the overscroll area,
+ * the scrollbars — dark; without it they are white, which is what showed under
+ * the chat. `interactiveWidget` asks for the on-screen keyboard to shorten the
+ * layout viewport, so the `dvh` the layout is built on keeps meaning what the
+ * layout assumes it means while someone is typing.
+ *
+ * Deliberately no `maximumScale` / `userScalable: false`. They are the usual
+ * reflex against iOS zooming when a small field takes focus, but they take
+ * pinch-zoom away from everyone; the composer asks for 16px on phones instead,
+ * which fixes the same thing and costs nobody anything.
+ */
+export const viewport: Viewport = {
+  colorScheme: "dark",
+
+  // --chat-bg converted to sRGB, so the browser chrome does not sit a shade
+  // off the page it frames. Hand-converted and hardcoded because a meta tag
+  // cannot read a custom property — if `--chat-bg` moves, this has to move
+  // with it.
+  themeColor: "#0b0d12",
+
+  interactiveWidget: "resizes-content",
+
+  // Paint under the notch and the home indicator. Only safe because
+  // `.chat-shell` pads the content back off them with `env(safe-area-inset-*)`
+  // — and those insets only become non-zero once this is set. Neither half is
+  // any use without the other.
+  viewportFit: "cover",
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   // `await connection()` is not ceremony. A layout uses no request-time API of
@@ -38,9 +67,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      className={`${geistSans.variable} antialiased`}
     >
-      <body className="min-h-dvh flex flex-col">{children}</body>
+      <body className="h-full">{children}</body>
     </html>
   );
 }

@@ -1,6 +1,4 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:8000";
+import { API_URL } from "@/lib/api";
 
 export interface Session {
   access_token: string;

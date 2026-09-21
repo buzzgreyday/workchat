@@ -1,0 +1,7 @@
+Keeps this directory in the checkout.
+
+Dockerfile's `COPY --from=builder /app/public ./public` is unconditional, and
+git does not track empty directories — so removing the last file from here
+would remove the directory, and the image build would fail on a line that has
+nothing to do with whatever was deleted. CI never builds the image, so it would
+have failed at deploy.

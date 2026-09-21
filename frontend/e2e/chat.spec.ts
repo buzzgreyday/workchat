@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 import {
   doneFrame,
-  fakeToken,
   mockBackend,
+  openChat,
 } from "./backend";
 
 async function ask(
@@ -29,7 +29,7 @@ test("a reply is streamed into the transcript", async ({
     ],
   });
 
-  await page.goto(`/?token=${fakeToken()}`);
+  await openChat(page);
   await ask(page, "What does he do?");
 
   await expect(
@@ -61,7 +61,7 @@ test("a failed reply says so, and the composer recovers", async ({
     ],
   });
 
-  await page.goto(`/?token=${fakeToken()}`);
+  await openChat(page);
   await ask(page, "What does he do?");
 
   await expect(
@@ -123,7 +123,7 @@ test("the allowance is re-read after a failure, since the question was still spe
     });
   });
 
-  await page.goto(`/?token=${fakeToken()}`);
+  await openChat(page);
   await expect(
     page.getByText("4 / 5 questions left"),
   ).toBeVisible();
@@ -145,7 +145,7 @@ test("Shift+Enter writes a second line instead of sending", async ({
 
   await mockBackend(page, { requests });
 
-  await page.goto(`/?token=${fakeToken()}`);
+  await openChat(page);
 
   const composer = page.getByLabel(
     "Your question",

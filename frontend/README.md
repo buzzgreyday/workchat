@@ -3,9 +3,24 @@
 The chat page a hiring manager lands on. Next.js App Router, one route, talking
 to the FastAPI backend in `../backend`.
 
-Most of the app is `src/hooks/useSession.ts`, which owns the access token and
-how it is renewed, and `src/hooks/useChat.ts`, which owns the transcript. The
-components under `src/components/chat/` render what those two decide.
+`src/hooks/useSession.ts` owns the access token and how it is renewed.
+Everything else is split by what it knows:
+
+| where | what it knows |
+|---|---|
+| `src/lib/copy.ts` | every string the app says to a person, and nothing else |
+| `src/lib/failure.ts` | which failure deserves which of those strings |
+| `src/lib/greeting.ts` | what the greeting says, given a session status |
+| `src/lib/transcript.ts` | the transcript reducer — what may happen to a message |
+| `src/hooks/useChat.ts` | orchestration of one turn, and only that |
+| `src/hooks/use{Transcript,Usage,ConversationMemory}.ts` | one concern each |
+| `src/components/chat/ChatProvider.tsx` | two contexts, so a streamed token re-renders the transcript and not the composer |
+| `src/app/globals.css` | **the whole visual scheme** — colour, type, spacing, radius. To restyle the app, you should not need to read past `@layer base` |
+
+The first four are pure — no React, no fetch — which is what makes them
+readable without a renderer in your head. The components under
+`src/components/chat/` read what they need from the provider rather than being
+handed it.
 
 ## Running it
 
@@ -20,8 +35,15 @@ npm run dev          # http://localhost:3000
 ```
 
 You will need `NEXT_PUBLIC_API_URL` pointing at a backend, and a link with a
-`?token=` or `?claim=` on it; without a credential the page says so rather than
-showing a chat box.
+`?claim=` on it; without a credential the page says so rather than showing a
+chat box.
+
+`?token=` — the v1 shape, where the link carries the access token itself — is
+still accepted, because those links are in inboxes and cannot be reissued. It
+is on its way out: a URL is copied into browser histories, sent as a referrer
+and written to every proxy log on the way, which is not where a credential
+belongs. `e2e/legacy.spec.ts` is the only place the suite still drives it, and
+should be deleted when the last of those links expires.
 
 ## Tests
 
@@ -49,6 +71,11 @@ What they cover, and why each one exists:
 | `reload.spec.ts` | F5 kept the session but lost the conversation, and split the transcript in two |
 | `greeting.spec.ts` | "Hi! 👋" addressed to nobody while a claim link was being exchanged |
 | `owner.spec.ts` | the header named the author, and could only be changed by rebuilding the image |
+| `mobile.spec.ts` | a white band under the chat on a phone, and a composer that scrolled before anything was typed |
+| `session.spec.ts` | four of `useSession`'s five statuses had no test at all — a spent link, a broken one, no link, and a token that expires mid-visit |
+| `viewport.spec.ts` | `dvh` is the layout viewport, which iOS does not shrink for the keyboard |
+| `theme.spec.ts` | the background colour exists twice, once as CSS and once as a `<meta>` literal |
+| `legacy.spec.ts` | the `?token=` links still in inboxes — delete with them |
 
 Browsers are not installed by `npm install`:
 
@@ -56,7 +83,11 @@ Browsers are not installed by `npm install`:
 npx playwright install chromium
 ```
 
-Only chromium. These are behaviour tests, not a compatibility matrix.
+Only chromium. These are behaviour tests, not a compatibility matrix — the
+`mobile` project is a Pixel 5 *viewport*, which is a chromium device
+descriptor, so it needs no second browser. `mobile.spec.ts` makes claims that
+are only true at phone width and is skipped on the desktop project; everything
+else runs on both.
 
 ## Configuration
 

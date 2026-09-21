@@ -45,6 +45,77 @@ export function fakeToken({
   return `${header}.${payload}.not-a-real-signature`;
 }
 
+/**
+ * A genuinely v1-shaped token: `jti`, and no `ver`.
+ *
+ * Deliberately separate from `fakeToken`. That one mints the *v2* access token
+ * the mocked `/v2/auth` routes hand back — and handing it in as `?token=`,
+ * which is what every spec used to do, meant the suite never once saw a real
+ * v1 claim set. `getGrantId`'s `claims.jti` fallback (src/lib/auth.ts) has
+ * therefore never run in a test, despite eighteen of them calling themselves
+ * v1.
+ */
+export function legacyToken({
+  sub = "Ada Lovelace",
+  grantId = "legacy-grant-1",
+}: {
+  sub?: string;
+  grantId?: string;
+} = {}): string {
+  const encode = (value: object) =>
+    Buffer.from(JSON.stringify(value))
+      .toString("base64url");
+
+  const header = encode({
+    alg: "HS256",
+    typ: "JWT",
+  });
+
+  // No `ver`, no `tid`, no `sid`: the absence of `ver` is precisely what marks
+  // a token as v1, and `jti` is both the token id and the grant.
+  const payload = encode({
+    sub,
+    jti: grantId,
+    exp:
+      Math.floor(Date.now() / 1000) + 604_800,
+  });
+
+  return `${header}.${payload}.not-a-real-signature`;
+}
+
+/**
+ * A promise a route can wait on, so a state that is normally a race becomes
+ * something a test can stand still and look at.
+ */
+export function gate(): {
+  held: Promise<void>;
+  release: () => void;
+} {
+  let release: () => void = () => {};
+
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  return { held, release };
+}
+
+/**
+ * How many times each auth route was called.
+ *
+ * Several things worth asserting are invisible on screen — that a v1 link
+ * never attempts an exchange, that one 401 causes exactly one refresh, that a
+ * 409 is retried once. Counting is the only way to see them.
+ */
+export interface AuthCalls {
+  claim: number;
+  refresh: number;
+}
+
+export function authCalls(): AuthCalls {
+  return { claim: 0, refresh: 0 };
+}
+
 export function sse(
   ...frames: object[]
 ): string {
@@ -100,6 +171,23 @@ export function replyWith(
   ];
 }
 
+/** How `/v2/auth/claim` answers. */
+export type ClaimBehaviour =
+  // Exchanged for a session.
+  | "ok"
+  // Single use, and this is the second. 409 — only a new link helps.
+  | "spent"
+  // Anything else that means no session came back.
+  | "error";
+
+/** How `/v2/auth/refresh` answers. */
+export type RefreshBehaviour =
+  | "ok"
+  // No cookie, or a dead one: there is no way back in from here.
+  | "gone"
+  // Another tab rotated first. The client is expected to retry once and win.
+  | "conflictOnce";
+
 export interface BackendOptions {
   sub?: string;
   grantId?: string;
@@ -109,6 +197,14 @@ export interface BackendOptions {
   stream?: object[];
   /** Bodies sent to /chat/stream, in order, for assertions. */
   requests?: Array<Record<string, unknown>>;
+  /** Default "ok". The failing shapes are what reach `spent` and `error`. */
+  claim?: ClaimBehaviour;
+  /** Default "ok". "gone" is what a visitor with no link at all sees. */
+  refresh?: RefreshBehaviour;
+  /** Awaited before the claim is fulfilled, to hold the loading state open. */
+  holdClaim?: Promise<void>;
+  /** Bumped per auth call, for the assertions no screen can show. */
+  calls?: AuthCalls;
 }
 
 export async function mockBackend(
@@ -122,6 +218,10 @@ export async function mockBackend(
     max = 5,
     stream,
     requests,
+    claim = "ok",
+    refresh = "ok",
+    holdClaim,
+    calls,
   } = options;
 
   const token = fakeToken({ sub, grantId });
@@ -137,13 +237,81 @@ export async function mockBackend(
       }),
     });
 
+  /** The domain error shape the backend's exception handler produces. */
+  const refuse = (
+    route: Route,
+    status: number,
+    detail: string,
+  ) =>
+    route.fulfill({
+      status,
+      contentType: "application/json",
+      body: JSON.stringify({ detail }),
+    });
+
   await page.route(
     "**/v2/auth/claim",
-    session,
+    async (route) => {
+      if (calls) {
+        calls.claim += 1;
+      }
+
+      // Held open so a test can watch the page while the exchange is still in
+      // flight — the window the greeting used to get wrong.
+      if (holdClaim) {
+        await holdClaim;
+      }
+
+      if (claim === "spent") {
+        return refuse(
+          route,
+          409,
+          "This link has already been used. Ask for a new one.",
+        );
+      }
+
+      if (claim === "error") {
+        return refuse(
+          route,
+          500,
+          "Internal server error",
+        );
+      }
+
+      return session(route);
+    },
   );
+
   await page.route(
     "**/v2/auth/refresh",
-    session,
+    (route) => {
+      const attempt = calls
+        ? (calls.refresh += 1)
+        : 1;
+
+      if (refresh === "gone") {
+        return refuse(
+          route,
+          401,
+          "Missing refresh token",
+        );
+      }
+
+      // One 409 then success: another tab rotated first, which the client is
+      // expected to absorb with a single retry rather than treat as a replay.
+      if (
+        refresh === "conflictOnce" &&
+        attempt === 1
+      ) {
+        return refuse(
+          route,
+          409,
+          "Rotation in progress",
+        );
+      }
+
+      return session(route);
+    },
   );
 
   await page.route("**/session", (route) =>
@@ -185,4 +353,54 @@ export async function mockBackend(
       });
     },
   );
+}
+
+/** The claim token a v2 link carries, unless a test needs a second one. */
+export const CLAIM = "a-claim-token";
+
+/**
+ * Open the page the way a hirer actually does.
+ *
+ * `?claim=` — the link carries a single-use claim token, which the page
+ * exchanges for an access token held in memory plus a refresh cookie it cannot
+ * read. The whole suite used to open `?token=` instead, putting the access
+ * token itself in the URL: the v1 shape, which is being retired precisely
+ * because a URL is copied into histories, referrers and logs.
+ */
+export async function openChat(
+  page: Page,
+  { claim = CLAIM }: { claim?: string } = {},
+): Promise<void> {
+  await page.goto(
+    `/?claim=${encodeURIComponent(claim)}`,
+  );
+}
+
+/**
+ * Open a legacy v1 link. Only `legacy.spec.ts` should reach for this.
+ */
+export async function openLegacyChat(
+  page: Page,
+  token: { sub?: string; grantId?: string } = {},
+): Promise<void> {
+  await page.goto(
+    `/?token=${legacyToken(token)}`,
+  );
+}
+
+/**
+ * Wait until the session is open.
+ *
+ * A v1 link was the access token, so the page was usable on its first paint.
+ * A claim link is one round trip short of that, and a spec that means "once
+ * the session is open" should say so rather than lean on Playwright's
+ * actionability timeout to paper over the difference.
+ */
+export async function waitForReady(
+  page: Page,
+): Promise<void> {
+  await page
+    .getByLabel("Your question")
+    .and(page.locator(":not([disabled])"))
+    .waitFor({ state: "visible" });
 }

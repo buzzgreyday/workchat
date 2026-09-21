@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 import {
-  fakeToken,
   mockBackend,
+  openChat,
   replyWith,
 } from "./backend";
 
@@ -13,6 +13,12 @@ import {
  * cost the hirer their single-use link. The conversation used to be dropped
  * anyway: the agent lost every turn of context, and the backend — handed a
  * null conversation id — opened a second row for the same person.
+ *
+ * Worth knowing about the reload itself: the credential is stripped from the
+ * URL once it is spent, so F5 has *always* landed on the cookie-resume branch
+ * — even back when these tests opened a v1 link. What the move to `?claim=`
+ * fixes is the first load, which used to exercise a path being retired. The
+ * assertions below were never affected either way.
  */
 
 test("the transcript and the conversation survive a reload", async ({
@@ -28,7 +34,7 @@ test("the transcript and the conversation survive a reload", async ({
     }),
   });
 
-  await page.goto(`/?token=${fakeToken()}`);
+  await openChat(page);
 
   const composer = page.getByLabel(
     "Your question",
@@ -79,9 +85,10 @@ test("a different link in the same tab does not inherit the last one's transcrip
     ),
   });
 
-  await page.goto(
-    `/?token=${fakeToken({ grantId: "grant-1", sub: "Ada Lovelace" })}`,
-  );
+  // A claim of its own per hirer: the mock keys the token it hands back on
+  // the grant configured above, and the point of the test is that the two
+  // transcripts never meet.
+  await openChat(page, { claim: "claim-ada" });
 
   const composer = page.getByLabel(
     "Your question",
@@ -106,9 +113,9 @@ test("a different link in the same tab does not inherit the last one's transcrip
     sub: "Grace Hopper",
   });
 
-  await page.goto(
-    `/?token=${fakeToken({ grantId: "grant-2", sub: "Grace Hopper" })}`,
-  );
+  await openChat(page, {
+    claim: "claim-grace",
+  });
 
   await expect(
     page.getByText("Hi Grace Hopper! 👋"),

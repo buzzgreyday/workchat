@@ -3,9 +3,8 @@
 import ChatHeader from "./Header";
 import MessageList from "./MessageList";
 import ChatInput from "./Input";
+import { ChatProvider } from "./ChatProvider";
 
-import { useChat } from "@/hooks/useChat";
-import { useSession } from "@/hooks/useSession";
 import type { Owner } from "@/lib/owner";
 
 export default function Chat({
@@ -20,37 +19,30 @@ export default function Chat({
   // browser bundle where the value would be frozen at build.
   owner: Owner;
 }) {
-  // Owns the access token and, for a claim link, the one-shot exchange that
-  // produces it. Dropping the credential out of the address bar happens in
-  // there too — after the exchange settles, so a reload before it lands can
-  // still retry rather than finding an empty URL.
-  const session = useSession({ token, claim });
-
-  const {
-    messages,
-    input,
-    loading,
-    disabled,
-    disabledReason,
-    usage,
-    setInput,
-    sendMessage,
-  } = useChat(session);
-
+  // Nothing is threaded through here any more. The three children read what
+  // they each need from the provider, so adding something to the composer no
+  // longer means touching a component that only ever passed it along.
+  //
+  // `h-full` rather than repeating the viewport arithmetic: the shell is one
+  // viewport tall and owns the padding, so the card just fills what it is
+  // given. Two places subtracting the same 2rem is how the two drift apart.
+  //
+  // `sm:max-h-175` rather than `max-h-175`: the 700px cap sits below a modern
+  // phone's viewport, so applying it everywhere left a band of dead background
+  // above and below the card on exactly the screens with least to spare.
   return (
-    <div className="chat-card flex h-[calc(100dvh-2rem)] max-h-175 w-full max-w-4xl flex-col overflow-hidden rounded-3xl shadow-2xl">
-      <ChatHeader usage={usage} owner={owner} />
+    <ChatProvider
+      token={token}
+      claim={claim}
+      owner={owner}
+    >
+      <div className="bg-panel border-line flex h-full w-full max-w-chat flex-col overflow-hidden rounded-card border shadow-2xl sm:max-h-[var(--card-max-height)]">
+        <ChatHeader />
 
-      <MessageList messages={messages} />
+        <MessageList />
 
-      <ChatInput
-        value={input}
-        loading={loading}
-        disabled={disabled}
-        disabledReason={disabledReason}
-        onChange={setInput}
-        onSend={sendMessage}
-      />
-    </div>
+        <ChatInput />
+      </div>
+    </ChatProvider>
   );
 }

@@ -1,49 +1,37 @@
 import { expect, test } from "@playwright/test";
 
-import { fakeToken, mockBackend } from "./backend";
+import {
+  gate,
+  mockBackend,
+  openChat,
+} from "./backend";
 
 /**
  * What the page says before it knows who is reading.
  *
- * A v1 link *is* the access token, so the hirer can be greeted on the first
- * paint. A claim link costs a round trip first, and the greeting used to fill
- * that gap with a bare "Hi! 👋" addressed to nobody, then flip to their name.
+ * A claim link costs a round trip before it knows the hirer's name, and the
+ * greeting used to fill that gap with a bare "Hi! 👋" addressed to nobody,
+ * then flip to their name once the exchange landed.
+ *
+ * The v1 half of this — a link that *is* the token, so the greeting lands on
+ * the first paint — moved to `legacy.spec.ts` with the rest of `?token=`.
  */
 
 test("a claim link shows it is working, then greets by name", async ({
   page,
 }) => {
   // Hold the exchange open so the loading state is observable rather than a
-  // race — this is precisely the window the greeting used to get wrong.
-  let release: () => void = () => {};
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  // race — this is precisely the window the greeting used to get wrong. This
+  // used to be hand-rolled here, re-declaring the whole session response body
+  // just to delay it; the mock takes the promise now.
+  const { held, release } = gate();
 
   await mockBackend(page, {
     sub: "Grace Hopper",
+    holdClaim: held,
   });
 
-  await page.route(
-    "**/v2/auth/claim",
-    async (route) => {
-      await held;
-
-      await route.fulfill({
-        contentType: "application/json",
-        body: JSON.stringify({
-          access_token: fakeToken({
-            sub: "Grace Hopper",
-          }),
-          token_type: "bearer",
-          expires_in: 900,
-          refresh_expires_in: 604800,
-        }),
-      });
-    },
-  );
-
-  await page.goto("/?claim=a-claim-token");
+  await openChat(page);
 
   await expect(
     page.getByLabel("Generating a reply"),
@@ -63,33 +51,4 @@ test("a claim link shows it is working, then greets by name", async ({
   await expect(
     page.getByLabel("Generating a reply"),
   ).toHaveCount(0);
-});
-
-test("a v1 link greets immediately, with no thinking state", async ({
-  page,
-}) => {
-  await mockBackend(page, { sub: "Alan Turing" });
-
-  await page.goto(
-    `/?token=${fakeToken({ sub: "Alan Turing" })}`,
-  );
-
-  await expect(
-    page.getByText("Hi Alan Turing! 👋"),
-  ).toBeVisible();
-  await expect(
-    page.getByLabel("Generating a reply"),
-  ).toHaveCount(0);
-});
-
-test("the credential does not survive in the address bar", async ({
-  page,
-}) => {
-  await mockBackend(page);
-
-  await page.goto(`/?token=${fakeToken()}`);
-
-  await expect(page).toHaveURL(
-    (url) => !url.search.includes("token"),
-  );
 });
