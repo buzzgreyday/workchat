@@ -1,57 +1,60 @@
 import { Send } from "lucide-react";
 
 import { Button } from "../ui/button";
+import { useControls } from "./ChatProvider";
+import { useAutoResize } from "@/hooks/useAutoResize";
+import { COMPOSER_PLACEHOLDER, NO_SESSION } from "@/lib/copy";
 
-interface ChatInputProps {
-  value: string;
-  loading: boolean;
-  // No usable session — an unopened claim link, one already spent, or an
-  // allowance that has run out. Separate from `loading` because it does not
-  // clear on its own.
-  disabled?: boolean;
-  // Why it is shut, shown in place of the prompt. Running out of questions and
-  // never having had a session are both dead ends, but not the same one.
-  disabledReason?: string | null;
-  onChange: (value: string) => void;
-  onSend: () => void;
-}
+export default function ChatInput() {
+  const {
+    input,
+    loading,
+    // No usable session — an unopened claim link, one already spent, or an
+    // allowance that has run out. Separate from `loading` because it does not
+    // clear on its own.
+    disabled,
+    // Why it is shut, shown in place of the prompt. Running out of questions
+    // and never having had a session are both dead ends, but not the same one.
+    disabledReason,
+    setInput,
+    sendMessage,
+  } = useControls();
 
-export default function ChatInput({
-  value,
-  loading,
-  disabled = false,
-  disabledReason,
-  onChange,
-  onSend,
-}: ChatInputProps) {
   const shut = loading || disabled;
 
+  const boxRef = useAutoResize(input);
+
   return (
-    <div className="flex items-end gap-3 border-t border-[var(--chat-border)] p-4">
+    <div className="border-line flex items-end gap-3 border-t p-gutter-sm">
       <textarea
         // A textarea rather than an input: a question worth asking a CV often
         // runs to two sentences, and there was no way to break a line — Enter
         // sent, and nothing else did anything.
+        ref={boxRef}
         rows={1}
-        className="chat-input max-h-32 min-h-11 flex-1 resize-none rounded-xl px-4 py-3 text-sm transition"
+        // `text-body` is 16px and `text-meta` is 14px. The pair is not a style
+        // choice: under 16px iOS zooms the page the moment the field takes
+        // focus and does not zoom back out, which leaves the layout offset
+        // behind the keyboard and looks exactly like the chat having broken.
+        // Desktop keeps the 14px it always had.
+        className="chat-field bg-panel-raised border-line text-ink placeholder:text-ink-muted max-h-composer-max min-h-control flex-1 resize-none rounded-control border px-4 py-3 text-body transition sm:text-meta"
+        // Short on purpose, all three of them. A textarea soft-wraps, so a
+        // placeholder wider than the box wraps to a second line inside a
+        // one-row field and the composer scrolls before anything is typed.
+        // The long version of why the chat is shut is already in the
+        // transcript, where there is room for it.
         placeholder={
           disabled
-            ? (disabledReason ??
-              "This link can't start a session")
-            : "Ask me about work related stuff..."
+            ? (disabledReason ?? NO_SESSION)
+            : COMPOSER_PLACEHOLDER
         }
         aria-label="Your question"
-        value={value}
+        value={input}
         disabled={shut}
-        onChange={(e) => {
-          onChange(e.target.value);
-
-          // Grow with the question, up to the max-height above, after which it
-          // scrolls. Reset first or the box can only ever get taller.
-          const box = e.currentTarget;
-          box.style.height = "auto";
-          box.style.height = `${box.scrollHeight}px`;
-        }}
+        // Growing with the question is `useAutoResize`'s job now — keyed on the
+        // value, so clearing on send shrinks the box back instead of leaving it
+        // standing at the height of a question already asked.
+        onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {
           // Enter still sends, because that is what a chat box does. Shift
           // holds it open for a second line.
@@ -60,17 +63,17 @@ export default function ChatInput({
             !e.shiftKey
           ) {
             e.preventDefault();
-            onSend();
+            sendMessage();
           }
         }}
       />
 
 
       <Button
-        onClick={() => onSend()}
+        onClick={() => sendMessage()}
         disabled={shut}
         aria-label="Send question"
-        className="chat-accent-solid h-11 w-11 shrink-0 rounded-xl shadow-sm transition hover:brightness-110 disabled:opacity-50"
+        className="size-control shrink-0 rounded-control shadow-sm"
         >
         <Send size={18} />
       </Button>

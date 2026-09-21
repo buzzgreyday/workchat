@@ -1,11 +1,6 @@
-import { Usage } from "@/types/chat";
-import type { Owner } from "@/lib/owner";
 import { Bot } from "lucide-react";
 
-interface Props {
-  usage: Usage | null;
-  owner: Owner;
-}
+import { useControls } from "./ChatProvider";
 
 function GithubIcon() {
   return (
@@ -23,16 +18,18 @@ function LinkedinIcon() {
   );
 }
 
-export default function ChatHeader({ usage, owner }: Props) {
+export default function ChatHeader() {
+  const { usage, owner } = useControls();
+
   return (
-    <div className="chat-header px-6 py-5">
+    <div className="bg-panel border-line border-b px-gutter-lg py-gutter">
       <div className="flex items-center gap-3">
-        <div className="chat-avatar flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm">
+        <div className="bg-accent text-on-accent flex size-10 shrink-0 items-center justify-center rounded-full shadow-sm">
           <Bot size={20} />
         </div>
 
         <div>
-          <h1 className="chat-text text-xl font-semibold">
+          <h1 className="text-ink text-title">
             Workchat with {owner.name}
           </h1>
 
@@ -45,7 +42,7 @@ export default function ChatHeader({ usage, owner }: Props) {
                 href={owner.githubUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="chat-text-muted flex items-center gap-1.5 text-sm transition hover:text-[var(--chat-accent)]"
+                className="text-ink-muted hover:text-accent flex items-center gap-1.5 text-meta transition"
               >
                 <GithubIcon />
                 GitHub
@@ -56,7 +53,7 @@ export default function ChatHeader({ usage, owner }: Props) {
                 href={owner.linkedinUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="chat-text-muted flex items-center gap-1.5 text-sm transition hover:text-[var(--chat-accent)]"
+                className="text-ink-muted hover:text-accent flex items-center gap-1.5 text-meta transition"
               >
                 <LinkedinIcon />
                 LinkedIn
@@ -67,7 +64,7 @@ export default function ChatHeader({ usage, owner }: Props) {
       </div>
 
       {usage && (
-        <span className="chat-badge mt-3 inline-block rounded-full px-3 py-1 text-xs font-medium shadow-sm">
+        <span className="bg-panel-raised text-ink-muted mt-3 inline-block rounded-full px-3 py-1 text-micro shadow-sm">
           {usage.remaining} / {usage.max} questions left
         </span>
       )}
