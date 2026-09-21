@@ -8,16 +8,6 @@ interface JwtClaims {
   jti?: string;
 }
 
-export function getToken(): string {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  return (
-    new URLSearchParams(window.location.search).get("token") ?? ""
-  );
-}
-
 /**
  * Which grant this token belongs to.
  *
