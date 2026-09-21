@@ -11,6 +11,12 @@ tracked independently._
 
 ### Fixed
 
+- Resizing bug on mobile.
+
+## [0.7.0] - 2026-09-21
+
+### Fixed
+
 - The Geist font now actually applies. It was declared as
   `--font-sans: var(--font-sans)` — a custom property referring to itself,
   which is a dependency cycle, so it computed to the guaranteed-invalid value.
