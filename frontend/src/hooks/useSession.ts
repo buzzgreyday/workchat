@@ -13,20 +13,19 @@ import {
   Session,
 } from "@/services/auth.service";
 
-export type SessionStatus =
-  | "loading"
-  | "ready"
-  // The claim link was already spent. Single use, so only a new link helps.
-  | "spent"
-  // A credential was presented and could not be turned into a session.
-  | "error"
-  // No credential at all, and no cookie left to resume from.
-  | "none";
+import type {
+  AuthFetch,
+  SessionStatus,
+} from "@/types/session";
 
-export type AuthFetch = (
-  input: string,
-  init?: RequestInit,
-) => Promise<Response>;
+// Re-exported because this is where the rest of the app has always imported
+// them from, and moving the declaration is not a reason to make every caller
+// move with it. `export type`, not a bare re-export: `isolatedModules` cannot
+// tell a type from a value across a module boundary otherwise.
+export type {
+  AuthFetch,
+  SessionStatus,
+};
 
 /**
  * Strip the credential out of the address bar.

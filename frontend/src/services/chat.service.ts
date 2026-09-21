@@ -4,7 +4,8 @@ import {
   Usage,
 } from "@/types/chat";
 import { SSEEvent } from "@/types/sse";
-import { AuthFetch } from "@/hooks/useSession";
+import { API_URL } from "@/lib/api";
+import type { AuthFetch } from "@/types/session";
 
 /**
  * A failed chat request, with enough detail to say something true about it.
@@ -68,9 +69,6 @@ async function toError(
   );
 }
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:8000";
 
 // Takes an authFetch rather than a bearer string because with v2 the right
 // token is not knowable at call time: the one held when a request starts may
