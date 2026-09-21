@@ -38,6 +38,19 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+    // A phone, because every fault this project exists to catch is one that a
+    // 1280px window cannot show: a document 2rem taller than the screen, a
+    // white canvas behind it, a placeholder that wraps inside a one-row box.
+    // All three shipped, and the desktop suite passed the whole time.
+    //
+    // Pixel 5 is a chromium descriptor, so this costs no second browser
+    // download — `playwright install chromium` in CI already covers it, and
+    // the suite stays what the README says it is rather than turning into a
+    // compatibility matrix.
+    {
+      name: "mobile",
+      use: { ...devices["Pixel 5"] },
+    },
   ],
 
   webServer: {

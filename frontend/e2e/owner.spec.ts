@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { fakeToken, mockBackend } from "./backend";
+import { mockBackend, openChat } from "./backend";
 
 /**
  * Whose CV this is, read from the running server's environment.
@@ -15,7 +15,7 @@ test("the header and the tab name the configured owner", async ({
   page,
 }) => {
   await mockBackend(page);
-  await page.goto(`/?token=${fakeToken()}`);
+  await openChat(page);
 
   await expect(
     page.getByRole("heading", {
@@ -32,7 +32,7 @@ test("a configured link is followed, and an empty one is not rendered", async ({
   page,
 }) => {
   await mockBackend(page);
-  await page.goto(`/?token=${fakeToken()}`);
+  await openChat(page);
 
   await expect(
     page.getByRole("link", { name: "GitHub" }),
