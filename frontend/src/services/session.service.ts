@@ -1,9 +1,7 @@
-import { AuthFetch } from "@/hooks/useSession";
+import { API_URL } from "@/lib/api";
+import type { AuthFetch } from "@/types/session";
 import { Usage } from "@/types/chat";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:8000";
 
 export interface SessionInfo {
   subject: string;

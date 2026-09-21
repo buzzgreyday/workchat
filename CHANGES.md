@@ -7,6 +7,144 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.7.0] - 2026-09-21
+
+### Fixed
+
+- The Geist font now actually applies. It was declared as
+  `--font-sans: var(--font-sans)` — a custom property referring to itself,
+  which is a dependency cycle, so it computed to the guaranteed-invalid value.
+  The rule that read it carried no fallback, and an invalid value on an
+  inherited property means `inherit`; the root element has no parent, so it
+  landed on whatever font the browser starts with. Geist was downloaded on
+  every page load and thrown away, and the compiled stylesheet never once
+  mentioned it. Geist Mono was being preloaded on top of that and no rule ever
+  referred to it at all; it has been removed rather than fixed.
+
+- The composer stays above the on-screen keyboard on iOS. The previous fix
+  asked the browser to shorten the layout viewport when a keyboard opens, which
+  Chromium honours and Safari ignores — Safari shrinks only the *visual*
+  viewport and scrolls to reach the focused field, and since the document can
+  no longer scroll there was nowhere for it to go. The height is now measured
+  from the visual viewport, which is the one number both engines report
+  honestly, and published as a custom property so a keyboard animation does not
+  re-render the transcript sixty times a second. A pinch-zoom shrinks that
+  measurement too, so zooming is excluded: matching it would crop the chat to
+  whatever slice of the page was on screen.
+
+- The chat no longer shows a band of white below itself on a phone. Three
+  things were true at once and only together did they produce it: the shadcn
+  `--background` token was pure white and `body` painted with it, the root
+  element painted nothing at all — and the root is what the browser propagates
+  to the viewport canvas, which is the surface an overscroll drags into view —
+  and nothing declared a `color-scheme`, so the scrollbars, the caret and the
+  fill behind a rubber-band were all drawn for a light page regardless. The two
+  canvas tokens now point at the chat's own background, the root paints it, and
+  `color-scheme: dark` covers the surfaces no background can reach.
+
+- The keyboard no longer pushes the page somewhere it does not paint. There was
+  no viewport declaration at all, so the layout viewport stayed a full screen
+  tall when the keyboard opened; the composer ended up behind it and the browser
+  scrolled the document to reach it. `interactive-widget=resizes-content` asks
+  for the layout to shrink instead, so `dvh` keeps meaning what the layout
+  assumes it means. Document scrolling is now impossible rather than merely
+  unlikely, which is what makes the fix hold on a browser that ignores the hint.
+
+- The composer no longer scrolls before anything has been typed. Its placeholder
+  was long enough to wrap, and a placeholder is laid out inside the box, so a
+  one-row `textarea` became two rows tall and scrollable while still empty. All
+  three placeholders are now short enough to fit, and a test asserts it for each
+  of them rather than for the one that was reported.
+
+- The composer shrinks back after a multi-line question is sent. Its height was
+  written from inside `onChange`, which is the one moment the value changes
+  because someone typed — sending clears it through state with no keystroke
+  behind it, so the box kept the height of the question that had just left it.
+  It follows the value now, so every route to a new one resizes.
+
+- The composer asks for 16px on a phone. Below that, iOS Safari zooms the page
+  when the field takes focus and does not zoom back out, which leaves the layout
+  offset behind the keyboard and looks exactly like the chat having broken.
+  Desktop keeps the 14px it always had. The alternative — disabling zoom in the
+  viewport meta — would have fixed it by taking pinch-zoom away from everyone.
+
+- The card is no longer capped below a phone's viewport. A flat 700px maximum
+  left a band of dead background above and below the chat on exactly the screens
+  with least room to spare; the cap now applies from the `sm` breakpoint up.
+
+### Changed
+
+- The whole visual scheme lives in one place. Colour, type, spacing and radius
+  were spread across sixty-odd unnamed utilities in six components, with three
+  literal `white`s and one stray `bg-slate-400` outside the token system
+  entirely, and three adjacent panels of one card carrying three different
+  paddings that nobody could tell apart from drift. They are named by role now
+  — `canvas`, `panel`, `ink`, `accent`, `title`, `body`, `gutter`, `control` —
+  and a restyle is an edit to the top of one stylesheet.
+
+- The send button renders its own colour. It used to be painted by a custom
+  class layered over a Button that was simultaneously painting itself from the
+  stock shadcn palette; the one that won was decided by CSS layer ordering
+  rather than by anything written down, and the class was invisible to the
+  merge step that is supposed to resolve exactly that. The palette the Button
+  reads now *is* this app's palette, so the override is gone rather than
+  refereed.
+
+- The end-to-end suite drives `?claim=` links. Eighteen of its nineteen
+  navigations used `?token=`, the v1 shape being retired because it carries the
+  access token in the URL — so the coverage was aimed at the path that is going
+  away while the one that stays had a single happy-path test. Four of
+  `useSession`'s five statuses had no test at all; they do now, along with the
+  token refresh, the rotation conflict that has to be retried, and the claim
+  being stripped from the address bar.
+
+- The `?token=` tests that remain say so. They are in `e2e/legacy.spec.ts`,
+  every title prefixed `legacy:`, with a note to delete the file when the last
+  of those links expires. One of them covers something no test ever has: a
+  genuinely v1-shaped token. The suite's fake token has always carried v2
+  claims, so the fallback that reads the grant from `jti` had never run.
+
+- The frontend is split by what each piece knows. `useChat` was 462 lines and
+  owned the copy, the error-to-copy mapping, the greeting, the transcript, the
+  persistence, the allowance, the composer's state and the streaming all at
+  once; it is 200 lines of orchestration now. What the app says to a person is
+  in one file that imports nothing. The transcript is a reducer, so "what may
+  happen to a message" is a list of seven things rather than four closures
+  spread through a send path. The allowance, the stored conversation and the
+  greeting each have a hook. None of this changes what the page does — the
+  behaviour suite that guards it did not change either.
+
+- The chat's parts read what they need instead of being handed it. Two contexts
+  rather than one, deliberately: the transcript changes on every streamed token,
+  and a single context would have re-rendered the header and the composer once
+  per token for the length of every reply — worse than the prop-drilling it
+  replaced.
+
+- The service layer no longer imports from the hook layer. `AuthFetch` and
+  `SessionStatus` were declared inside `useSession`, so two services and every
+  pure module had to reach into a React hook to name them; they are types in
+  `src/types/session.ts` now. The backend's URL was written out three times and
+  is written once.
+
+- Playwright runs a phone as well as a desktop. Every fault above is invisible
+  at 1280px and obvious at 393px, and the existing suite passed throughout. The
+  new project is a chromium device descriptor, so CI needs no second browser.
+
+### Removed
+
+- Around seventy dead custom properties, including a whole dark-mode palette
+  that nothing could ever select — the variant it was written for is
+  class-based and no element has ever carried the class. Darkness here comes
+  from the palette itself and from `color-scheme`. The variant declaration
+  stays: without it those `dark:` utilities would fall back to
+  `prefers-color-scheme` and start applying on anyone's machine set to dark.
+
+- Dead code: an empty `lib/jwt.ts`, five shadcn primitives nothing rendered, the
+  five Next scaffolding SVGs in `public/`, a `getToken()` that read a credential
+  from the URL the server has read since the owner work landed, and two
+  dependencies — `@tanstack/react-query` and `motion` — that were installed and
+  never imported.
+
 ## [0.6.0] - 2026-09-20
 
 ### Fixed

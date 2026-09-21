@@ -1,16 +1,14 @@
-import { Message } from "@/types/chat";
 import MessageBubble from "./MessageBubble";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
+import { useTranscriptContext } from "./ChatProvider";
 
 
-interface MessageListProps {
-  messages: Message[];
-}
+// Rendering each message, no fetch, jwt, etc. Reads the transcript context
+// rather than taking a prop, so the token-by-token re-render it cannot avoid
+// stops at this subtree instead of reaching the header and the composer too.
+export default function MessageList() {
+  const { messages } = useTranscriptContext();
 
-// Rendering each message, no fetch, jwt, etc.
-export default function MessageList({
-  messages,
-}: MessageListProps) {
   const { containerRef, bottomRef } =
     useAutoScroll(messages);
 
@@ -26,7 +24,12 @@ export default function MessageList({
       // instead, which is the part a screen reader actually needs.
       role="log"
       aria-label="Conversation"
-      className="flex-1 overflow-y-auto p-6 space-y-4"
+      // `min-h-0` because a flex item's automatic minimum size is its content:
+      // without it this box refuses to shrink below the whole transcript and
+      // the card's `overflow-hidden` is the only thing hiding the difference.
+      // `overscroll-contain` keeps a flick at either end of the transcript from
+      // chaining out into the document behind it.
+      className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-gutter-lg space-y-4"
     >
       {messages.map((message) => (
         <MessageBubble
