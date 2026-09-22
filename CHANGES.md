@@ -7,7 +7,31 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
-## [0.7.0] - 2026-09-21
+## [0.7.2] - 2026-09-22
+
+### Fixed
+
+- The chat no longer slides up the screen on a phone while a reply streams in.
+  Auto-scroll called `scrollIntoView()` on a sentinel at the end of the
+  transcript, once per token. `scrollIntoView` is not scoped to the nearest
+  scroller — it moves every scrollable ancestor it can, which on a phone
+  includes the page itself while the keyboard is animating and `--app-height`
+  is a frame behind it. It now sets `scrollTop` on the transcript, which can
+  only ever move the transcript.
+- Asking a question while scrolled up now brings the transcript back down, so
+  the question and its answer no longer land below the fold.
+- A reply that arrives in one large chunk is followed instead of stopping
+  auto-scroll. Whether the reader is following is now remembered from their
+  last scroll rather than measured after the new content has landed.
+- The transcript stays on its newest line when the keyboard resizes it.
+- Auto-scroll runs before paint, removing a one-frame jitter per token.
+
+### Reverted
+
+- The `min-h-0` added to `main` and the chat card in 0.7.1. It did not address
+  the bug above; the transcript already carried the `min-h-0` that matters.
+
+## [0.7.1] - 2026-09-21
 
 ### Fixed
 
