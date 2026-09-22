@@ -4,6 +4,7 @@ import {
   doneFrame,
   mockBackend,
   openChat,
+  replyWith,
 } from "./backend";
 
 async function ask(
@@ -168,4 +169,75 @@ test("Shift+Enter writes a second line instead of sending", async ({
   expect(requests[0]?.message).toBe(
     "First line\nSecond line",
   );
+});
+
+/** How far the transcript is from showing its last line, in pixels. */
+async function transcriptGap(
+  page: import("@playwright/test").Page,
+): Promise<number> {
+  return page
+    .getByRole("log", { name: "Conversation" })
+    .evaluate(
+      (el) =>
+        el.scrollHeight -
+        el.scrollTop -
+        el.clientHeight,
+    );
+}
+
+/**
+ * Two ways the transcript used to be left behind.
+ *
+ * A reply taller than the follow threshold, arriving in one chunk, was read as
+ * the reader having scrolled away — measured after it had landed, the reader
+ * was suddenly a long way from the bottom — so following stopped with nobody
+ * having touched anything. And a question asked while scrolled up stayed
+ * scrolled up, sending the question and its answer below the fold.
+ */
+test("the transcript follows a long reply, and comes back down for a new question", async ({
+  page,
+}) => {
+  await mockBackend(page, {
+    stream: replyWith(
+      "He has built backends in Python for a decade. ".repeat(80),
+    ),
+  });
+
+  await openChat(page);
+  await ask(page, "What does he do?");
+
+  await expect(
+    page.getByText("backends in Python").first(),
+  ).toBeVisible();
+
+  await expect
+    .poll(() => transcriptGap(page))
+    .toBeLessThanOrEqual(1);
+
+  // Scroll away to re-read, and give the scroll event its frame to land —
+  // it is dispatched on the next animation frame, not synchronously.
+  await page
+    .getByRole("log", { name: "Conversation" })
+    .evaluate(async (el) => {
+      el.scrollTop = 0;
+
+      await new Promise((resolve) =>
+        requestAnimationFrame(() =>
+          requestAnimationFrame(resolve),
+        ),
+      );
+    });
+
+  expect(await transcriptGap(page)).toBeGreaterThan(120);
+
+  await ask(page, "And before that?");
+
+  // Not `toBeInViewport()` on the question itself. The mock answers every
+  // question with the same reply, and one this long lands underneath it and
+  // pushes it back off the top — which is the transcript following its newest
+  // line, the very thing being asserted. That it came back down at all is what
+  // the fault was about, and the gap below is what says so.
+  await expect
+    .poll(() => transcriptGap(page))
+    .toBeLessThanOrEqual(1);
 });

@@ -203,6 +203,11 @@ export interface BackendOptions {
   refresh?: RefreshBehaviour;
   /** Awaited before the claim is fulfilled, to hold the loading state open. */
   holdClaim?: Promise<void>;
+  /**
+   * Awaited before /chat/stream answers, so a test can put the page in a known
+   * state between the question going out and the reply coming back.
+   */
+  holdStream?: Promise<void>;
   /** Bumped per auth call, for the assertions no screen can show. */
   calls?: AuthCalls;
 }
@@ -221,6 +226,7 @@ export async function mockBackend(
     claim = "ok",
     refresh = "ok",
     holdClaim,
+    holdStream,
     calls,
   } = options;
 
@@ -335,12 +341,16 @@ export async function mockBackend(
 
   await page.route(
     "**/chat/stream",
-    (route) => {
+    async (route) => {
       requests?.push(
         JSON.parse(
           route.request().postData() ?? "{}",
         ),
       );
+
+      if (holdStream) {
+        await holdStream;
+      }
 
       return route.fulfill({
         contentType: "text/event-stream",
