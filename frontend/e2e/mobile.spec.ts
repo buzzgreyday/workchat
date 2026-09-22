@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-import { mockBackend, openChat } from "./backend";
+import {
+  gate,
+  mockBackend,
+  openChat,
+  replyWith,
+} from "./backend";
 
 /**
  * The phone-shaped faults.
@@ -244,4 +249,113 @@ test("the composer shrinks back after a multi-line question is sent", async ({
       ),
     )
     .toBe(oneLine);
+});
+
+/**
+ * The 0.7.1 fault, which the test above could not see.
+ *
+ * Auto-scroll followed the transcript by calling `scrollIntoView()` on a
+ * sentinel at the end of it, once per token. `scrollIntoView` is not scoped to
+ * the nearest scroller: it scrolls *every* ancestor that can move, the
+ * document included. On a phone, in the window where the keyboard is animating
+ * and `--app-height` is a frame behind it, that walked the whole page up the
+ * screen and left it there, where `overflow: hidden` on `html` meant nothing
+ * could scroll it back.
+ *
+ * The damage itself cannot be reproduced here, and a test that tries is a test
+ * that always passes. `overflow: hidden` on the root element propagates to the
+ * viewport, which leaves the document with no scrolling area at all — making
+ * the page taller than the screen does not create one, and `window.scrollY`
+ * stays 0 in this app whatever a script does to it. A phone's visual viewport
+ * is not so constrained, which is why the fault was only ever seen on one.
+ *
+ * So the call is watched for rather than its effect. Auto-scroll has no
+ * business moving anything outside the transcript, and `scrollIntoView` is the
+ * one API here that cannot promise that; writing `scrollTop` can only ever
+ * move the element it is written to.
+ *
+ * The reply is deliberately short. The mock delivers a whole answer in a
+ * single chunk, and the old guard — "is the transcript near its bottom, now
+ * that the new content has landed?" — bails out on a long one without
+ * scrolling at all, so a long reply would watch for a call that never comes
+ * for the wrong reason. Short, it stays near the bottom, the guard passes, and
+ * the old code reaches `scrollIntoView` exactly as it did on a phone.
+ */
+test("a streamed reply is followed without reaching outside the transcript", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const counter = { calls: 0 };
+
+    (
+      window as unknown as {
+        __scrollIntoView: { calls: number };
+      }
+    ).__scrollIntoView = counter;
+
+    const original =
+      Element.prototype.scrollIntoView;
+
+    Element.prototype.scrollIntoView =
+      function (this: Element, ...args: []) {
+        counter.calls += 1;
+
+        return original.apply(this, args);
+      };
+  });
+
+  const reply = gate();
+
+  await mockBackend(page, {
+    holdStream: reply.held,
+    stream: replyWith("Backend work, in Python."),
+  });
+
+  await openChat(page);
+
+  const composer = page.getByLabel(
+    "Your question",
+  );
+
+  await expect(composer).toBeVisible();
+
+  await composer.fill("What does he do?");
+  await composer.press("Enter");
+
+  // Zeroed once the question is out: reaching and focusing the composer is
+  // Playwright's own scrolling, and only what the reply does is in question.
+  await page.evaluate(() => {
+    (
+      window as unknown as {
+        __scrollIntoView: { calls: number };
+      }
+    ).__scrollIntoView.calls = 0;
+  });
+
+  reply.release();
+
+  await expect(
+    page.getByText("Backend work, in Python."),
+  ).toBeVisible();
+
+  // Given a frame to do it in — the old scroll was smooth, and a smooth scroll
+  // has not moved anything yet on the frame the text appears. The call itself
+  // is synchronous, so one frame is enough for it to have been counted.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(resolve),
+      ),
+  );
+
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __scrollIntoView: { calls: number };
+          }
+        ).__scrollIntoView.calls,
+    ),
+  ).toBe(0);
 });

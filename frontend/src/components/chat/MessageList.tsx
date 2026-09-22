@@ -9,8 +9,7 @@ import { useTranscriptContext } from "./ChatProvider";
 export default function MessageList() {
   const { messages } = useTranscriptContext();
 
-  const { containerRef, bottomRef } =
-    useAutoScroll(messages);
+  const { containerRef } = useAutoScroll(messages);
 
   const awaitingReply =
     messages.at(-1)?.status === "streaming";
@@ -45,8 +44,6 @@ export default function MessageList() {
           ? "Generating a reply"
           : "Reply ready"}
       </p>
-
-    <div ref={bottomRef} />
   </div>
 );
 }

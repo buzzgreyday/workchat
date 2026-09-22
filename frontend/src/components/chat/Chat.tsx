@@ -36,7 +36,7 @@ export default function Chat({
       claim={claim}
       owner={owner}
     >
-      <div className="bg-panel border-line flex h-full min-h-0 w-full max-w-chat flex-col overflow-hidden rounded-card border shadow-2xl sm:max-h-[var(--card-max-height)]">
+      <div className="bg-panel border-line flex h-full w-full max-w-chat flex-col overflow-hidden rounded-card border shadow-2xl sm:max-h-[var(--card-max-height)]">
         <ChatHeader />
 
         <MessageList />
