@@ -116,34 +116,29 @@ The site keeps its own copy of the contract in `types/workchat.d.ts` and a
 stand-in element in `e2e/fixtures/`. When the stand-in passes and the real
 bundle does not, this is what changed.
 
-### The whole thing, by hand
+### The whole thing, for real
 
-For the times the question is not the contract but whether it actually works:
-
-```bash
-docker compose up -d                  # db, backend :8000, the chat :3000
-cd frontend && npm run build:embed    # into public/, which :3000 serves
-
-cd ../../website
-NEXT_PUBLIC_CHAT_ORIGIN=http://localhost:3000 \
-NEXT_PUBLIC_API_URL=http://localhost:8000 \
-npm run dev -- --port 3001
-```
-
-Two things are not automatic. The backend's dev CORS list is localhost:3000
-only, so the site on another port needs `ALLOWED_HOSTS=http://localhost:3001`
-in `backend/.env` — in dev mode that is unioned with the defaults rather than
-replacing them. And the chat needs a session, which means a link:
+For the times the question is not the contract but whether it works. From the
+site's repo:
 
 ```bash
-curl -s -X POST http://localhost:8000/admin/issue-token \
-  -H "X-Admin-Key: $ADMIN_KEY" -H 'Content-Type: application/json' \
-  -d '{"subject":"Tester","company":"Acme","version":2}'
+npm run dev:stack
 ```
 
-Open `http://localhost:3001/chat?claim=<the token>`. For an inner loop,
-`npm run watch:embed` rebuilds on every change to the chat, components
-included, and the site picks it up on reload.
+Brings up the database, the backend and this frontend, builds the element into
+`public/`, mints a claim link and starts the site against all three — then
+prints a URL to open. The site's `scripts/dev-stack.mjs` drives it; everything is
+real, including the model, so a question there costs an API call and one of
+the link's allowance.
+
+It overlays `docker-compose.embed.yaml` onto the stack, which widens the
+backend's dev CORS list to the site's port. That is a compose `environment`
+entry rather than an edit to `backend/.env`: it beats the env file, nothing on
+disk changes, and leaving the overlay off puts the list back.
+
+For an inner loop, leave it running and use `npm run watch:embed` here — the
+element rebuilds on every change, components included, and the site picks it
+up on reload.
 
 ### In CI
 

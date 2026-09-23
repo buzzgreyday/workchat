@@ -2,6 +2,9 @@
   "name": "frontend",
   "version": "0.7.2",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "npm run build:embed && next build",

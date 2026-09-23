@@ -1,8 +1,42 @@
-import { build, context } from "esbuild";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import postcss from "postcss";
-import tailwindcss from "@tailwindcss/postcss";
+
+/**
+ * The version check, and why the real imports below are dynamic.
+ *
+ * Tailwind's node bindings use `module.isBuiltin`, which arrived in 18.6. On
+ * anything older the failure is a linker error sixty lines into a minified
+ * bundle, naming a symbol nobody here wrote and no file anybody here owns.
+ *
+ * A guard at the top of this file cannot prevent that: static imports are
+ * linked before a single line of it runs, so the crash happens first. Loading
+ * them on demand is what buys the chance to say something useful — which is
+ * the whole reason this is not the ordinary import block it looks like it
+ * should be.
+ */
+const MINIMUM_NODE = 20;
+
+if (
+  Number(process.versions.node.split(".")[0]) <
+  MINIMUM_NODE
+) {
+  console.error(
+    [
+      `The embed build needs Node ${MINIMUM_NODE} or newer.`,
+      `This is Node ${process.versions.node}.`,
+      "",
+      "Same floor as Next and the Dockerfile. `nvm use` reads .nvmrc.",
+    ].join("\n"),
+  );
+
+  process.exit(1);
+}
+
+const { build, context } = await import("esbuild");
+const { default: postcss } = await import("postcss");
+const { default: tailwindcss } = await import(
+  "@tailwindcss/postcss"
+);
 
 /**
  * The element, as one file the site can load at runtime.
