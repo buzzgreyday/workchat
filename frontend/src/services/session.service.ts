@@ -1,4 +1,4 @@
-import { API_URL } from "@/lib/api";
+import { apiUrl } from "@/lib/api";
 import type { AuthFetch } from "@/types/session";
 import { Usage } from "@/types/chat";
 
@@ -23,7 +23,7 @@ class SessionService {
     authFetch: AuthFetch,
   ): Promise<SessionInfo> {
     const response = await authFetch(
-      `${API_URL}/session`,
+      `${apiUrl()}/session`,
     );
 
     if (!response.ok) {

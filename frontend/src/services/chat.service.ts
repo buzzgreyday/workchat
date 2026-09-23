@@ -4,7 +4,7 @@ import {
   Usage,
 } from "@/types/chat";
 import { SSEEvent } from "@/types/sse";
-import { API_URL } from "@/lib/api";
+import { apiUrl } from "@/lib/api";
 import type { AuthFetch } from "@/types/session";
 
 /**
@@ -150,7 +150,7 @@ class ChatService {
     },
   ): Promise<void> {
     const response = await authFetch(
-      `${API_URL}/chat/stream`,
+      `${apiUrl()}/chat/stream`,
       {
         method: "POST",
         headers: {

@@ -1,0 +1,38 @@
+/*
+ * The chat's stylesheet, compiled for a shadow root.
+ *
+ * Not `globals.css` handed over as text: that file is Tailwind *source*, and a
+ * shadow root has no build step. It is imported here so there is still exactly
+ * one stylesheet in this project, and `build.mjs` runs Tailwind over the
+ * result before esbuild ever sees it.
+ */
+@import "../../src/app/globals.css";
+
+/*
+ * Tailwind's automatic source detection starts from the entry file, and this
+ * one sits in a folder containing no components at all. Without this the scan
+ * finds no `bg-panel`, no `h-full`, nothing — and emits a stylesheet with a
+ * palette and no utilities, which looks like a broken import rather than an
+ * empty scan.
+ */
+@source "../../src";
+
+/*
+ * What `html` does for the app, done for the element.
+ *
+ * `globals.css` puts the canvas and the colour scheme on `html`, which inside
+ * a shadow root is a selector for something that is not there. The palette
+ * itself needs no help: `build.mjs` rewrites `:root` to reach `:host` as well,
+ * because the same rule would otherwise miss too.
+ *
+ * Height is taken, not asserted — `100%` of whatever the host sized, so the
+ * page decides how big its chat is and the chat still gets a definite height
+ * to give `h-full` meaning. A host that sizes nothing gets nothing; that is
+ * the one thing EMBED.md asks of them.
+ */
+:host {
+  display: block;
+  height: 100%;
+  color-scheme: dark;
+  background: var(--chat-bg);
+}

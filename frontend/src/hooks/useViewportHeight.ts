@@ -29,9 +29,24 @@ const SCALE_EPSILON = 0.01;
  * this fires on every frame of a keyboard animation, and a re-render per frame
  * would drag the whole transcript through React; and a property write is not a
  * `setState`, so the hook stays clear of `react-hooks/set-state-in-effect`.
+ *
+ * `ownsViewport` is how the embed opts out, and it has to be told rather than
+ * work it out. The property is written on `document.documentElement` — the
+ * only element `globals.css` reads it from — which in an embed is the *host
+ * page's* `<html>`, a document this code has no business sizing. Nothing
+ * inside the shadow root reads it back either: the rule that consumes it is
+ * `html { height: var(--app-height) }`, and a shadow tree has no `html`. So
+ * embedded it is a write to somebody else's page for no gain, and the keyboard
+ * it exists to survive is the host's layout problem, not this element's.
  */
-export function useViewportHeight(): void {
+export function useViewportHeight(
+  ownsViewport: boolean = true,
+): void {
   useEffect(() => {
+    if (!ownsViewport) {
+      return;
+    }
+
     // Read inside the effect, never at module scope: this module is imported
     // during the server render, where there is no window.
     const viewport = window.visualViewport;
@@ -98,5 +113,5 @@ export function useViewportHeight(): void {
       // nothing is watching any more is worse than the fallback it replaced.
       root.style.removeProperty(PROPERTY);
     };
-  }, []);
+  }, [ownsViewport]);
 }

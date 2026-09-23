@@ -1,4 +1,4 @@
-import { API_URL } from "@/lib/api";
+import { apiUrl } from "@/lib/api";
 
 export interface Session {
   access_token: string;
@@ -44,7 +44,7 @@ class AuthService {
     claimToken: string,
   ): Promise<Session> {
     const response = await fetch(
-      `${API_URL}/v2/auth/claim`,
+      `${apiUrl()}/v2/auth/claim`,
       {
         method: "POST",
         headers: {
@@ -73,7 +73,7 @@ class AuthService {
    */
   async refresh(): Promise<Session> {
     const response = await fetch(
-      `${API_URL}/v2/auth/refresh`,
+      `${apiUrl()}/v2/auth/refresh`,
       {
         method: "POST",
         credentials: "include",
