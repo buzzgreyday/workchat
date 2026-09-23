@@ -10,6 +10,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
+    "test:contract": "npm run build:embed && node embed/contract.mjs",
     "build:standalone": "npm run build && mkdir -p .next/standalone/public .next/standalone/.next/static && cp -r public/. .next/standalone/public/ && cp -r .next/static/. .next/standalone/.next/static/"
   },
   "dependencies": {

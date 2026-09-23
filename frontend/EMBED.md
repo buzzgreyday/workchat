@@ -94,6 +94,64 @@ rewritten to reach `:host` — inside a shadow root there is no `:root` to
 declare a palette on. The result is adopted by the shadow root, so the host
 page's stylesheets are untouched in both directions.
 
+## Testing it with the site
+
+The contract is unpinnable by design: the site loads `/embed.js` at runtime and
+has no version to hold back on. So the only thing that can catch it moving is
+the site's own suite, run against a bundle from here.
+
+```bash
+npm run test:contract                        # ../website
+WEBSITE_DIR=/path/to/site npm run test:contract
+```
+
+Builds the element and runs the site's Playwright tests against that exact
+file. Rename an attribute, an event or a `--chat-*` variable and it goes red
+here, in this repo, before the change is deployed to a site that cannot pin a
+version of it. It needs a checkout of the site with its dependencies
+installed, and nothing else — no database, no key, no stack. The backend stays
+mocked, because what is being checked is this element's surface.
+
+The site keeps its own copy of the contract in `types/workchat.d.ts` and a
+stand-in element in `e2e/fixtures/`. When the stand-in passes and the real
+bundle does not, this is what changed.
+
+### The whole thing, by hand
+
+For the times the question is not the contract but whether it actually works:
+
+```bash
+docker compose up -d                  # db, backend :8000, the chat :3000
+cd frontend && npm run build:embed    # into public/, which :3000 serves
+
+cd ../../website
+NEXT_PUBLIC_CHAT_ORIGIN=http://localhost:3000 \
+NEXT_PUBLIC_API_URL=http://localhost:8000 \
+npm run dev -- --port 3001
+```
+
+Two things are not automatic. The backend's dev CORS list is localhost:3000
+only, so the site on another port needs `ALLOWED_HOSTS=http://localhost:3001`
+in `backend/.env` — in dev mode that is unioned with the defaults rather than
+replacing them. And the chat needs a session, which means a link:
+
+```bash
+curl -s -X POST http://localhost:8000/admin/issue-token \
+  -H "X-Admin-Key: $ADMIN_KEY" -H 'Content-Type: application/json' \
+  -d '{"subject":"Tester","company":"Acme","version":2}'
+```
+
+Open `http://localhost:3001/chat?claim=<the token>`. For an inner loop,
+`npm run watch:embed` rebuilds on every change to the chat, components
+included, and the site picks it up on reload.
+
+### In CI
+
+`npm run test:contract` is what a job would run, after `npm run build:embed`
+and a checkout of the site beside this repo. It is not wired up: the site is a
+separate repository, so the job needs credentials to check it out, and a token
+is not something to add on somebody's behalf.
+
 ## Deploying
 
 - **Cache** `/embed.js` short and revalidated — `Cache-Control: public,
