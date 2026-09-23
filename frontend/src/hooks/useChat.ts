@@ -31,10 +31,12 @@ export function useChat({
   accessToken,
   status,
   authFetch,
+  seedQuestion,
 }: {
   accessToken: string;
   status: SessionStatus;
   authFetch: AuthFetch;
+  seedQuestion?: string;
 }) {
   // Hook order is load-bearing. The greeting rewrite is an effect inside
   // `useTranscript` and the sessionStorage restore is one inside
@@ -73,7 +75,16 @@ export function useChat({
       settled: !loading,
     });
 
-  const [input, setInput] = useState("");
+  // Seeded, not sent. A link that arrives with a question puts it in the
+  // composer for the hirer to read, edit or delete — asking on their behalf
+  // would spend one of a handful of questions on wording they never saw.
+  //
+  // The initial value only, so nothing re-seeds over what they are typing.
+  // That makes the seed a first-render concern: the embed sets `about` on the
+  // element before it connects, which is the render this reads.
+  const [input, setInput] = useState(
+    seedQuestion ?? "",
+  );
 
   // Nothing to send with, so the composer stays shut rather than letting the
   // hirer type a question into a 401 — or into a 429, once the allowance is

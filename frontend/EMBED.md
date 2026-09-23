@@ -24,6 +24,7 @@ safe. Renaming or removing one breaks every page that embeds this.
 | Attribute | Meaning |
 | --- | --- |
 | `api-url` | Where the backend is. Defaults to `/api`. |
+| `about` | Opens the composer with this question in it, unsent. |
 | `claim` | A claim token, when the visitor followed a link. |
 | `owner-name` | Whose CV this is. Defaults to the name in `lib/owner-defaults.ts`. |
 | `owner-github` | GitHub URL for the header. Set it empty for no link. |
@@ -34,6 +35,13 @@ embed has no server render, so the host page says who this is — or says
 nothing and gets the defaults. Absent and empty are different answers: an
 absent `owner-linkedin` takes the default, an empty one means "no LinkedIn"
 and the header shows no link rather than somebody else's.
+
+`about` seeds the composer rather than asking: the visitor reads it, edits it
+or deletes it, and a handful of questions is too few to spend one on wording
+nobody saw. It is read on the element's first render, so set it in the markup
+or before the element is inserted — React does the latter by itself. Changing
+it later does not re-seed, which is what stops it overwriting what somebody is
+halfway through typing.
 
 **Events** (bubbling and composed, so listen on the element)
 
@@ -92,7 +100,13 @@ page's stylesheets are untouched in both directions.
   max-age=60, must-revalidate`. It is the entry point; cache it for a year and
   a release reaches nobody. Everything is bundled into this one file, so there
   are no chunk paths to keep stable.
-- **CORS**: embedded on mringdal.com, the backend calls are cross-origin.
+- **CORS on `/embed.js` itself**, not only on the API: it is loaded as a
+  module script from another origin, and a module script without
+  `Access-Control-Allow-Origin` is blocked before it runs. The failure is
+  silent in the network panel's usual reading — the file downloads, the
+  element never registers.
+- **CORS on the API**: embedded on mringdal.com, the backend calls are
+  cross-origin.
   Allow that origin with credentials, and keep the session cookie `SameSite=Lax`
   — same site, different subdomain, so it still travels.
 - **Test** what the host actually gets: a Playwright test that loads a page
@@ -112,6 +126,6 @@ into its own shadow root and otherwise leaves the document as it found it.
 
 ## Known gaps
 
-- No `about`/`greeting` attributes. Seeding the composer and overriding the
-  opening message both need changes in `useTranscript` and the composer, not
-  in the element.
+- No `greeting` attribute. Overriding the opening message means changing
+  `lib/greeting.ts` and `useTranscript`, which decide what it says from the
+  session status — not something the element can pass through.
