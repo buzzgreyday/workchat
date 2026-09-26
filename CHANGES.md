@@ -7,6 +7,42 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.8.0] - 2026-09-26
+
+### Added
+
+- `<workchat-chat>`, the chat as a custom element any page can embed with a
+  script tag. Built from the app's own components into `public/embed.js` and
+  served at `/embed.js`, so a release here reaches every embedding page on its
+  next load. Attributes `api-url`, `about`, `claim` and `owner-name`; a
+  `workchat-usage` event; the `--chat-*` palette as its styling surface. See
+  `frontend/EMBED.md`.
+- `about` puts a question in the composer, unsent, for the visitor to read,
+  edit or delete.
+- `npm run test:contract` runs the site's Playwright suite against a freshly
+  built bundle, so a change to the element's surface fails here first.
+
+### Changed
+
+- New type and palette: Nunito Light for text, Bebas Neue for the title, and a
+  blue scheme. Only Nunito (OFL) is committed; Bebas comes from
+  `next/font/google`, because the Fontshare copy's licence forbids a public
+  repository.
+- The GitHub and LinkedIn links moved out of the chat header onto the
+  standalone page, below the card.
+- The composer is 16px at every width, so a question is the same size typed
+  as it is once sent. It was 14px on desktop.
+- Your own messages take `--chat-text` like the rest of the text.
+
+### Removed
+
+- The embed's `owner-github` and `owner-linkedin` attributes, with the links
+  they fed. A page still setting them gets nothing, and no error.
+
+### Fixed
+
+- `backend/uv.lock` carried 0.7.0 through 0.7.1 and 0.7.2.
+
 ## [0.7.2] - 2026-09-22
 
 ### Fixed

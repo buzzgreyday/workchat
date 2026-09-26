@@ -1,4 +1,5 @@
 import Chat from "@/components/chat/Chat";
+import OwnerLinks from "@/components/OwnerLinks";
 import { readOwner } from "@/lib/owner";
 
 export default async function Home({
@@ -26,12 +27,20 @@ export default async function Home({
     // That height is the *visual* viewport where the browser reports it, which
     // is what keeps the composer above an iOS keyboard; three elements each
     // naming their own `dvh` is how they drift apart when it changes.
-    <main className="bg-canvas chat-shell flex h-full items-center justify-center">
-      <Chat
-        token={token}
-        claim={claim}
-        owner={owner}
-      />
+    //
+    // The links sit under the card, not in it: they belong to this page, and
+    // the embed renders `Chat` without it. The card's wrapper takes whatever
+    // height the links leave, so `h-full` inside it still means "fill".
+    <main className="bg-canvas chat-shell flex h-full flex-col items-center justify-center gap-3">
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+        <Chat
+          token={token}
+          claim={claim}
+          owner={owner}
+        />
+      </div>
+
+      <OwnerLinks owner={owner} />
     </main>
   );
 }

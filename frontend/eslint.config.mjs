@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+
+    // Build output, not source. `embed/` is linted; the bundle it produces is
+    // a single minified line, and linting it is 1000 warnings about somebody
+    // else's minifier.
+    "public/embed.js",
   ]),
 ]);
 

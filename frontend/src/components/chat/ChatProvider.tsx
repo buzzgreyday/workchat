@@ -3,6 +3,8 @@
 import {
   createContext,
   use,
+  useEffect,
+  useRef,
   type ReactNode,
 } from "react";
 
@@ -11,6 +13,14 @@ import { useSession } from "@/hooks/useSession";
 import { useViewportHeight } from "@/hooks/useViewportHeight";
 import type { Owner } from "@/lib/owner";
 import type { Message, Usage } from "@/types/chat";
+
+/**
+ * The part of the owner the chat itself shows: the name in its header.
+ *
+ * The profile links are the standalone page's (see `OwnerLinks`), so an
+ * embedding page has nothing to pass for them.
+ */
+export type ChatOwner = Pick<Owner, "name">;
 
 /**
  * What the transcript is, on its own.
@@ -35,7 +45,7 @@ interface ControlsValue {
    * request time, and the import would pull it into the browser bundle where
    * the value would be frozen at build.
    */
-  owner: Owner;
+  owner: ChatOwner;
   usage: Usage | null;
   input: string;
   loading: boolean;
@@ -84,18 +94,37 @@ export function ChatProvider({
   token,
   claim,
   owner,
+  seedQuestion,
+  onUsageChange,
+  ownsViewport,
   children,
 }: {
   token?: string;
   claim?: string;
-  owner: Owner;
+  owner: ChatOwner;
+  /** A question to open the composer with, rather than an empty one. */
+  seedQuestion?: string;
+  /**
+   * Told when the allowance moves. Nothing in this app listens; it exists for
+   * the embed, where the host page owns everything around the chat and the
+   * remaining questions are the one number it might want to show there.
+   */
+  onUsageChange?: (usage: Usage) => void;
+  /**
+   * False when the chat is a component of somebody else's page rather than the
+   * page itself. Only the embed passes it.
+   */
+  ownsViewport?: boolean;
   children: ReactNode;
 }) {
   // Publishes `--app-height`. Here because this is already where the page's
   // browser-side concerns live, and because it mounts once, unconditionally,
   // for the whole life of the page — including the spent and error states,
   // where the card is still on screen and still has to fit.
-  useViewportHeight();
+  //
+  // Called unconditionally and told whether to act, rather than called
+  // conditionally: that is the rule, and the embed needs it inert, not absent.
+  useViewportHeight(ownsViewport);
 
   // Owns the access token and, for a claim link, the one-shot exchange that
   // produces it. Dropping the credential out of the address bar happens in
@@ -112,7 +141,23 @@ export function ChatProvider({
     usage,
     setInput,
     sendMessage,
-  } = useChat(session);
+  } = useChat({ ...session, seedQuestion });
+
+  // Held in a ref and notified from an effect, not called where usage is set.
+  // The embed passes a fresh arrow on every attribute change, so a plain
+  // dependency would re-fire the notification on renders where the number did
+  // not move — and the host is listening for changes, not for renders.
+  const notify = useRef(onUsageChange);
+
+  useEffect(() => {
+    notify.current = onUsageChange;
+  }, [onUsageChange]);
+
+  useEffect(() => {
+    if (usage) {
+      notify.current?.(usage);
+    }
+  }, [usage]);
 
   // React 19: the context *is* the provider — no `.Provider`.
   return (

@@ -1,14 +1,20 @@
 {
   "name": "frontend",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run build:embed && next build",
+    "build:embed": "node embed/build.mjs",
+    "watch:embed": "node embed/build.mjs --watch",
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
-    "build:standalone": "next build && mkdir -p .next/standalone/public .next/standalone/.next/static && cp -r public/. .next/standalone/public/ && cp -r .next/static/. .next/standalone/.next/static/"
+    "test:contract": "npm run build:embed && node embed/contract.mjs",
+    "build:standalone": "npm run build && mkdir -p .next/standalone/public .next/standalone/.next/static && cp -r public/. .next/standalone/public/ && cp -r .next/static/. .next/standalone/.next/static/"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -31,8 +37,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.25.12",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
+    "postcss": "^8.5.28",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

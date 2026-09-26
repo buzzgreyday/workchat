@@ -11,6 +11,8 @@
  * into the bundle and put the build-time baking back.
  */
 
+import { DEFAULT_OWNER } from "./owner-defaults";
+
 export interface Owner {
   name: string;
   githubUrl: string;
@@ -36,15 +38,15 @@ export function readOwner(): Owner {
   return {
     name: configured(
       process.env.OWNER_NAME,
-      "Michael",
+      DEFAULT_OWNER.name,
     ),
     githubUrl: configured(
       process.env.OWNER_GITHUB_URL,
-      "https://github.com/buzzgreyday",
+      DEFAULT_OWNER.githubUrl,
     ),
     linkedinUrl: configured(
       process.env.OWNER_LINKEDIN_URL,
-      "https://linkedin.com/in/michael-ringdal",
+      DEFAULT_OWNER.linkedinUrl,
     ),
   };
 }

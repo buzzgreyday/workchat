@@ -1,0 +1,20 @@
+# The stack, as the site talks to it.
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.embed.yaml up -d
+#
+# Normally driven by `npm run dev:stack` in the site's repo, which is what
+# knows the port. Overlaid rather than written into backend/.env, because
+# compose's `environment` beats `env_file`: nothing on disk changes, and
+# leaving the overlay off puts the origin list straight back.
+services:
+  backend:
+    environment:
+      # The site runs on its own port, and in dev mode the backend allows
+      # localhost:3000 and nothing else — which is the chat itself. A browser
+      # refuses a credentialed request whose origin is not on this list, and
+      # the chat sends credentials so its refresh cookie travels, so without
+      # this the session call fails and the allowance never arrives.
+      #
+      # 3000 is repeated for the sake of being readable; the dev defaults are
+      # unioned with this rather than replaced by it.
+      ALLOWED_HOSTS: "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
