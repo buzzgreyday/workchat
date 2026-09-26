@@ -21,5 +21,9 @@
      browser fakes. */
   --chat-font-title: var(--font-bebas), "Arial Narrow", sans-serif;
   --chat-font-title-weight: 400;
-  --chat-font-title-size: 2.5rem;
+  /* 2.5rem where there is room, down to 1.5rem on a phone, where the full
+     size wrapped the title onto two lines. `cqi` is a share of the nearest
+     container's width — `main`, in page.tsx — so this follows the space the
+     bar has, like the chat's own sizing does. */
+  --chat-font-title-size: clamp(1.5rem, 7cqi, 2.5rem);
 }
