@@ -1,0 +1,25 @@
+/*
+ * chat.mringdal.com's own look.
+ *
+ * Standalone only. `layout.tsx` imports this after `globals.css`, and the
+ * embed never imports it, so nothing here reaches a page that embeds the
+ * chat — that page gets the plain defaults in `globals.css` and dresses them
+ * through the same `--chat-*` variables this file sets. This site is one host
+ * of the chat among others, and styles it the way any of them would.
+ *
+ * The font variables name faces `layout.tsx` loads through next/font.
+ */
+:root {
+  --chat-bg: oklch(0.343 0.056 241.383);
+  --chat-text: #e3e3e3;
+  --chat-accent: oklch(0.501 0.058 241.486);
+
+  --chat-font: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  --chat-font-weight: 300;
+
+  /* Bebas has one weight and capitals only. Anything but 400 is a weight the
+     browser fakes. */
+  --chat-font-title: var(--font-bebas), "Arial Narrow", sans-serif;
+  --chat-font-title-weight: 400;
+  --chat-font-title-size: 2.5rem;
+}

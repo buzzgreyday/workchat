@@ -5,6 +5,8 @@ import localFont from "next/font/local";
 
 import { readOwner } from "@/lib/owner";
 import "./globals.css";
+// After globals.css, so this site's look overrides the plain defaults.
+import "./theme.css";
 
 // Variable fonts: one file per style covers every weight in the range, so
 // `globals.css` can ask for any weight without a new file being added here.
@@ -53,10 +55,10 @@ const bebas = Bebas_Neue({
 export const viewport: Viewport = {
   colorScheme: "dark",
 
-  // --chat-bg converted to sRGB, so the browser chrome does not sit a shade
-  // off the page it frames. Hand-converted and hardcoded because a meta tag
-  // cannot read a custom property — if `--chat-bg` moves, this has to move
-  // with it.
+  // theme.css's --chat-bg converted to sRGB, so the browser chrome does not
+  // sit a shade off the page it frames. Hand-converted and hardcoded because
+  // a meta tag cannot read a custom property — if that `--chat-bg` moves,
+  // this has to move with it.
   themeColor: "#1b3c53",
 
   interactiveWidget: "resizes-content",

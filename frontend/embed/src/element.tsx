@@ -15,9 +15,10 @@ import chatCss from "./embed.css";
  *
  * Public API, versioned like one:
  *
- *   Attributes   api-url, about, claim, owner-name
+ *   Attributes   api-url, about, claim, owner-name, header
  *   Events       workchat-usage (detail: { used, remaining, max })
- *   CSS          the --chat-* palette, set on the element by the host page
+ *   CSS          the --chat-* palette and fonts, set on the element by the
+ *                host page
  *
  * No close event: in the host's own document Escape reaches their <dialog>
  * by itself. Forwarding it was an iframe problem.
@@ -31,6 +32,7 @@ const ATTRIBUTES = [
   "about",
   "claim",
   "owner-name",
+  "header",
   // `owner-github` and `owner-linkedin` were here. Their links moved out of
   // the chat onto the standalone page, so a host page that still sets them
   // gets what it would have got from any unknown attribute: nothing, and no
@@ -149,6 +151,12 @@ class WorkchatChat extends HTMLElement {
           // onto the host's own <html> — a document it does not own, for a
           // rule that only exists outside this shadow root.
           ownsViewport={false}
+          // `header="none"` for a host with a header of its own. Any other
+          // value, or none, keeps it — the default a page that says nothing
+          // has always had.
+          showHeader={
+            this.getAttribute("header") !== "none"
+          }
           onUsageChange={(usage) =>
             this.#emit("workchat-usage", usage)
           }

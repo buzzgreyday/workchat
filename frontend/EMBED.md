@@ -27,6 +27,7 @@ safe. Renaming or removing one breaks every page that embeds this.
 | `about` | Opens the composer with this question in it, unsent. |
 | `claim` | A claim token, when the visitor followed a link. |
 | `owner-name` | Whose CV this is. Defaults to the name in `lib/owner-defaults.ts`. |
+| `header` | `none` hides the chat's header — its title and the questions-left badge. Anything else, or nothing, shows it. |
 
 The app reads the owner from the environment during its server render. An
 embed has no server render, so the host page says who this is — or says
@@ -44,6 +45,11 @@ or before the element is inserted — React does the latter by itself. Changing
 it later does not re-seed, which is what stops it overwriting what somebody is
 halfway through typing.
 
+`header="none"` is for a host that frames the chat with a header of its own,
+such as a dialog with a title and a close button. The allowance the badge
+would have shown still arrives, as `workchat-usage`; show it wherever the
+host's header has room.
+
 **Events** (bubbling and composed, so listen on the element)
 
 | Event | Detail |
@@ -54,8 +60,10 @@ There is no close event. Running in the host's document, Escape reaches their
 `<dialog>` on its own — forwarding it was something only a frame needed.
 
 **CSS variables** — the palette is the `--chat-*` set declared at the top of
-`src/app/globals.css`: `--chat-bg`, `--chat-panel`, `--chat-line`, and the
-rest. Set them on the element itself:
+`src/app/globals.css`: `--chat-bg`, `--chat-panel`, `--chat-border`, and the
+rest. Its values are plain defaults, not the standalone site's look, which
+lives in `src/app/theme.css` and never reaches an embed. Set them on the
+element itself:
 
 ```css
 workchat-chat {
@@ -70,8 +78,37 @@ Set them on an ancestor instead and the defaults inside win, because custom
 properties inherit but are then overridden by the shadow tree's own
 declaration — the element is the place to put them.
 
-The element fills its container and sets no height of its own beyond `100%`.
-Give the container one, or give the element one, or it collapses.
+**Fonts** — by default the chat is in the host page's font: it inherits, like
+any other text on the page. To choose, set these on the element too:
+
+| Variable | Meaning | Unset |
+| --- | --- | --- |
+| `--chat-font` | The text's font family. | The host's font. |
+| `--chat-font-weight` | The text's weight. | The host's weight. |
+| `--chat-font-title` | The header title's family. | `--chat-font`. |
+| `--chat-font-title-weight` | The title's weight. | `600` |
+| `--chat-font-title-size` | The title's size. | `1.25rem` |
+
+```css
+workchat-chat {
+  --chat-font: "Inter", system-ui, sans-serif;
+  --chat-font-title: "Fraunces", serif;
+}
+```
+
+The host loads the font, not the element. An `@font-face` inside a shadow
+root is ignored, so a face has to be declared in the host's document — its
+stylesheet, a Google Fonts link, next/font — and the variables name it. Give
+the family a fallback stack, as above; the element adds none of its own.
+
+**Sizing** — the element fills its container and sets no height of its own
+beyond `100%`. Give the container one, or give the element one, or it
+collapses.
+
+Its layout responds to the space it is given, not to the window. The card
+caps at 700px tall once the chat is 40rem wide, and fills its container when
+narrower — so a chat in a small dialog on a large screen fills the dialog, as
+it would on a phone.
 
 ## Building
 

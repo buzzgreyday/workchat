@@ -21,18 +21,22 @@
 
 :root {
   /* ---- Palette -----------------------------------------------------------
+     The defaults, and deliberately plain. These are what an embedding page
+     gets when it sets nothing; the standalone site's own look lives in
+     `theme.css`, which overrides them there and reaches nowhere else.
+
      The source of truth. `@theme` below only gives these names Tailwind can
      build utilities from; it does not redefine them. That split is not
      tidiness — Tailwind tree-shakes `@theme` variables it sees no utility for,
      and the hand-written recipes at the bottom of this file read the palette
      directly, so the palette has to live somewhere that always emits. */
-  --chat-bg: oklch(0.343 0.056 241.383);
+  --chat-bg: oklch(0.16 0.01 260);
   --chat-panel: oklch(0.2 0.012 260);
   --chat-panel-alt: oklch(0.25 0.014 260);
   --chat-border: oklch(1 0 0 / 10%);
-  --chat-text: #e3e3e3;
+  --chat-text: oklch(0.95 0 0);
   --chat-text-muted: oklch(0.63 0.01 260);
-  --chat-accent: oklch(0.501 0.058 241.486);
+  --chat-accent: oklch(0.6 0.14 245);
 
   /* Text that sits *on* the accent. Was three literal `white`s scattered
      through the classes, which meant the accent could be changed to something
@@ -51,8 +55,9 @@
 
   /* ---- Geometry that is not a Tailwind namespace ----------------------- */
   --radius: 0.625rem;
-  /* 700px. Below a modern phone's viewport, which is why it is applied from
-     `sm` up rather than everywhere — see Chat.tsx. */
+  /* 700px. Below a modern phone's viewport, which is why it only applies
+     once the chat itself is 40rem wide — measured on the chat's container,
+     not the window, see Chat.tsx. */
   --card-max-height: 43.75rem;
   --bubble-max-width: 80%;
   /* The floor under the safe-area insets in `.chat-shell`. */
@@ -90,35 +95,46 @@
   --color-destructive: oklch(0.704 0.191 22.216);
 
   /* ---- Type -------------------------------------------------------------
-     `var(--font-nunito)`, not `var(--font-sans)` — the next/font variable
-     and the theme key must never share a name. It used to be the
-     latter: a custom property referring to itself, which is a dependency
-     cycle, so it computed to the guaranteed-invalid value. Geist was
-     downloaded on every page load, `--font-geist-sans` was set on <html>, and
-     `var(--font-geist-sans)` appeared nowhere in the compiled CSS — the app
-     rendered in the browser's default font from the day the font was added.
-     The stack after it is a real fallback for a face that fails to load;
-     declaring this key at all replaces Tailwind's own, so leaving it off is
-     what left nothing to fall back to.
+     Fonts are the host's to choose, through five optional variables:
+     `--chat-font`, `--chat-font-weight`, `--chat-font-title`,
+     `--chat-font-title-weight` and `--chat-font-title-size`. None of them is
+     declared anywhere in this file, and that is the design, not an omission:
+     a default declared on `:root` would be rewritten onto `:host` too, and
+     then an embed could no longer inherit the page it sits in.
+
+     `--font-sans` has a real fallback stack, because it reaches <html>
+     through Tailwind's preflight and <html> has no parent to inherit from —
+     a family with no fallback there lands on the UA's default font, which is
+     how Geist once went unused for a whole release.
+
+     `--font-display` has none, on purpose. Unset, the declaration is invalid
+     at computed-value time, `font-family` is inherited, and so the title is
+     in the body face. Only the title uses it, and a title always has a
+     parent.
+
+     The next/font variables (`--font-nunito`, `--font-bebas`) are never
+     named here; `theme.css` hands them over. A theme key must also never
+     share a name with the variable it reads — `--font-sans: var(--font-sans)`
+     is a cycle, and computes to nothing.
 
      Four sizes and two weights is this app's entire inventory. Naming them by
      role is what stops a fifth appearing by accident. */
-  --font-sans: var(--font-nunito), ui-sans-serif, system-ui,
-    sans-serif;
+  --font-sans: var(
+    --chat-font,
+    ui-sans-serif,
+    system-ui,
+    sans-serif
+  );
+  --font-display: var(--chat-font-title);
 
-  /* The title's face, via `font-display`. Same rule: its own name, and a
-     real fallback stack behind it. */
-  --font-display: var(--font-bebas), "Arial Narrow", ui-sans-serif,
-    sans-serif;
-
-  --text-title: 2.5rem;
-  --text-title--line-height: calc(1.75 / 1.25);
-  --text-title--font-weight: 400;
+  --text-title: var(--chat-font-title-size, 1.25rem);
+  --text-title--line-height: 1.4;
+  --text-title--font-weight: var(--chat-font-title-weight, 600);
 
   /* 16px, and not a style opinion: below it, iOS Safari zooms the page when a
      field takes focus and does not zoom back out, which leaves the layout
-     offset behind the keyboard. The composer is `text-body sm:text-meta`, and
-     that pair has to survive any restyle. */
+     offset behind the keyboard. The composer is `text-body` at every width,
+     the same size as the bubbles, and must never go below it on a phone. */
   --text-body: 1rem;
   --text-body--line-height: calc(1.5 / 1);
 
@@ -127,7 +143,6 @@
 
   --text-micro: 0.75rem;
   --text-micro--line-height: calc(1 / 0.75);
-  --text-micro--font-weight: 300;
 
   /* ---- Space ------------------------------------------------------------
      Three adjacent panels of one card had three paddings — `px-6 py-5`, `p-6`
@@ -162,10 +177,16 @@
     @apply border-border outline-ring/50;
   }
 
-  /* Light is the default weight. Anything heavier asks for it by role —
-     `text-title` is the one that does. */
   body {
-    @apply bg-background text-foreground font-light;
+    @apply bg-background text-foreground;
+  }
+
+  /* The body weight, when a host names one. Unset, this is invalid at
+     computed-value time and `font-weight` inherits: the browser's normal
+     standalone, the host page's weight when embedded. `build.mjs` rewrites
+     `:root` to reach `:host` too. The title asks for its own weight by role. */
+  :root {
+    font-weight: var(--chat-font-weight);
   }
 
   /* No `html { @apply font-sans }` here.
