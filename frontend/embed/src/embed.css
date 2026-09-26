@@ -29,10 +29,19 @@
  * page decides how big its chat is and the chat still gets a definite height
  * to give `h-full` meaning. A host that sizes nothing gets nothing; that is
  * the one thing EMBED.md asks of them.
+ *
+ * The font is inherited from the host page unless it names one. Unset,
+ * `var(--chat-font)` is invalid at computed-value time and `font-family`
+ * inherits from the element's parent — the page's own text. This is the one
+ * place that happens: `globals.css` never declares `--chat-font`, because a
+ * default there would be rewritten onto `:host` and win over the page.
+ * Declared here, it also outranks Tailwind's preflight, which would otherwise
+ * set `:host` to the system stack.
  */
 :host {
   display: block;
   height: 100%;
   color-scheme: dark;
   background: var(--chat-bg);
+  font-family: var(--chat-font);
 }

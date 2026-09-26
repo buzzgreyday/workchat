@@ -15,6 +15,7 @@ export default function Chat({
   seedQuestion,
   onUsageChange,
   ownsViewport,
+  showHeader = true,
 }: {
   token?: string;
   claim?: string;
@@ -31,6 +32,9 @@ export default function Chat({
   // False when this is a component of another page. Only the embed says so;
   // see `embed/src/element.tsx`.
   ownsViewport?: boolean;
+  // False when the host page has a header of its own. The allowance the
+  // header would have shown still reaches the host, through `onUsageChange`.
+  showHeader?: boolean;
 }) {
   // Nothing is threaded through here any more. The three children read what
   // they each need from the provider, so adding something to the composer no
@@ -40,9 +44,13 @@ export default function Chat({
   // viewport tall and owns the padding, so the card just fills what it is
   // given. Two places subtracting the same 2rem is how the two drift apart.
   //
-  // `sm:max-h-175` rather than `max-h-175`: the 700px cap sits below a modern
-  // phone's viewport, so applying it everywhere left a band of dead background
-  // above and below the card on exactly the screens with least to spare.
+  // The 700px cap applies from a 40rem-wide *container*, not a 40rem window.
+  // It sits below a modern phone's viewport, so applying it everywhere left a
+  // band of dead background above and below the card on exactly the screens
+  // with least to spare. And measured on the window it was wrong once
+  // embedded: a chat in a narrow dialog on a wide screen was capped as though
+  // it had the whole desktop. Responsive rules inside the chat use container
+  // variants (`@min-[…]:`), never viewport ones (`sm:`), for the same reason.
   return (
     <ChatProvider
       token={token}
@@ -52,12 +60,14 @@ export default function Chat({
       onUsageChange={onUsageChange}
       ownsViewport={ownsViewport}
     >
-      <div className="bg-panel border-line flex h-full w-full max-w-chat flex-col overflow-hidden rounded-card border shadow-2xl sm:max-h-[var(--card-max-height)]">
-        <ChatHeader />
+      <div className="@container flex h-full w-full items-center justify-center">
+        <div className="bg-panel border-line flex h-full w-full max-w-chat flex-col overflow-hidden rounded-card border shadow-2xl @min-[40rem]:max-h-[var(--card-max-height)]">
+          {showHeader && <ChatHeader />}
 
-        <MessageList />
+          <MessageList />
 
-        <ChatInput />
+          <ChatInput />
+        </div>
       </div>
     </ChatProvider>
   );

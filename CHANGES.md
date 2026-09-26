@@ -7,6 +7,32 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.9.0] - 2026-09-26
+
+### Added
+
+- The embed takes fonts from the host: it inherits the page's font by
+  default, and `--chat-font`, `--chat-font-weight`, `--chat-font-title`,
+  `--chat-font-title-weight` and `--chat-font-title-size` choose otherwise.
+  The host loads the faces; the element names them.
+- `header="none"` hides the chat's header, for a host that frames it with its
+  own. The allowance still arrives as `workchat-usage`.
+
+### Changed
+
+- The element's defaults are plain. chat.mringdal.com's palette, Nunito and
+  Bebas moved to `src/app/theme.css`, which only the standalone site loads,
+  so an embed no longer inherits one site's branding.
+- The card's height cap follows the chat's own width (a container query), not
+  the window's. A chat in a narrow dialog on a wide screen fills the dialog.
+- The title is written in normal case. Bebas draws capitals regardless, and
+  screen readers no longer spell it out.
+
+### Fixed
+
+- The embed's title was a 2.5rem system font at weight 400: the Bebas size
+  and weight, without Bebas, which never reached the shadow root.
+
 ## [0.8.0] - 2026-09-26
 
 ### Added

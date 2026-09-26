@@ -13,7 +13,7 @@ export default function ChatHeader() {
         </div>
 
         <h1 className="text-ink text-title font-display">
-          WORKCHAT WITH {owner.name.toUpperCase()}
+          Workchat with {owner.name}
         </h1>
       </div>
 
