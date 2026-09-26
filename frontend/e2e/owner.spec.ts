@@ -50,3 +50,17 @@ test("a configured link is followed, and an empty one is not rendered", async ({
     }),
   ).toHaveCount(0);
 });
+
+test("the site's top bar is the only header", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  await openChat(page);
+
+  // The site frames the chat as any host would, with the chat's own header
+  // turned off. Two headings would mean both came back.
+  await expect(page.getByRole("heading")).toHaveCount(1);
+  await expect(
+    page.locator("header").getByText(/questions left/),
+  ).toBeVisible();
+});

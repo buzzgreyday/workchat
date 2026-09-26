@@ -1,7 +1,15 @@
 import { Bot } from "lucide-react";
 
 import { useControls } from "./ChatProvider";
+import UsageBadge from "./UsageBadge";
 
+/**
+ * The chat's own header, for a host that has none.
+ *
+ * The default when embedded: a page that says nothing about headers gets this
+ * one. A page with a header of its own passes `header="none"` and shows the
+ * allowance itself — the standalone site does exactly that, in its top bar.
+ */
 export default function ChatHeader() {
   const { usage, owner } = useControls();
 
@@ -17,11 +25,7 @@ export default function ChatHeader() {
         </h1>
       </div>
 
-      {usage && (
-        <span className="bg-panel-raised text-ink-muted mt-3 inline-block rounded-full px-3 py-1 text-micro shadow-sm">
-          {usage.remaining} / {usage.max} questions left
-        </span>
-      )}
+      {usage && <UsageBadge usage={usage} className="mt-3" />}
     </div>
   );
 }

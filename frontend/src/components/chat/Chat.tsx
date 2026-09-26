@@ -23,11 +23,12 @@ export default function Chat({
   // environment at request time, and importing it here would pull it into the
   // browser bundle where the value would be frozen at build.
   owner: ChatOwner;
-  // Passed straight through to the provider, which is where usage lives. Only
-  // the embed supplies it; see `embed/src/element.tsx`.
   // Puts a question in the composer on first render. The site links to
   // `/chat?about=...` from its project pages; this is where that lands.
   seedQuestion?: string;
+  // Passed straight through to the provider, which is where usage lives. For
+  // a host showing the allowance in its own header: the embed's page, and the
+  // standalone site's top bar.
   onUsageChange?: (usage: Usage) => void;
   // False when this is a component of another page. Only the embed says so;
   // see `embed/src/element.tsx`.
