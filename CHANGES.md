@@ -7,7 +7,7 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
-## [Unreleased]
+## [0.9.0] - 2026-09-26
 
 ### Added
 
