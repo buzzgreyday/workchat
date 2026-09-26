@@ -6,7 +6,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import Chat from "../../src/components/chat/Chat";
 import { setApiUrl } from "../../src/lib/api";
 import { DEFAULT_OWNER } from "../../src/lib/owner-defaults";
-import type { Owner } from "../../src/lib/owner";
+import type { ChatOwner } from "../../src/components/chat/ChatProvider";
 // Compiled by `build.mjs`, arriving here as text. See `embed.css`.
 import chatCss from "./embed.css";
 
@@ -15,7 +15,7 @@ import chatCss from "./embed.css";
  *
  * Public API, versioned like one:
  *
- *   Attributes   api-url, claim, owner-name, owner-github, owner-linkedin
+ *   Attributes   api-url, about, claim, owner-name
  *   Events       workchat-usage (detail: { used, remaining, max })
  *   CSS          the --chat-* palette, set on the element by the host page
  *
@@ -31,8 +31,10 @@ const ATTRIBUTES = [
   "about",
   "claim",
   "owner-name",
-  "owner-github",
-  "owner-linkedin",
+  // `owner-github` and `owner-linkedin` were here. Their links moved out of
+  // the chat onto the standalone page, so a host page that still sets them
+  // gets what it would have got from any unknown attribute: nothing, and no
+  // error.
 ] as const;
 
 /**
@@ -160,22 +162,15 @@ class WorkchatChat extends HTMLElement {
    *
    * The app reads this from the environment on the server and hands it down;
    * an embed has no server render of its own, so the host page's attributes
-   * are the only channel. `??` rather than a truthiness test, to keep the
-   * distinction `owner.ts` makes: an absent attribute means "nothing was
-   * said", an empty one means "I do not have one" — and an owner with no
-   * LinkedIn must get no link, not somebody else's.
+   * are the only channel. Only the name: the GitHub and LinkedIn links live
+   * on the standalone page now, outside the chat, and a host page has its
+   * own way of linking to its owner.
    */
-  #owner(): Owner {
+  #owner(): ChatOwner {
     return {
       name:
         this.getAttribute("owner-name") ??
         DEFAULT_OWNER.name,
-      githubUrl:
-        this.getAttribute("owner-github") ??
-        DEFAULT_OWNER.githubUrl,
-      linkedinUrl:
-        this.getAttribute("owner-linkedin") ??
-        DEFAULT_OWNER.linkedinUrl,
     };
   }
 

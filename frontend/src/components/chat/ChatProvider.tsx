@@ -15,6 +15,14 @@ import type { Owner } from "@/lib/owner";
 import type { Message, Usage } from "@/types/chat";
 
 /**
+ * The part of the owner the chat itself shows: the name in its header.
+ *
+ * The profile links are the standalone page's (see `OwnerLinks`), so an
+ * embedding page has nothing to pass for them.
+ */
+export type ChatOwner = Pick<Owner, "name">;
+
+/**
  * What the transcript is, on its own.
  *
  * Split from the rest deliberately. This changes on *every streamed token*,
@@ -37,7 +45,7 @@ interface ControlsValue {
    * request time, and the import would pull it into the browser bundle where
    * the value would be frozen at build.
    */
-  owner: Owner;
+  owner: ChatOwner;
   usage: Usage | null;
   input: string;
   loading: boolean;
@@ -93,7 +101,7 @@ export function ChatProvider({
 }: {
   token?: string;
   claim?: string;
-  owner: Owner;
+  owner: ChatOwner;
   /** A question to open the composer with, rather than an empty one. */
   seedQuestion?: string;
   /**

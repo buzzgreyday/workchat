@@ -27,14 +27,15 @@ safe. Renaming or removing one breaks every page that embeds this.
 | `about` | Opens the composer with this question in it, unsent. |
 | `claim` | A claim token, when the visitor followed a link. |
 | `owner-name` | Whose CV this is. Defaults to the name in `lib/owner-defaults.ts`. |
-| `owner-github` | GitHub URL for the header. Set it empty for no link. |
-| `owner-linkedin` | LinkedIn URL for the header. Set it empty for no link. |
 
 The app reads the owner from the environment during its server render. An
 embed has no server render, so the host page says who this is — or says
-nothing and gets the defaults. Absent and empty are different answers: an
-absent `owner-linkedin` takes the default, an empty one means "no LinkedIn"
-and the header shows no link rather than somebody else's.
+nothing and gets the default.
+
+`owner-github` and `owner-linkedin` are gone. The links moved out of the chat
+onto the standalone page, below the card, because an embedding page already
+has its own way of pointing at its owner. Setting them does nothing now, and
+breaks nothing: an attribute the element does not read is ignored.
 
 `about` seeds the composer rather than asking: the visitor reads it, edits it
 or deletes it, and a handful of questions is too few to spend one on wording

@@ -32,12 +32,13 @@ export default function ChatInput() {
         // sent, and nothing else did anything.
         ref={boxRef}
         rows={1}
-        // `text-body` is 16px and `text-meta` is 14px. The pair is not a style
-        // choice: under 16px iOS zooms the page the moment the field takes
-        // focus and does not zoom back out, which leaves the layout offset
-        // behind the keyboard and looks exactly like the chat having broken.
-        // Desktop keeps the 14px it always had.
-        className="chat-field bg-panel-raised border-line text-ink placeholder:text-ink-muted max-h-composer-max min-h-control flex-1 resize-none rounded-control border px-4 py-3 text-body transition sm:text-meta"
+        // `text-body`, 16px, at every width. Not only a style choice: under
+        // 16px iOS zooms the page the moment the field takes focus and does
+        // not zoom back out, which leaves the layout offset behind the
+        // keyboard and looks exactly like the chat having broken. Desktop used
+        // to drop to 14px, which made the question look smaller than the same
+        // words once they landed in a bubble; now what is typed matches.
+        className="chat-field bg-panel-raised border-line text-ink placeholder:text-ink-muted max-h-composer-max min-h-control flex-1 resize-none rounded-control border px-4 py-3 text-body transition"
         // Short on purpose, all three of them. A textarea soft-wraps, so a
         // placeholder wider than the box wraps to a second line inside a
         // one-row field and the composer scrolls before anything is typed.

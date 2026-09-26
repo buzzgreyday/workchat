@@ -5,7 +5,7 @@ import MessageList from "./MessageList";
 import ChatInput from "./Input";
 import { ChatProvider } from "./ChatProvider";
 
-import type { Owner } from "@/lib/owner";
+import type { ChatOwner } from "./ChatProvider";
 import type { Usage } from "@/types/chat";
 
 export default function Chat({
@@ -21,7 +21,7 @@ export default function Chat({
   // Read on the server and handed down, not imported: `@/lib/owner` reads the
   // environment at request time, and importing it here would pull it into the
   // browser bundle where the value would be frozen at build.
-  owner: Owner;
+  owner: ChatOwner;
   // Passed straight through to the provider, which is where usage lives. Only
   // the embed supplies it; see `embed/src/element.tsx`.
   // Puts a question in the composer on first render. The site links to

@@ -36,7 +36,7 @@ export default function MessageBubble({
       <div
         className={`min-w-0 max-w-[var(--bubble-max-width)] wrap-anywhere rounded-bubble px-4 py-3 shadow-sm ${
           isUser
-            ? "bg-accent text-on-accent rounded-br-sm"
+            ? "bg-accent text-ink rounded-br-sm"
             : "bg-panel-raised border-line text-ink rounded-bl-sm border"
         }`}
       >

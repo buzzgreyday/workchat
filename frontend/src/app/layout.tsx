@@ -1,12 +1,36 @@
 import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
-import { Geist } from "next/font/google";
+import { Bebas_Neue } from "next/font/google";
+import localFont from "next/font/local";
 
 import { readOwner } from "@/lib/owner";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Variable fonts: one file per style covers every weight in the range, so
+// `globals.css` can ask for any weight without a new file being added here.
+const nunito = localFont({
+  variable: "--font-nunito",
+  src: [
+    {
+      path: "./fonts/nunito/Nunito-Variable.woff2",
+      weight: "200 900",
+      style: "normal",
+    },
+    {
+      path: "./fonts/nunito/Nunito-VariableItalic.woff2",
+      weight: "200 900",
+      style: "italic",
+    },
+  ],
+});
+
+// A single weight, and capitals only — there is no bold to ask for, which is
+// why `--text-title--font-weight` is 400. From Google rather than a file in
+// `fonts/`: the Fontshare copy's licence forbids putting it in a public
+// repository, and Google's is the same Dharma Type design under the OFL.
+const bebas = Bebas_Neue({
+  variable: "--font-bebas",
+  weight: "400",
   subsets: ["latin"],
 });
 
@@ -33,7 +57,7 @@ export const viewport: Viewport = {
   // off the page it frames. Hand-converted and hardcoded because a meta tag
   // cannot read a custom property — if `--chat-bg` moves, this has to move
   // with it.
-  themeColor: "#0b0d12",
+  themeColor: "#1b3c53",
 
   interactiveWidget: "resizes-content",
 
@@ -67,7 +91,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} antialiased`}
+      className={`${nunito.variable} ${bebas.variable} antialiased`}
     >
       <body className="h-full">{children}</body>
     </html>
