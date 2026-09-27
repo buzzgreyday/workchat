@@ -7,6 +7,15 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.9.4] - 2026-09-27
+
+### Fixed
+
+- chat.mringdal.com's WORKCHAT title no longer outgrows its bar when the
+  browser enlarges text by itself, as DuckDuckGo's Text Size does on iOS. The
+  title keeps its designed size; messages, the badge and the links still
+  follow the reader's text size.
+
 ## [0.9.3] - 2026-09-27
 
 ### Added
