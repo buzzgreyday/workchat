@@ -59,7 +59,7 @@ export const viewport: Viewport = {
   // sit a shade off the page it frames. Hand-converted and hardcoded because
   // a meta tag cannot read a custom property — if that `--chat-bg` moves,
   // this has to move with it.
-  themeColor: "#1b3c53",
+  themeColor: "#547792",
 
   interactiveWidget: "resizes-content",
 

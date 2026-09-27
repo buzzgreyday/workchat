@@ -19,7 +19,7 @@ import type { Usage } from "@/types/chat";
  * `workchat-usage` — and asks for `frame="page"`: no card, since there is
  * nothing around the chat for a card to sit in.
  *
- * The chat's band is `bg-panel` edge to edge; the transcript and composer
+ * The chat's band is `--site-chat-bg` edge to edge; the transcript and composer
  * keep their readable column inside it. The bars are the page's own colour.
  * Rendered as the three children of page.tsx's `<main>`.
  */
@@ -38,8 +38,8 @@ export default function StandaloneChat({
     <>
       {/* Wraps rather than squeezing: on a phone the count drops to a line of
           its own instead of breaking the title in two. */}
-      <header className="shell-top shell-sides border-line flex w-full shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b pb-3">
-        <h1 className="text-ink text-title font-display">
+      <header className="shell-top shell-sides flex w-full shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--site-bar-border)] bg-[var(--site-bar-bg)] pb-3">
+        <h1 className="text-heading text-title font-display">
           Workchat
         </h1>
         {usage && (
@@ -47,7 +47,7 @@ export default function StandaloneChat({
         )}
       </header>
 
-      <div className="shell-sides-bleed bg-panel flex min-h-0 w-full flex-1 justify-center">
+      <div className="shell-sides-bleed flex bg-[var(--site-chat-bg)] min-h-0 w-full flex-1 justify-center">
         <Chat
           token={token}
           claim={claim}
@@ -58,14 +58,17 @@ export default function StandaloneChat({
         />
       </div>
 
-      {/* No links configured, no footer — rather than an empty strip. The
+      {/* `site-footer` steps aside while the on-screen keyboard is up, so the
+          composer sits right on it — see globals.css.
+
+          No links configured, no footer — rather than an empty strip. The
           chat's band then reaches the bottom, which is padded instead. */}
       {owner.githubUrl || owner.linkedinUrl ? (
-        <footer className="shell-bottom shell-sides border-line flex w-full shrink-0 justify-center border-t pt-2">
+        <footer className="site-footer shell-bottom shell-sides flex w-full shrink-0 justify-center border-t border-[var(--site-footer-border)] bg-[var(--site-footer-bg)] pt-2">
           <OwnerLinks owner={owner} />
         </footer>
       ) : (
-        <div className="shell-bottom bg-panel w-full shrink-0" />
+        <div className="site-footer shell-bottom w-full shrink-0 bg-[var(--site-chat-bg)]" />
       )}
     </>
   );

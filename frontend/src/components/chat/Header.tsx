@@ -16,11 +16,11 @@ export default function ChatHeader() {
   return (
     <div className="bg-panel border-line border-b px-gutter-lg py-gutter">
       <div className="flex items-center gap-3">
-        <div className="bg-accent text-on-accent flex size-10 shrink-0 items-center justify-center rounded-full shadow-sm">
+        <div className="bg-avatar text-avatar-ink flex size-10 shrink-0 items-center justify-center rounded-full shadow-sm">
           <Bot size={20} />
         </div>
 
-        <h1 className="text-ink text-title font-display">
+        <h1 className="text-heading text-title font-display">
             Workchat
         </h1>
         <p className={"font-sans"}>with {owner.name.toUpperCase()}</p>

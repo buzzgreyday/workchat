@@ -359,3 +359,53 @@ test("a streamed reply is followed without reaching outside the transcript", asy
     ),
   ).toBe(0);
 });
+
+test("the footer steps aside while the keyboard would be up", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  await openChat(page);
+
+  const footer = page.locator("footer.site-footer");
+  const composer = page.getByRole("textbox", {
+    name: "Your question",
+  });
+
+  await expect(footer).toBeVisible();
+
+  // Shut until the session opens, and a disabled field cannot take focus.
+  await expect(composer).toBeEnabled();
+
+  // Focus is what raises the on-screen keyboard on a touch screen, and so
+  // what the rule keys on; headless Chromium has no keyboard to show.
+  await composer.focus();
+  await expect(footer).toBeHidden();
+
+  await composer.blur();
+  await expect(footer).toBeVisible();
+});
+
+test("one tap on send sends, while the keyboard would be up", async ({
+  page,
+}) => {
+  await mockBackend(page, {
+    stream: replyWith("Backend work, mostly Python."),
+  });
+  await openChat(page);
+
+  const composer = page.getByRole("textbox", {
+    name: "Your question",
+  });
+
+  await expect(composer).toBeEnabled();
+  await composer.tap();
+  await composer.fill("What did he build?");
+
+  // The tap that used to be lost: leaving the field brought the footer back,
+  // the composer moved up under the finger, and the tap missed the button.
+  await page.getByRole("button", { name: "Send question" }).tap();
+
+  await expect(
+    page.locator(".chat-message", { hasText: "What did he build?" }),
+  ).toBeVisible();
+});

@@ -16,7 +16,7 @@ export default function UsageBadge({
 }) {
   return (
     <span
-      className={`bg-panel-raised text-ink-muted inline-block rounded-full px-3 py-1 text-micro shadow-sm ${className}`}
+      className={`chat-ui bg-badge text-badge-ink inline-block rounded-full px-3 py-1 text-micro shadow-sm ${className}`}
     >
       {usage.remaining} / {usage.max} questions left
     </span>

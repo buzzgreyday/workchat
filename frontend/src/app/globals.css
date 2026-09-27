@@ -43,15 +43,49 @@
      pale and the label on it would vanish with nothing to change. */
   --chat-on-accent: #fff;
 
-  /* Derived, not re-typed. This used to be the accent's own oklch triple
-     written out a second time with an alpha on it — one hue, two places to
-     edit, and only one of them would get edited. Mixing with `transparent`
-     premultiplies, so the result is the accent at 20% and nothing else. */
-  --chat-accent-soft: color-mix(
-    in oklab,
-    var(--chat-accent) 20%,
-    transparent
-  );
+  /* ---- Parts -----------------------------------------------------------
+     One variable per thing on screen, each defaulting to the palette colour
+     it has always used. Leave them alone and the eight colours above decide
+     everything; set one and only that part moves. The palette is the quick
+     way to restyle, these are the precise one.
+
+     Declared here, so they are rewritten onto `:host` like the palette: a
+     host that sets `--chat-accent` on the element still moves every part
+     that follows the accent, because each of these is computed on the same
+     element the host's value lands on. */
+  --chat-title-color: var(--chat-text);
+
+  --chat-user-bubble-bg: var(--chat-accent);
+  /* On the accent, so the colour made for the accent: a pale accent and pale
+     text is the pairing this used to produce. */
+  --chat-user-bubble-text: var(--chat-on-accent);
+  --chat-bot-bubble-bg: var(--chat-panel-alt);
+  --chat-bot-bubble-text: var(--chat-text);
+  --chat-bot-bubble-border: var(--chat-border);
+  /* Links in a reply. */
+  --chat-link: var(--chat-accent);
+
+  --chat-avatar-bg: var(--chat-accent);
+  --chat-avatar-icon: var(--chat-on-accent);
+  /* The circle beside each reply. Shrink it and set the icon to `none` for
+     a plain dot. */
+  --chat-avatar-size: 2rem;
+  /* The dots while a reply is being written. */
+  --chat-typing: var(--chat-text-muted);
+
+  --chat-input-bg: var(--chat-panel-alt);
+  --chat-input-text: var(--chat-text);
+  --chat-input-placeholder: var(--chat-text-muted);
+  --chat-input-border: var(--chat-border);
+  /* The border and glow when the input has focus. */
+  --chat-input-focus: var(--chat-accent);
+
+  --chat-send-bg: var(--chat-accent);
+  --chat-send-icon: var(--chat-on-accent);
+
+  /* The "questions left" pill. */
+  --chat-badge-bg: var(--chat-panel-alt);
+  --chat-badge-text: var(--chat-text-muted);
 
   /* ---- Geometry that is not a Tailwind namespace ----------------------- */
   --radius: 0.625rem;
@@ -75,6 +109,25 @@
   --color-accent: var(--chat-accent);
   --color-on-accent: var(--chat-on-accent);
 
+  /* The parts, as utilities. `heading` rather than `title`: `text-title` is
+     already the title's size, and a colour of the same name would collide
+     with it. */
+  --color-heading: var(--chat-title-color);
+  --color-bubble-user: var(--chat-user-bubble-bg);
+  --color-bubble-user-ink: var(--chat-user-bubble-text);
+  --color-bubble-bot: var(--chat-bot-bubble-bg);
+  --color-bubble-bot-ink: var(--chat-bot-bubble-text);
+  --color-bubble-bot-line: var(--chat-bot-bubble-border);
+  --color-avatar: var(--chat-avatar-bg);
+  --color-avatar-ink: var(--chat-avatar-icon);
+  --color-typing: var(--chat-typing);
+  --color-field: var(--chat-input-bg);
+  --color-field-ink: var(--chat-input-text);
+  --color-field-placeholder: var(--chat-input-placeholder);
+  --color-field-line: var(--chat-input-border);
+  --color-badge: var(--chat-badge-bg);
+  --color-badge-ink: var(--chat-badge-text);
+
   /* shadcn's semantic names, pointed at the same palette.
      Not an alias layer for its own sake: `ui/button.tsx` reads these, and they
      used to hold the stock *light* values — which is why the send button had
@@ -83,8 +136,9 @@
      *is* the accent here, so the button renders this app's colours unaided. */
   --color-background: var(--chat-bg);
   --color-foreground: var(--chat-text);
-  --color-primary: var(--chat-accent);
-  --color-primary-foreground: var(--chat-on-accent);
+  /* Primary is the send button, the one button this app has. */
+  --color-primary: var(--chat-send-bg);
+  --color-primary-foreground: var(--chat-send-icon);
   --color-secondary: var(--chat-panel-alt);
   --color-secondary-foreground: var(--chat-text);
   --color-muted: var(--chat-panel-alt);
@@ -153,9 +207,16 @@
   --spacing-gutter: 1.25rem;
   --spacing-gutter-lg: 1.5rem;
 
-  /* 44px: the send button, and the floor the composer may not shrink below.
-     A tap target, not a decoration. */
-  --spacing-control: 2.75rem;
+  /* The height of a one-line composer — its line, its padding (`py-3`) and
+     its border — so the send button beside it is exactly as tall, and the
+     field never shrinks below it. The line follows the message size, which
+     the composer does too (never under 1rem), so the two stay matched when a
+     theme makes the text larger. 50px at the default size: over the 44px a
+     tap target needs, which is what this used to be, fixed, and a few pixels
+     short of the field it sat beside. */
+  --spacing-control: calc(
+    max(1rem, var(--chat-font-message-size, 1rem)) * 1.5 + 1.5rem + 2px
+  );
   --spacing-composer-max: 8rem;
 
   /* ---- Radius ----------------------------------------------------------
@@ -280,6 +341,26 @@ html {
 }
 
 /**
+ * The footer, out of the way while someone types on a phone or tablet.
+ *
+ * Keyed to the composer having focus on a touch screen, because that is what
+ * brings the on-screen keyboard up — rather than measuring the viewport for a
+ * keyboard-sized loss, which iOS and Android report differently and a
+ * rotation or a browser toolbar can fake. With the keyboard up, space is
+ * scarcest; the footer's links are nobody's business mid-question, and the
+ * composer then sits directly on the keyboard. Blur and it comes back.
+ *
+ * `pointer: coarse` keeps a desktop, where focus brings no keyboard, as it
+ * is. A tablet with a hardware keyboard loses the footer while typing too,
+ * which is the price of not guessing.
+ */
+@media (pointer: coarse) {
+  main:has(.chat-field:focus) .site-footer {
+    display: none;
+  }
+}
+
+/**
  * The composer's focus state.
  *
  * A class rather than utilities because it is one decision made of three
@@ -289,8 +370,57 @@ html {
  */
 .chat-field:focus {
   outline: none;
-  border-color: var(--chat-accent);
-  box-shadow: 0 0 0 2px var(--chat-accent-soft);
+  border-color: var(--chat-input-focus);
+  /* Derived, not re-typed: the focus colour at 20%. Mixing with
+     `transparent` premultiplies, so it is that hue and nothing else. */
+  box-shadow: 0 0 0 2px
+    color-mix(in oklab, var(--chat-input-focus) 20%, transparent);
+}
+
+/**
+ * Type, by part.
+ *
+ * Classes rather than utilities because each is three properties read from
+ * optional variables, and the unset case is the design: with no fallback, a
+ * family or weight nobody named is invalid at computed-value time and simply
+ * inherits — the chat's own `--chat-font`, or the host page's font. So a host
+ * can name a face for the replies alone and leave everything else be.
+ *
+ *   --chat-font-message         replies and questions, the bubbles
+ *   --chat-font-message-weight
+ *   --chat-font-message-size    1rem unset
+ *   --chat-font-input           the text being typed
+ *   --chat-font-ui              the small print: the questions-left pill
+ */
+.chat-message {
+  font-family: var(--chat-font-message);
+  font-weight: var(--chat-font-message-weight);
+  font-size: var(--chat-font-message-size, 1rem);
+}
+
+.chat-message a {
+  color: var(--chat-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Never under 16px, whatever the messages are set to: below it iOS zooms the
+   page when the field takes focus and leaves the layout offset behind the
+   keyboard. Larger follows the messages, so typed and sent stay one size. */
+.chat-field {
+  font-family: var(--chat-font-input);
+  font-size: max(1rem, var(--chat-font-message-size, 1rem));
+}
+
+.chat-ui {
+  font-family: var(--chat-font-ui);
+}
+
+/* The robot in the reply avatar. `--chat-avatar-icon-display: none` leaves
+   the circle alone — a dot. Unset, the declaration is invalid and `display`
+   falls back to its initial value, which shows the icon. */
+.chat-avatar-icon {
+  display: var(--chat-avatar-icon-display);
 }
 
 /* Subtle rotating accent sheen, shown around the bot avatar while it's replying */
@@ -311,10 +441,10 @@ html {
   border-radius: 9999px;
   background: conic-gradient(
     from 0deg,
-    var(--chat-accent),
+    var(--chat-avatar-bg),
     transparent 35%,
     transparent 65%,
-    var(--chat-accent)
+    var(--chat-avatar-bg)
   );
   animation: chat-ring-spin 2.4s linear infinite;
   z-index: -1;
