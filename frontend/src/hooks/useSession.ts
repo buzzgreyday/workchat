@@ -232,7 +232,13 @@ export function useSession({
               : "none",
         );
       } finally {
-        if (!cancelled && claim) {
+        // Whenever a claim came in at all — an empty one too. `?claim=` with
+        // nothing after it (a link cut short, an address bar autocompleting
+        // one) is no claim to exchange, and went down the refresh path above,
+        // but it is still no reason to leave a dangling `?claim=` in the
+        // address. `undefined` means none was given: an embed with no `claim`
+        // attribute leaves its host page's address alone.
+        if (!cancelled && claim !== undefined) {
           stripCredentialParams();
         }
       }
