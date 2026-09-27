@@ -1,6 +1,9 @@
 /*
  * chat.mringdal.com's own look — every setting, in one place.
  *
+ * docs/design.md describes this scheme for other projects (the mringdal.com
+ * website first), in plain hex. Change a colour here, update it there.
+ *
  * Standalone only. `layout.tsx` imports this after `globals.css`, and the
  * embed never imports it, so nothing here reaches a page that embeds the
  * chat — that page gets the plain defaults in `globals.css` and dresses them
