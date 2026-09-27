@@ -26,13 +26,15 @@
 :root {
   /* ---- Palette ---------------------------------------------------------- */
   --chat-bg: oklch(0.553 0.058 242.232);
-  --chat-panel: oklch(0.318 0.044 250.55);
-  --chat-panel-alt: oklch(0.318 0.044 250.55 / 0.8); /* ai answer bubbles, questions count*/
+  --chat-panel: oklch(0.295 0.044 250.55);
+  /* The panel lifted with a little white, so replies, the input and the
+     questions-left pill read as raised above it. Derived, so it follows the
+     panel; raise the white share for more lift. */
+  --chat-panel-alt: color-mix(in oklab, var(--chat-panel) 92%, white);
   --chat-border: oklch(1 0 0 / 10%);
   --chat-text: #eae0cf;
   --chat-text-muted: oklch(0.63 0.01 260);
   --chat-accent: oklch(0.75 0.04 224.461);
-  --chat-accent: #C29C37;
   /* The send button's colour, on its own: the title and the avatar have a
      colour of their own now, so this can change without moving them. The
      pill text and the input's focus follow the button. */
