@@ -91,6 +91,29 @@ test("the claim does not survive in the address bar", async ({
   );
 });
 
+test("an empty ?claim= is no claim, and does not linger in the address bar", async ({
+  page,
+}) => {
+  const calls = authCalls();
+
+  await mockBackend(page, { refresh: "gone", calls });
+
+  await page.goto("/?claim=&x=1");
+
+  // Nothing to exchange, so it is an ordinary arrival: resume from the
+  // cookie, and with none, ask for a link.
+  await expect(
+    page.getByText("You'll need the chat link you were sent"),
+  ).toBeVisible();
+  expect(calls.claim).toBe(0);
+
+  // And the address is left as it would be after a real claim: no `claim`,
+  // everything else kept.
+  await expect(page).toHaveURL(
+    (url) => !url.search.includes("claim") && url.searchParams.get("x") === "1",
+  );
+});
+
 test("an expired access token is refreshed, and the question still goes through", async ({
   page,
 }) => {

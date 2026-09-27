@@ -7,6 +7,16 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [Unreleased]
+
+### Fixed
+
+- An empty `?claim=` — a link cut short, an address bar autocompleting one —
+  no longer stays in the address bar. It was already treated as no claim
+  (the chat resumes from the cookie, or asks for a link); now it is stripped
+  like a spent one, on chat.mringdal.com and in the embed alike. An embed with
+  no `claim` attribute still leaves its host page's address alone.
+
 ## [0.9.4] - 2026-09-27
 
 ### Fixed
