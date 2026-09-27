@@ -92,3 +92,17 @@
 		}
 	}
 }
+
+# Other sites on this host, each in a file of its own.
+#
+# This Caddy owns ports 80 and 443, so anything else the host serves has to go
+# through it. Rather than write those sites in here — this repo is not tied to
+# any domain, and is not where another project's routing belongs — each drops
+# a `<name>.caddy` file into the sites directory, mounted from
+# `CADDY_SITES_DIR` (default `./caddy/sites`, see docker-compose.prod.yaml),
+# and reloads Caddy. Every such file must name its own host: a bare block
+# would become a catch-all in front of this one.
+#
+# Empty by default, and a glob that matches nothing imports nothing, so a
+# deployment with no other sites is exactly what it was before this existed.
+import /etc/caddy/sites/*.caddy
