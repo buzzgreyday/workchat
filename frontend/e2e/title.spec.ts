@@ -10,8 +10,14 @@ import { mockBackend, openChat } from "./backend";
  * means none of it happens.
  */
 
+// The two versions are stacked; what is shown is whichever layer is lit.
 const shown = (page: import("@playwright/test").Page) =>
-  page.locator("h1 [aria-hidden='true']").textContent();
+  page.evaluate(() =>
+    [...document.querySelectorAll("h1 [aria-hidden='true'] > span")]
+      .filter((el) => Number(getComputedStyle(el).opacity) > 0.5)
+      .map((el) => el.textContent)
+      .join(""),
+  );
 
 test("the two halves trade places", async ({ page }) => {
   await mockBackend(page);
@@ -33,7 +39,7 @@ test("the title stays still when reduced motion is asked for", async ({
   await openChat(page);
 
   // Past the point where the first switch would have happened.
-  await page.waitForTimeout(4500);
+  await page.waitForTimeout(5500);
 
   expect(await shown(page)).toBe("Workchat");
 });
