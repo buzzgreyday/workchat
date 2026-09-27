@@ -27,10 +27,11 @@ export default async function Home({
     // is what keeps the composer above an iOS keyboard; three elements each
     // naming their own `dvh` is how they drift apart when it changes.
     //
-    // A container, so the chat sizes itself by this space and not the window.
-    // What goes in it — the site's top bar, then the chat — is
-    // `StandaloneChat`'s, which needs the browser to hold the allowance.
-    <main className="bg-canvas chat-shell @container flex h-full flex-col items-center justify-center gap-3">
+    // Edge to edge: the top bar, the chat and the footer are
+    // `StandaloneChat`'s, which needs the browser to hold the allowance. Each
+    // pads itself off the screen's edges (`.shell-*` in globals.css). A
+    // container, so what sizes itself inside does so by this space.
+    <main className="bg-canvas @container flex h-full flex-col">
       <StandaloneChat
         token={token}
         claim={claim}

@@ -11,16 +11,16 @@ import { mockBackend, openChat } from "./backend";
  * from whatever the image was built with.
  */
 
-test("the header and the tab name the configured owner", async ({
+test("the tab names the configured owner, under the site's own title", async ({
   page,
 }) => {
   await mockBackend(page);
   await openChat(page);
 
+  // The top bar says "Workchat" and no more — the name lives in the tab and
+  // the metadata, which are what is read from the environment here.
   await expect(
-    page.getByRole("heading", {
-      name: "Workchat with Ada Lovelace",
-    }),
+    page.getByRole("heading", { name: "Workchat", exact: true }),
   ).toBeVisible();
 
   await expect(page).toHaveTitle(

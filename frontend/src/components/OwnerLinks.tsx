@@ -45,7 +45,7 @@ export default function OwnerLinks({
           href={owner.githubUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-ink-muted hover:text-accent flex items-center gap-1.5 text-meta transition"
+          className="chat-ui flex items-center gap-1.5 text-meta text-[var(--site-link)] transition hover:text-[var(--site-link-hover)]"
         >
           <GithubIcon />
           GitHub
@@ -56,7 +56,7 @@ export default function OwnerLinks({
           href={owner.linkedinUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-ink-muted hover:text-accent flex items-center gap-1.5 text-meta transition"
+          className="chat-ui flex items-center gap-1.5 text-meta text-[var(--site-link)] transition hover:text-[var(--site-link-hover)]"
         >
           <LinkedinIcon />
           LinkedIn

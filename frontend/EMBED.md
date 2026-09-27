@@ -78,6 +78,28 @@ Set them on an ancestor instead and the defaults inside win, because custom
 properties inherit but are then overridden by the shadow tree's own
 declaration — the element is the place to put them.
 
+**Colours by part** — the palette is the quick way; these are the precise one.
+Each defaults to the palette colour it has always used, so setting
+`--chat-accent` still moves everything that follows the accent, and setting
+one of these moves that part alone:
+
+| Variable | Part | Default |
+| --- | --- | --- |
+| `--chat-title-color` | The header title | `--chat-text` |
+| `--chat-user-bubble-bg`, `--chat-user-bubble-text` | The visitor's questions | `--chat-accent`, `--chat-on-accent` |
+| `--chat-bot-bubble-bg`, `--chat-bot-bubble-text`, `--chat-bot-bubble-border` | The replies | `--chat-panel-alt`, `--chat-text`, `--chat-border` |
+| `--chat-link` | Links in a reply | `--chat-accent` |
+| `--chat-avatar-bg`, `--chat-avatar-icon` | The bot's avatar | `--chat-accent`, `--chat-on-accent` |
+| `--chat-avatar-size`, `--chat-avatar-icon-display` | The avatar's size, and `none` to drop its icon for a plain dot | `2rem`, shown |
+| `--chat-typing` | The dots while a reply is written | `--chat-text-muted` |
+| `--chat-input-bg`, `--chat-input-text`, `--chat-input-placeholder`, `--chat-input-border` | The input | `--chat-panel-alt`, `--chat-text`, `--chat-text-muted`, `--chat-border` |
+| `--chat-input-focus` | The input's border and glow on focus | `--chat-accent` |
+| `--chat-send-bg`, `--chat-send-icon` | The send button | `--chat-accent`, `--chat-on-accent` |
+| `--chat-badge-bg`, `--chat-badge-text` | The questions-left pill | `--chat-panel-alt`, `--chat-text-muted` |
+
+`src/app/theme.css` sets every one of them for the standalone site, and reads
+as a worked example.
+
 **Fonts** — by default the chat is in the host page's font: it inherits, like
 any other text on the page. To choose, set these on the element too:
 
@@ -88,6 +110,11 @@ any other text on the page. To choose, set these on the element too:
 | `--chat-font-title` | The header title's family. | `--chat-font`. |
 | `--chat-font-title-weight` | The title's weight. | `600` |
 | `--chat-font-title-size` | The title's size. | `1.25rem` |
+| `--chat-font-message` | The bubbles' family. | `--chat-font` |
+| `--chat-font-message-weight` | The bubbles' weight. | `--chat-font-weight` |
+| `--chat-font-message-size` | The bubbles' size. The input follows it, never below `1rem`. | `1rem` |
+| `--chat-font-input` | The family of the text being typed. | `--chat-font` |
+| `--chat-font-ui` | The small print: the questions-left pill. | `--chat-font` |
 
 ```css
 workchat-chat {

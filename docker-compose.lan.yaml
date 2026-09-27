@@ -1,0 +1,29 @@
+# The dev stack, reachable from a phone on the same network.
+#
+#   scripts/dev-lan.sh          # finds the address, applies this, prints a QR
+#
+# Or by hand, with LAN_IP set to this machine's address on the network:
+#
+#   LAN_IP=192.168.1.20 docker compose -f docker-compose.yaml \
+#     -f docker-compose.lan.yaml up -d backend frontend
+#
+# A phone's "localhost" is the phone, so everything the browser is told about
+# has to name this machine by its LAN address instead. Overlaid rather than
+# edited into backend/.env or the base file, for the same reason as
+# docker-compose.embed.yaml: `environment` beats `env_file`, nothing on disk
+# changes, and bringing the stack up without it puts everything back.
+services:
+  backend:
+    environment:
+      # The chat's origin on the LAN. Unioned with the dev defaults, so
+      # localhost:3000 keeps working on this machine at the same time.
+      ALLOWED_HOSTS: "http://${LAN_IP:?LAN_IP must be set}:3000"
+
+  frontend:
+    environment:
+      # Inlined into the browser bundle by `next dev` at startup, which is why
+      # applying this recreates the container rather than reloading it.
+      NEXT_PUBLIC_API_URL: "http://${LAN_IP:?LAN_IP must be set}:8000"
+      # Read by next.config.ts: `next dev` blocks its dev-only assets and
+      # hot-reload socket for any host but the one it started on.
+      LAN_IP: "${LAN_IP:?LAN_IP must be set}"

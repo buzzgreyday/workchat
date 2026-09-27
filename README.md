@@ -298,6 +298,24 @@ Open a shell:
 docker compose exec frontend sh
 ```
 
+Try it on a phone on the same Wi-Fi:
+
+```bash
+scripts/dev-lan.sh          # prints a claim link and a QR code to scan
+scripts/dev-lan.sh --off    # back to localhost only
+```
+
+It recreates the backend and frontend with `docker-compose.lan.yaml`, which
+points the browser at this machine's LAN address instead of `localhost` and
+adds that origin to the backend's CORS list. `localhost:3000` keeps working
+alongside it. Each run mints a fresh claim link; claims work once, so run it
+again for a new one.
+
+Edits hot-reload on the phone as they do on this machine, while the overlay is
+on. Each run, `--off` included, recreates the frontend with a different API
+address, so reload any page left open from before. One opened before `--off`
+keeps showing its last state and stops updating.
+
 ---
 
 # Database

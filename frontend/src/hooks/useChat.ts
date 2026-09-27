@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { getGrantId } from "@/lib/auth";
+import { newId } from "@/lib/utils";
 import {
   GENERIC_FAILURE_MESSAGE,
   NO_QUESTIONS_LEFT,
@@ -113,7 +114,7 @@ export function useChat({
 
     dispatch({
       type: "user/asked",
-      id: crypto.randomUUID(),
+      id: newId(),
       content: text,
       at: new Date(),
     });
@@ -123,7 +124,7 @@ export function useChat({
     try {
       dispatch({
         type: "assistant/opened",
-        id: crypto.randomUUID(),
+        id: newId(),
         at: new Date(),
       });
 

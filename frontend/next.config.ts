@@ -3,6 +3,13 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
 
+  // `next dev` refuses its dev-only assets and hot-reload socket to any host
+  // but the one it started on, so a phone opening this machine by its LAN
+  // address gets a page that never hydrates. Set by docker-compose.lan.yaml
+  // (via scripts/dev-lan.sh); unset, this is empty and changes nothing.
+  // Development only — a production build ignores it.
+  allowedDevOrigins: process.env.LAN_IP ? [process.env.LAN_IP] : [],
+
   async headers() {
     return [
       {
