@@ -7,6 +7,14 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.9.2] - 2026-09-27
+
+### Added
+
+- The embed takes `frame="page"`: no card, no height cap, the chat's column
+  on whatever band the host gives it — chat.mringdal.com's own layout, for a
+  page that is the chat. Without it, or with any other value, the card stays.
+
 ## [0.9.1] - 2026-09-27
 
 ### Added

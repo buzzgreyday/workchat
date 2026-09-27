@@ -28,6 +28,7 @@ safe. Renaming or removing one breaks every page that embeds this.
 | `claim` | A claim token, when the visitor followed a link. |
 | `owner-name` | Whose CV this is. Defaults to the name in `lib/owner-defaults.ts`. |
 | `header` | `none` hides the chat's header — its title and the questions-left badge. Anything else, or nothing, shows it. |
+| `frame` | `page` drops the card — its border, corners, shadow and height cap — for a host that gives the chat a band of its own. Anything else, or nothing, keeps the card. |
 
 The app reads the owner from the environment during its server render. An
 embed has no server render, so the host page says who this is — or says
@@ -241,6 +242,11 @@ keyboard. Embedded there is nothing to write it for — the rule that reads it
 is `html { height: var(--app-height) }`, and a shadow tree has no `html` — and
 the keyboard is the host's layout problem. The element adopts one stylesheet
 into its own shadow root and otherwise leaves the document as it found it.
+
+`frame="page"` is chat.mringdal.com's own layout: the transcript and composer
+keep their reading column, and the host paints the band behind them. The
+element's box is `--chat-bg`; set it to the band's colour, or the element's
+background to `transparent`.
 
 ## Known gaps
 
