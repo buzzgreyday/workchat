@@ -5,6 +5,7 @@ import { useState } from "react";
 import Chat from "@/components/chat/Chat";
 import UsageBadge from "@/components/chat/UsageBadge";
 import OwnerLinks from "@/components/OwnerLinks";
+import RollingTitle from "@/components/RollingTitle";
 import type { Owner } from "@/lib/owner";
 import type { Usage } from "@/types/chat";
 
@@ -40,7 +41,7 @@ export default function StandaloneChat({
           its own instead of breaking the title in two. */}
       <header className="shell-top shell-sides flex w-full shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--site-bar-border)] bg-[var(--site-bar-bg)] pb-3">
         <h1 className="text-heading text-title font-display">
-          Workchat
+          <RollingTitle text="Workchat" />
         </h1>
         {usage && (
           <UsageBadge usage={usage} className="ms-auto shrink-0" />
