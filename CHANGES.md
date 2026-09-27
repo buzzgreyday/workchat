@@ -7,7 +7,28 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
-## [0.9.0] - 2026-09-26
+## [0.9.1] - 2026-09-27
+
+### Added
+
+- chat.mringdal.com's title switches between WORKCHAT and CHATWORK now and
+  then: one slowly cross-fades into the other in the same place, so the title
+  never goes dark, then it rests about seven seconds. Screen readers always
+  hear "Workchat", and with reduced motion asked for it stays still.
+- `docs/design.md`: the mringdal look written down for other projects —
+  colour roles with their hex values, the rules that keep them apart,
+  measured contrast, type, shape and spacing — with the recipe for the
+  Next.js website: `next/font`, Tailwind 4 tokens, and the palette handed to
+  `<workchat-chat>`.
+
+### Changed
+
+- chat.mringdal.com: the panel is a touch deeper, and replies, the input and
+  the questions-left pill sit on a raised panel lifted from it with white,
+  where they had been the same colour as the chat behind them. The
+  visitor's own messages reach 4.5:1 as a result.
+
+## [0.9.0] - 2026-09-27
 
 ### Added
 
@@ -25,6 +46,10 @@ tracked independently._
   top bar, band and footer.
 - `header="none"` hides the chat's header, for a host that frames it with its
   own. The allowance still arrives as `workchat-usage`.
+- `scripts/dev-lan.sh` opens the local dev stack to a phone on the same
+  network: it applies `docker-compose.lan.yaml`, allows the LAN address in
+  Next's `allowedDevOrigins`, mints a claim link and prints a QR code.
+  Hot reload works over the LAN; `--off` puts the stack back.
 
 ### Changed
 
@@ -49,6 +74,8 @@ tracked independently._
   count drops to its own line on a phone rather than breaking the title.
 - The title is written in normal case. Bebas draws capitals regardless, and
   screen readers no longer spell it out.
+- chat.mringdal.com's theme: a coral send button (`--chat-action`), with the
+  title, avatar and questions-left text in a pale gold of their own.
 
 ### Removed
 
@@ -59,6 +86,15 @@ tracked independently._
 
 - The embed's title was a 2.5rem system font at weight 400: the Bebas size
   and weight, without Bebas, which never reached the shadow root.
+- One tap on send sends on a phone or tablet. Pressing it took focus from
+  the input, which brought the footer back and moved the composer under the
+  finger, so the first tap missed. The button now keeps focus on the input,
+  and the keyboard stays up for the next question.
+- Asking a question on a plain-http page threw: `crypto.randomUUID()` only
+  exists on secure pages. Message ids fall back to `getRandomValues`. The
+  HTTPS site was never affected.
+- The send button is as tall as a one-line input. It was a fixed 44px beside
+  a 50px field.
 
 ## [0.8.0] - 2026-09-26
 
