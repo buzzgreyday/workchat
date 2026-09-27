@@ -58,3 +58,6 @@ known_hosts
 # Machine-specific Claude Code settings. A shared .claude/settings.json stays
 # tracked; the .local one is personal and can carry environment details.
 .claude/settings.local.json
+
+# Playwright output, if a run is started from the repo root by mistake.
+/test-results/
