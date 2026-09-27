@@ -7,6 +7,23 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.9.1] - 2026-09-27
+
+### Added
+
+- `docs/design.md`: the mringdal look written down for other projects —
+  colour roles with their hex values, the rules that keep them apart,
+  measured contrast, type, shape and spacing — with the recipe for the
+  Next.js website: `next/font`, Tailwind 4 tokens, and the palette handed to
+  `<workchat-chat>`.
+
+### Changed
+
+- chat.mringdal.com: the panel is a touch deeper, and replies, the input and
+  the questions-left pill sit on a raised panel lifted from it with white,
+  where they had been the same colour as the chat behind them. The
+  visitor's own messages reach 4.5:1 as a result.
+
 ## [0.9.0] - 2026-09-27
 
 ### Added
@@ -54,9 +71,7 @@ tracked independently._
 - The title is written in normal case. Bebas draws capitals regardless, and
   screen readers no longer spell it out.
 - chat.mringdal.com's theme: a coral send button (`--chat-action`), with the
-  title, avatar and questions-left text in a pale gold of their own, on a
-  slightly deeper panel. Replies, the input and the pill sit on a raised
-  panel lifted from it with white.
+  title, avatar and questions-left text in a pale gold of their own.
 
 ### Removed
 
