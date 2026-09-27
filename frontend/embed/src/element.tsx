@@ -15,7 +15,7 @@ import chatCss from "./embed.css";
  *
  * Public API, versioned like one:
  *
- *   Attributes   api-url, about, claim, owner-name, header
+ *   Attributes   api-url, about, claim, owner-name, header, frame
  *   Events       workchat-usage (detail: { used, remaining, max })
  *   CSS          the --chat-* palette and fonts, set on the element by the
  *                host page
@@ -33,6 +33,7 @@ const ATTRIBUTES = [
   "claim",
   "owner-name",
   "header",
+  "frame",
   // `owner-github` and `owner-linkedin` were here. Their links moved out of
   // the chat onto the standalone page, so a host page that still sets them
   // gets what it would have got from any unknown attribute: nothing, and no
@@ -156,6 +157,14 @@ class WorkchatChat extends HTMLElement {
           // has always had.
           showHeader={
             this.getAttribute("header") !== "none"
+          }
+          // `frame="page"` for a host that gives the chat a whole band of its
+          // own, as chat.mringdal.com does: no card, no height cap. Anything
+          // else keeps the card.
+          frame={
+            this.getAttribute("frame") === "page"
+              ? "page"
+              : "card"
           }
           onUsageChange={(usage) =>
             this.#emit("workchat-usage", usage)
