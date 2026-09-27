@@ -139,7 +139,7 @@ test("the browser is told to resize the layout for the keyboard", async ({
   // instruction rather than the effect. `interactive-widget=resizes-content`
   // is what makes `dvh` shrink when a keyboard opens instead of leaving the
   // composer behind it; `viewport-fit=cover` is what makes the safe-area
-  // insets `.chat-shell` pads with resolve to anything at all.
+  // insets the `.shell-*` rules pad with resolve to anything at all.
   const content = await page
     .locator('meta[name="viewport"]')
     .getAttribute("content");

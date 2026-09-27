@@ -16,6 +16,7 @@ export default function Chat({
   onUsageChange,
   ownsViewport,
   showHeader = true,
+  frame = "card",
 }: {
   token?: string;
   claim?: string;
@@ -36,6 +37,11 @@ export default function Chat({
   // False when the host page has a header of its own. The allowance the
   // header would have shown still reaches the host, through `onUsageChange`.
   showHeader?: boolean;
+  // "card": a bordered, rounded, capped box, for a chat set into somebody
+  // else's page — a dialog, a sidebar. "page": no box, for a host that gives
+  // the chat the whole page and frames it itself; the transcript and composer
+  // keep a readable column, and the host paints what is either side of it.
+  frame?: "card" | "page";
 }) {
   // Nothing is threaded through here any more. The three children read what
   // they each need from the provider, so adding something to the composer no
@@ -62,7 +68,13 @@ export default function Chat({
       ownsViewport={ownsViewport}
     >
       <div className="@container flex h-full w-full items-center justify-center">
-        <div className="bg-panel border-line flex h-full w-full max-w-chat flex-col overflow-hidden rounded-card border shadow-2xl @min-[40rem]:max-h-[var(--card-max-height)]">
+        <div
+          className={
+            frame === "card"
+              ? "bg-panel flex h-full w-full max-w-chat flex-col overflow-hidden rounded-card border shadow-2xl @min-[40rem]:max-h-[var(--card-max-height)]"
+              : "flex h-full w-full max-w-chat flex-col"
+          }
+        >
           {showHeader && <ChatHeader />}
 
           <MessageList />

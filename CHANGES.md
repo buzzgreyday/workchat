@@ -25,12 +25,14 @@ tracked independently._
   so an embed no longer inherits one site's branding.
 - The card's height cap follows the chat's own width (a container query), not
   the window's. A chat in a narrow dialog on a wide screen fills the dialog.
-- chat.mringdal.com frames the chat as any host would: a top bar of its own
-  (the title, the questions left, the GitHub and LinkedIn links) and the chat
-  under it with its header off. The links moved up from below the card. The
-  chat's built-in header stays as the default for embeds that bring none.
-- The standalone title scales with the page: 2.5rem where there is room,
-  down to 1.5rem on a phone, where it had wrapped onto two lines.
+- chat.mringdal.com gives the chat the whole page: a top bar with the title
+  and the questions left, the chat edge to edge under it, and a footer with
+  the GitHub and LinkedIn links. It frames the chat as any host would, with
+  the chat's header off and no card (`frame="page"`); the transcript keeps a
+  readable column. The chat's built-in header and card stay the defaults for
+  embeds.
+- The standalone title scales with the page, 2.5rem down to 1.5rem, and the
+  count drops to its own line on a phone rather than breaking the title.
 - The title is written in normal case. Bebas draws capitals regardless, and
   screen readers no longer spell it out.
 

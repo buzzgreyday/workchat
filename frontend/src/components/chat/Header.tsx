@@ -21,8 +21,9 @@ export default function ChatHeader() {
         </div>
 
         <h1 className="text-ink text-title font-display">
-          Workchat with {owner.name}
+            Workchat
         </h1>
+        <p className={"font-sans"}>with {owner.name.toUpperCase()}</p>
       </div>
 
       {usage && <UsageBadge usage={usage} className="mt-3" />}

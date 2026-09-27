@@ -63,10 +63,10 @@ export const viewport: Viewport = {
 
   interactiveWidget: "resizes-content",
 
-  // Paint under the notch and the home indicator. Only safe because
-  // `.chat-shell` pads the content back off them with `env(safe-area-inset-*)`
-  // — and those insets only become non-zero once this is set. Neither half is
-  // any use without the other.
+  // Paint under the notch and the home indicator. Only safe because the
+  // `.shell-*` rules pad the content back off them with
+  // `env(safe-area-inset-*)` — and those insets only become non-zero once
+  // this is set. Neither half is any use without the other.
   viewportFit: "cover",
 };
 

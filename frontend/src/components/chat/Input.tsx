@@ -25,7 +25,7 @@ export default function ChatInput() {
   const boxRef = useAutoResize(input);
 
   return (
-    <div className="border-line flex items-end gap-3 border-t p-gutter-sm">
+    <div className="flex items-end gap-3 p-gutter-sm">
       <textarea
         // A textarea rather than an input: a question worth asking a CV often
         // runs to two sentences, and there was no way to break a line — Enter
@@ -38,7 +38,7 @@ export default function ChatInput() {
         // keyboard and looks exactly like the chat having broken. Desktop used
         // to drop to 14px, which made the question look smaller than the same
         // words once they landed in a bubble; now what is typed matches.
-        className="chat-field bg-panel-raised border-line text-ink placeholder:text-ink-muted max-h-composer-max min-h-control flex-1 resize-none rounded-control border px-4 py-3 text-body transition"
+        className="chat-field bg-panel-raised text-ink placeholder:text-ink-muted max-h-composer-max min-h-control flex-1 resize-none rounded-control border px-4 py-3 text-body transition"
         // Short on purpose, all three of them. A textarea soft-wraps, so a
         // placeholder wider than the box wraps to a second line inside a
         // one-row field and the composer scrolls before anything is typed.
