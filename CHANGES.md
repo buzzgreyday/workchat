@@ -7,6 +7,59 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.9.0] - 2026-09-26
+
+### Added
+
+- The embed takes fonts from the host: it inherits the page's font by
+  default, and `--chat-font`, `--chat-font-weight`, `--chat-font-title`,
+  `--chat-font-title-weight` and `--chat-font-title-size` choose otherwise.
+  The host loads the faces; the element names them.
+- Colours by part: `--chat-title-color`, the user and bot bubbles, links,
+  avatar, typing dots, input (including focus), send button and the
+  questions-left pill each have their own variable, defaulting to the palette
+  colour they used before. Fonts by part too: `--chat-font-message` (with
+  weight and size), `--chat-font-input` and `--chat-font-ui`. The input
+  follows the message size but never goes below 1rem. `src/app/theme.css`
+  lists every setting, with `--site-*` variables for the standalone page's
+  top bar, band and footer.
+- `header="none"` hides the chat's header, for a host that frames it with its
+  own. The allowance still arrives as `workchat-usage`.
+
+### Changed
+
+- The element's defaults are plain. chat.mringdal.com's palette, Nunito and
+  Bebas moved to `src/app/theme.css`, which only the standalone site loads,
+  so an embed no longer inherits one site's branding.
+- The card's height cap follows the chat's own width (a container query), not
+  the window's. A chat in a narrow dialog on a wide screen fills the dialog.
+- chat.mringdal.com gives the chat the whole page: a top bar with the title
+  and the questions left, the chat edge to edge under it, and a footer with
+  the GitHub and LinkedIn links. It frames the chat as any host would, with
+  the chat's header off and no card (`frame="page"`); the transcript keeps a
+  readable column. The chat's built-in header and card stay the defaults for
+  embeds.
+- The visitor's own messages follow `--chat-on-accent` again, through
+  `--chat-user-bubble-text`: they sit on the accent, and 0.8.0's
+  `--chat-text` put pale text on a pale accent.
+- On a phone or tablet, the standalone footer steps aside while the input has
+  focus, which is what brings the on-screen keyboard up, so the input sits
+  right on the keyboard. It comes back when the input loses focus.
+- The standalone title scales with the page, 2.5rem down to 1.5rem, and the
+  count drops to its own line on a phone rather than breaking the title.
+- The title is written in normal case. Bebas draws capitals regardless, and
+  screen readers no longer spell it out.
+
+### Removed
+
+- `--chat-accent-soft`. It only coloured the input's focus glow, which is now
+  derived from `--chat-input-focus`.
+
+### Fixed
+
+- The embed's title was a 2.5rem system font at weight 400: the Bebas size
+  and weight, without Bebas, which never reached the shadow root.
+
 ## [0.8.0] - 2026-09-26
 
 ### Added

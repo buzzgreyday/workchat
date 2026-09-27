@@ -105,9 +105,9 @@ export function ChatProvider({
   /** A question to open the composer with, rather than an empty one. */
   seedQuestion?: string;
   /**
-   * Told when the allowance moves. Nothing in this app listens; it exists for
-   * the embed, where the host page owns everything around the chat and the
-   * remaining questions are the one number it might want to show there.
+   * Told when the allowance moves, for a host that shows it in a header of
+   * its own: the embed's page, through `workchat-usage`, and the standalone
+   * site's top bar (`StandaloneChat`).
    */
   onUsageChange?: (usage: Usage) => void;
   /**

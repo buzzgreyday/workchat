@@ -11,16 +11,16 @@ import { mockBackend, openChat } from "./backend";
  * from whatever the image was built with.
  */
 
-test("the header and the tab name the configured owner", async ({
+test("the tab names the configured owner, under the site's own title", async ({
   page,
 }) => {
   await mockBackend(page);
   await openChat(page);
 
+  // The top bar says "Workchat" and no more — the name lives in the tab and
+  // the metadata, which are what is read from the environment here.
   await expect(
-    page.getByRole("heading", {
-      name: "Workchat with Ada Lovelace",
-    }),
+    page.getByRole("heading", { name: "Workchat", exact: true }),
   ).toBeVisible();
 
   await expect(page).toHaveTitle(
@@ -49,4 +49,18 @@ test("a configured link is followed, and an empty one is not rendered", async ({
       name: "LinkedIn",
     }),
   ).toHaveCount(0);
+});
+
+test("the site's top bar is the only header", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  await openChat(page);
+
+  // The site frames the chat as any host would, with the chat's own header
+  // turned off. Two headings would mean both came back.
+  await expect(page.getByRole("heading")).toHaveCount(1);
+  await expect(
+    page.locator("header").getByText(/questions left/),
+  ).toBeVisible();
 });
