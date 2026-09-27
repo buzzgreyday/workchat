@@ -7,6 +7,16 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [Unreleased]
+
+### Added
+
+- Other sites on the same host can be served through this stack's Caddy:
+  the Caddyfile imports `/etc/caddy/sites/*.caddy`, mounted from
+  `CADDY_SITES_DIR` (default `./caddy/sites`, empty). Each site brings its own
+  file and reloads Caddy; with none there, nothing changes. See "Other sites
+  on this host" in `docs/deployment.md`.
+
 ## [0.9.2] - 2026-09-27
 
 ### Added

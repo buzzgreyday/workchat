@@ -19,6 +19,10 @@ services:
       - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Other sites this host serves, one `.caddy` file each, imported at the
+      # end of the Caddyfile. Empty unless another project puts one there —
+      # see "Other sites on this host" in docs/deployment.md.
+      - ${CADDY_SITES_DIR:-./caddy/sites}:/etc/caddy/sites:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

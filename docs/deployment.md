@@ -408,6 +408,58 @@ JSON
 
 ---
 
+## Other sites on this host
+
+This stack's Caddy holds ports 80 and 443, so any other site on the same host
+has to be served through it. It does that without this repo knowing about
+them: the Caddyfile ends with
+
+```
+import /etc/caddy/sites/*.caddy
+```
+
+and `docker-compose.prod.yaml` mounts `CADDY_SITES_DIR` (default
+`./caddy/sites`) there, read-only. The directory is empty in this repo, and a
+glob that matches nothing imports nothing, so a host with no other sites runs
+exactly as it did.
+
+Another project joins by doing three things on the host:
+
+1. **Join this stack's network**, `ai-cv_default` — named after the pinned
+   project, so it is stable. In its own compose file:
+   ```yaml
+   networks:
+     edge:
+       external: true
+       name: ai-cv_default
+   ```
+   and give its service an alias no service here uses, so Caddy can reach it
+   by name (`frontend`, `backend`, `db` and `caddy` are taken).
+2. **Write `<name>.caddy`** into the sites directory, with a site block that
+   names its host. Never a bare block: that would be a catch-all in front of
+   this site.
+3. **Reload Caddy** — graceful, no restart, and a config that does not parse
+   is refused with the running one kept:
+   ```bash
+   docker exec ai-cv-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+   ```
+
+Certificates for the new host are issued on the reload, like this stack's, so
+its DNS has to point here first.
+
+Two things to know once another site has joined:
+
+- **`docker compose down` here warns** that it cannot remove `ai-cv_default`
+  while the other site's container is attached. The network stays, and the
+  next `up` reuses it. Deploys use `up`, not `down`, so they never see this.
+- **A broken `.caddy` file stops Caddy from starting** on its next restart,
+  and with it this stack. The reload refuses one, so a site that reloads after
+  writing its file finds out then; if the reload fails it should put its
+  previous file back.
+
+If a page on the other site embeds the chat, its origin also goes on
+`ALLOWED_HOSTS` in `backend/.env` — see `frontend/EMBED.md`.
+
 ## Logs
 
 ```bash
