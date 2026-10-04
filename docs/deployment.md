@@ -41,6 +41,10 @@ git clone https://github.com/buzzgreyday/workchat.git && cd workchat
       control. They must agree. The Caddyfile and compose file read the first
       two, so there is no tracked file to edit:
       - `SITE_DOMAIN` — Caddy site address, e.g. `chat.example.com` (no scheme)
+      - `API_DOMAIN` — the API's own host, e.g. `api.example.com` (no scheme).
+        Same Caddy, same backend; the frontend is built to call it. Needs its
+        own DNS record pointing here. Must share the registrable domain with
+        the pages that call it, for the SameSite=Strict refresh cookie
       - `ACME_EMAIL` — where Let's Encrypt sends expiry and problem notices
       - `BASE_URL` — e.g. `https://chat.example.com`, used in QR-code token links
       - `ALLOWED_HOSTS` — e.g. `https://chat.example.com`, CORS origins (scheme required)
@@ -576,7 +580,11 @@ somewhere off this workstation as well.
 
 ## Notes
 
-- `NEXT_PUBLIC_API_URL` is baked into the frontend at build time as `/api`
-  so the browser hits the same origin (no CORS surface for normal traffic).
+- `NEXT_PUBLIC_API_URL` is baked into the frontend at build time as
+  `https://${API_DOMAIN}`, so the chat calls the API's own host with CORS
+  (`ALLOWED_HOSTS` must list `https://${SITE_DOMAIN}`). `${SITE_DOMAIN}/api`
+  still proxies to the same backend. Session cookies belong to the host that
+  set them, so moving the API to a new host costs every open session one
+  sign-in — once, at the switch.
 - `/docs`, `/redoc`, `/openapi.json` are disabled when `DEV_MODE=0`.
 - The backend and Postgres are not exposed on the host — only Caddy is.

@@ -1,6 +1,7 @@
 {
 	# Global options.
-	# ACME_EMAIL and SITE_DOMAIN come from backend/.env via docker-compose.prod.yaml.
+	# ACME_EMAIL, SITE_DOMAIN and API_DOMAIN come from backend/.env via
+	# docker-compose.prod.yaml.
 	# Caddy does NOT reject an empty value here -- `caddy validate` reports a blank
 	# site address as valid, and it would then serve as a catch-all with no
 	# certificate. The guard is compose-side: `${SITE_DOMAIN:?}` fails the whole
@@ -9,22 +10,29 @@
 	email {$ACME_EMAIL}
 }
 
-{$SITE_DOMAIN} {
-	encode zstd gzip
+# The pieces both sites share, so the API answers under one set of rules
+# whichever address it is reached by.
 
+(security_headers) {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		X-Frame-Options "DENY"
 	}
+}
 
+# {args[0]} is where the API sits on the site importing this: "/api" on
+# SITE_DOMAIN, where it shares a host with the frontend, and "" on API_DOMAIN,
+# where it is the whole host. The zones keep their names on both, so a client
+# has one allowance per zone whichever address it calls.
+(rate_limits) {
 	# Cheap abuse/cost protection: each /chat call bills OpenAI, and
 	# /admin/issue-token mints credentials. Limit both per client IP.
 	rate_limit {
 		zone chat_zone {
 			match {
-				path /api/chat*
+				path {args[0]}/chat*
 			}
 			key {remote_host}
 			events 30
@@ -32,7 +40,7 @@
 		}
 		zone admin_zone {
 			match {
-				path /api/admin*
+				path {args[0]}/admin*
 			}
 			key {remote_host}
 			events 20
@@ -44,7 +52,7 @@
 		# one NAT address, so several claims in the same minute is normal use.
 		zone auth_zone {
 			match {
-				path /api/v2/auth*
+				path {args[0]}/v2/auth*
 			}
 			key {remote_host}
 			events 30
@@ -57,24 +65,16 @@
 		# unmetered way to probe whether a token is still good.
 		zone session_zone {
 			match {
-				path /api/session
+				path {args[0]}/session
 			}
 			key {remote_host}
 			events 60
 			window 1m
 		}
 	}
+}
 
-	# Backend API — strip /api prefix before proxying.
-	handle_path /api/* {
-		reverse_proxy backend:8000
-	}
-
-	# Everything else goes to the Next.js frontend.
-	handle {
-		reverse_proxy frontend:3000
-	}
-
+(access_log) {
 	log {
 		output stdout
 		# Credentials travel as a URL query param on first load — v1 access
@@ -103,6 +103,38 @@
 			}
 		}
 	}
+}
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	import security_headers
+	import rate_limits /api
+
+	# Backend API — strip /api prefix before proxying. Still served here
+	# alongside API_DOMAIN: the same backend, for anything that calls it by
+	# this address.
+	handle_path /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else goes to the Next.js frontend.
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	import access_log
+}
+
+# The API on a host of its own: what the chat frontend and the pages that embed
+# it call. No prefix to strip — the backend's routes are the whole site.
+{$API_DOMAIN} {
+	encode zstd gzip
+	import security_headers
+	import rate_limits ""
+
+	reverse_proxy backend:8000
+
+	import access_log
 }
 
 # Other sites on this host, each in a file of its own.
