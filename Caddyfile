@@ -81,12 +81,24 @@
 		# tokens as ?token=, v2 claim tokens as ?claim=. Strip both before
 		# they ever hit the logs. A spent claim token is worth less than a
 		# live access token, but it is still a credential until it is used.
+		#
+		# Visitors' addresses are cut to their network: enough to see where
+		# traffic comes from, not who sent it — an address is personal data,
+		# and these logs have no retention policy beyond Docker's rotation.
 		format filter {
 			wrap json
 			fields {
 				request>uri query {
 					delete token
 					delete claim
+				}
+				request>remote_ip ip_mask {
+					ipv4 16
+					ipv6 32
+				}
+				request>client_ip ip_mask {
+					ipv4 16
+					ipv6 32
 				}
 			}
 		}

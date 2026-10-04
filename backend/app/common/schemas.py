@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import String, ForeignKey, DateTime, Integer, func
+from sqlalchemy import Date, String, ForeignKey, DateTime, Integer, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from app.common.db import Base
 
@@ -49,6 +49,11 @@ class DatabaseToken(Base):
     # pair. Defaulted to 1 so every row that predates this column keeps working
     # exactly as it did, which is the whole point of the version claim.
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # What kind of grant this is: "link", one issued for someone and delivered
+    # as a link, or "trial", one a visitor without a link opened for themselves
+    # (services/trial). Carried into the access token so the chat can word
+    # things for a guest, and kept here so the two can be counted apart.
+    kind: Mapped[str] = mapped_column(String(16), default="link", server_default="link")
     # When this grant's claim link was exchanged, and the gate that makes the
     # exchange single-use: the claiming UPDATE only matches while this is NULL.
     # A second presentation of the link is refused and the operator is told, so
@@ -183,3 +188,42 @@ class DatabaseChatMessage(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+
+
+class DatabaseTrialRequest(Base):
+    """
+    One guest trial opened, on one day, from one address.
+
+    Holds no address. `ip_hash` is an HMAC of it under a key that changes every
+    UTC day (services/trial/keys.py), so it can answer "has this address had a
+    trial today?" and nothing else: not which address, and not whether today's
+    visitor is yesterday's. Rows go once their day is over (services/trial).
+
+    `challenge_hash` is the proof-of-work challenge that paid for the trial,
+    unique so that one solved challenge opens one trial.
+    """
+    __tablename__ = "trial_requests"
+    __table_args__ = (UniqueConstraint("day", "ip_hash", name="uq_trial_requests_day_ip_hash"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    day: Mapped[date] = mapped_column(Date, index=True)
+    ip_hash: Mapped[str] = mapped_column(String(64))
+    challenge_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class DatabaseTrialBudget(Base):
+    """
+    How many trials have been opened on one UTC day, against the daily ceiling.
+
+    A counter rather than a count of trial_requests, so the ceiling is held by
+    one atomic UPDATE — two trials racing for the last place cannot both get
+    it. No personal data: a date and a number.
+    """
+    __tablename__ = "trial_budget"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    issued: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+

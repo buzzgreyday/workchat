@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 
-import { getGrantId } from "@/lib/auth";
+import { getGrantId, isTrial } from "@/lib/auth";
+import { MAX_MESSAGE_CHARS } from "@/lib/limits";
 import { newId } from "@/lib/utils";
 import {
   GENERIC_FAILURE_MESSAGE,
@@ -17,7 +18,11 @@ import { useConversationMemory } from "@/hooks/useConversationMemory";
 import { useTranscript } from "@/hooks/useTranscript";
 import { useUsage } from "@/hooks/useUsage";
 import { chatService } from "@/services/chat.service";
-import type { AuthFetch, SessionStatus } from "@/types/session";
+import type {
+  AuthFetch,
+  SessionStatus,
+  TrialState,
+} from "@/types/session";
 
 /**
  * One turn of the conversation, end to end.
@@ -32,11 +37,13 @@ export function useChat({
   accessToken,
   status,
   authFetch,
+  trial = "unavailable",
   seedQuestion,
 }: {
   accessToken: string;
   status: SessionStatus;
   authFetch: AuthFetch;
+  trial?: TrialState;
   seedQuestion?: string;
 }) {
   // Hook order is load-bearing. The greeting rewrite is an effect inside
@@ -46,6 +53,7 @@ export function useChat({
   const { messages, dispatch } = useTranscript({
     status,
     accessToken,
+    trial,
   });
 
   const {
@@ -83,8 +91,11 @@ export function useChat({
   // The initial value only, so nothing re-seeds over what they are typing.
   // That makes the seed a first-render concern: the embed sets `about` on the
   // element before it connects, which is the render this reads.
+  //
+  // Cut to the length limit, like anything typed: a seed comes from a link or
+  // the host page, and a long one would only be refused when sent.
   const [input, setInput] = useState(
-    seedQuestion ?? "",
+    (seedQuestion ?? "").slice(0, MAX_MESSAGE_CHARS),
   );
 
   // Nothing to send with, so the composer stays shut rather than letting the
@@ -133,6 +144,8 @@ export function useChat({
         {
           message: text,
           history: memory.history,
+          history_signature:
+            memory.historySignature,
           conversation_id: memory.conversationId,
         },
         {
@@ -147,6 +160,7 @@ export function useChat({
             nextHistory,
             nextUsage,
             nextConversationId,
+            nextSignature,
           ) {
             setUsage(nextUsage);
 
@@ -160,6 +174,7 @@ export function useChat({
                 conversationId:
                   nextConversationId ??
                   memory.conversationId,
+                historySignature: nextSignature,
               },
             });
 
@@ -197,7 +212,10 @@ export function useChat({
 
       dispatch({
         type: "assistant/failed",
-        content: failureMessage(error),
+        content: failureMessage(
+          error,
+          isTrial(accessToken),
+        ),
       });
     }
   };

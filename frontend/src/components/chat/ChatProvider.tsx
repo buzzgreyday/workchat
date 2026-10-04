@@ -13,6 +13,7 @@ import { useSession } from "@/hooks/useSession";
 import { useViewportHeight } from "@/hooks/useViewportHeight";
 import type { Owner } from "@/lib/owner";
 import type { Message, Usage } from "@/types/chat";
+import type { TrialState } from "@/types/session";
 
 /**
  * The part of the owner the chat itself shows: the name in its header.
@@ -53,6 +54,10 @@ interface ControlsValue {
   disabledReason: string | null;
   setInput: (value: string) => void;
   sendMessage: (question?: string) => void;
+  /** Whether a guest trial is on offer, and how the last attempt went. */
+  trial: TrialState;
+  /** Solve the proof-of-work and open a guest session. */
+  startTrial: () => void;
 }
 
 // `null` rather than a plausible-looking default. A default would let a
@@ -171,6 +176,8 @@ export function ChatProvider({
         disabledReason,
         setInput,
         sendMessage,
+        trial: session.trial,
+        startTrial: session.startTrial,
       }}
     >
       <TranscriptContext value={{ messages }}>

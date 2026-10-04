@@ -28,6 +28,11 @@
       "level": "ERROR",
       "propagate": false
     },
+    "uvicorn.access": {
+      "handlers": ["console"],
+      "level": "WARNING",
+      "propagate": false
+    },
     "openai": {
       "level": "INFO"
     },

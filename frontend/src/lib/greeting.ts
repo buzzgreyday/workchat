@@ -3,10 +3,25 @@ import {
   BROKEN_LINK_MESSAGE,
   hello,
   NO_LINK_MESSAGE,
+  NO_LINK_TRIAL_MESSAGE,
   SPENT_LINK_MESSAGE,
+  TRIAL_FAILED_MESSAGE,
+  TRIAL_GONE_MESSAGE,
+  TRIAL_USED_MESSAGE,
 } from "@/lib/copy";
 import type { Greeting } from "@/lib/transcript";
-import type { SessionStatus } from "@/types/session";
+import type { SessionStatus, TrialState } from "@/types/session";
+
+// What the no-link greeting says, by how a trial stands. "starting" never
+// reaches here: the session is "loading" then, which shows the typing dots.
+const NO_LINK: Record<TrialState, string> = {
+  unavailable: NO_LINK_MESSAGE,
+  available: NO_LINK_TRIAL_MESSAGE,
+  starting: NO_LINK_TRIAL_MESSAGE,
+  used: TRIAL_USED_MESSAGE,
+  gone: TRIAL_GONE_MESSAGE,
+  failed: TRIAL_FAILED_MESSAGE,
+};
 
 /**
  * What the greeting says, and whether it has anything to say yet.
@@ -20,6 +35,7 @@ import type { SessionStatus } from "@/types/session";
 export function greeting(
   status: SessionStatus,
   accessToken: string,
+  trial: TrialState = "unavailable",
 ): Greeting {
   if (status === "spent") {
     return {
@@ -37,7 +53,7 @@ export function greeting(
 
   if (status === "none") {
     return {
-      content: NO_LINK_MESSAGE,
+      content: NO_LINK[trial],
       status: "complete",
     };
   }

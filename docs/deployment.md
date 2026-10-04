@@ -160,6 +160,32 @@ Not `docker compose exec backend curl …`: the backend image is
 expanded by the host shell (where it is unset) rather than inside the
 container, sending an empty header and getting a 401.
 
+## Guest trials
+
+Off until you turn them on. In `backend/.env`:
+
+```bash
+TRIAL_ENABLED=1
+TRIAL_SECRET=$(openssl rand -hex 32)   # paste the value, not the command
+```
+
+then `docker compose up -d backend`. The chat starts offering "Try it" to
+visitors without a link: a few questions (`TRIAL_MAX_QUERIES`, 3), once per IP
+address per day, at most `TRIAL_DAILY_LIMIT` (50) trials a day for everyone —
+so the most a day of strangers can cost is the product of the two. A
+proof-of-work in the visitor's browser (`TRIAL_POW_MAX_NUMBER`) makes each one
+cost a script something. All optional settings are listed in
+`backend/.env.production.example`.
+
+The address is read from `X-Forwarded-For`, which `docker-compose.prod.yaml`
+allows (`TRUST_PROXY_HEADERS`) because Caddy is the only way in and writes that
+header itself. Do not set it anywhere the backend's port is reachable directly:
+the header would be whatever a client chose to send. What is stored about an
+address, and for how long, is in [privacy.md](privacy.md#guest-trials).
+
+To turn trials off again, unset `TRIAL_ENABLED` and restart the backend; the
+endpoints answer 404 and the chat goes back to asking for a link.
+
 ## Read what hirers asked
 
 Chat turns are stored in Postgres and read through the admin API, using the same
@@ -244,8 +270,19 @@ links — `refresh_tokens` stays empty otherwise — but harmless to add either 
 45 3 * * * /usr/bin/flock -n /tmp/workchat-sessions.lock /opt/ai-cv/scripts/purge-expired-sessions.sh >> /var/log/workchat/purge.log 2>&1
 ```
 
-Override the tail it keeps with `SESSION_GRACE_DAYS`. Both scripts take
-`--dry-run`, which counts instead of writing.
+Override the tail it keeps with `SESSION_GRACE_DAYS`.
+
+**Guest-trial rows go when their day ends.** Only relevant with
+`TRIAL_ENABLED`, harmless otherwise. The backend already drops earlier days
+whenever a trial is requested; this makes it true on a day nobody asks. Just
+after midnight UTC — `CRON_TZ` pins that whatever the host's zone:
+
+```
+CRON_TZ=UTC
+5 0 * * * /usr/bin/flock -n /tmp/workchat-trials.lock /opt/ai-cv/scripts/purge-trial-requests.sh >> /var/log/workchat/purge.log 2>&1
+```
+
+All three scripts take `--dry-run`, which counts instead of writing.
 
 **Revoking access.** `POST /api/admin/tokens/{token_id}/revoke` with your admin
 key kills a grant and every session under it, v1 links included. Revoking the

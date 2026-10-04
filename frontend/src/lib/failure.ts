@@ -4,9 +4,12 @@ import {
   GENERIC_FAILURE_MESSAGE,
   LINK_EXPIRED_MESSAGE,
   OUT_OF_QUESTIONS_MESSAGE,
+  OUT_OF_QUESTIONS_TRIAL_MESSAGE,
   rateLimitedMessage,
   SESSION_ENDED_MESSAGE,
+  tooLongMessage,
 } from "@/lib/copy";
+import { MAX_MESSAGE_CHARS } from "@/lib/limits";
 
 /**
  * Did the *backend* refuse this for want of quota?
@@ -41,6 +44,9 @@ export function isQuotaExhausted(
  */
 export function failureMessage(
   error: unknown,
+  // A guest trial runs out the same way a link does, but "ask for a new link"
+  // is the wrong thing to tell someone who never had one.
+  trial = false,
 ): string {
   if (!(error instanceof ChatError)) {
     return GENERIC_FAILURE_MESSAGE;
@@ -48,8 +54,16 @@ export function failureMessage(
 
   if (error.status === 429) {
     return isQuotaExhausted(error)
-      ? OUT_OF_QUESTIONS_MESSAGE
+      ? trial
+        ? OUT_OF_QUESTIONS_TRIAL_MESSAGE
+        : OUT_OF_QUESTIONS_MESSAGE
       : rateLimitedMessage(error.retryAfter);
+  }
+
+  // The composer stops at the limit, so this is a question that got past it —
+  // a seeded one, a paste in an older tab. Refused before it was paid for.
+  if (error.status === 422) {
+    return tooLongMessage(MAX_MESSAGE_CHARS);
   }
 
   if (error.status === 401) {

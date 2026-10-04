@@ -40,6 +40,7 @@ class SQLTokenRepository(TokenRepository):
                 "max_queries": grant.max_queries,
                 "expires_at": grant.expires_at,
                 "version": grant.version,
+                "kind": grant.kind,
             },
         )
         row = DatabaseToken(
@@ -53,6 +54,10 @@ class SQLTokenRepository(TokenRepository):
             expires_at=grant.expires_at,
             created_at=grant.created_at,
             version=grant.version,
+            kind=grant.kind,
+            # Set at birth for a grant that is opened rather than claimed — a
+            # trial is its own session from the start, with no link to spend.
+            claimed_at=grant.claimed_at,
         )
         self.db.add(row)
         await self.db.flush()

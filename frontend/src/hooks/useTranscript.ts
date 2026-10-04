@@ -7,7 +7,7 @@ import {
   initialTranscript,
   transcriptReducer,
 } from "@/lib/transcript";
-import type { SessionStatus } from "@/types/session";
+import type { SessionStatus, TrialState } from "@/types/session";
 
 /**
  * The transcript, and the one thing allowed to change it without a send.
@@ -15,9 +15,11 @@ import type { SessionStatus } from "@/types/session";
 export function useTranscript({
   status,
   accessToken,
+  trial,
 }: {
   status: SessionStatus;
   accessToken: string;
+  trial: TrialState;
 }) {
   // Lazily initialised from the real status and token rather than a blank: a
   // v1 link *is* the access token, so it is present on this first render and
@@ -25,7 +27,7 @@ export function useTranscript({
   // show them the typing dots for a session that was never being opened.
   const [messages, dispatch] = useReducer(
     transcriptReducer,
-    greeting(status, accessToken),
+    greeting(status, accessToken, trial),
     initialTranscript,
   );
 
@@ -37,9 +39,9 @@ export function useTranscript({
   useEffect(() => {
     dispatch({
       type: "greeting/set",
-      greeting: greeting(status, accessToken),
+      greeting: greeting(status, accessToken, trial),
     });
-  }, [status, accessToken]);
+  }, [status, accessToken, trial]);
 
   return { messages, dispatch };
 }

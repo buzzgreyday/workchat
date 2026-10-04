@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 
+import { solve } from "@/lib/pow";
 import {
   AuthError,
   authService,
@@ -16,6 +17,7 @@ import {
 import type {
   AuthFetch,
   SessionStatus,
+  TrialState,
 } from "@/types/session";
 
 // Re-exported because this is where the rest of the app has always imported
@@ -25,6 +27,7 @@ import type {
 export type {
   AuthFetch,
   SessionStatus,
+  TrialState,
 };
 
 /**
@@ -256,9 +259,80 @@ export function useSession({
     }
   }, [token]);
 
+  // --- guest trial --------------------------------------------------------
+  //
+  // Only for someone who arrived with nothing: no link, and no cookie to
+  // resume from. Whether one is on offer is asked of the backend rather than
+  // configured here, so switching trials off is a backend setting and nothing
+  // a host page has to know about.
+  const [trial, setTrial] =
+    useState<TrialState>("unavailable");
+
+  useEffect(() => {
+    if (status !== "none" || trial !== "unavailable") {
+      return;
+    }
+
+    let cancelled = false;
+
+    // A 404 means trials are off; anything else failing means we cannot
+    // tell. Either way nothing is offered, and the no-link message stands.
+    authService.trialChallenge().then(
+      () => !cancelled && setTrial("available"),
+      () => undefined,
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, trial]);
+
+  // A second press while one is under way must not solve or post twice.
+  const starting = useRef(false);
+
+  const startTrial = useCallback(async () => {
+    if (starting.current) {
+      return;
+    }
+
+    starting.current = true;
+    setTrial("starting");
+    // The greeting shows the typing dots while this runs.
+    setStatus("loading");
+
+    try {
+      // A fresh challenge, not one fetched when the button appeared: it would
+      // have aged by however long the visitor read the page first, and a
+      // challenge is only good for minutes.
+      const solution = await solve(
+        await authService.trialChallenge(),
+      );
+      const session = await authService.trial(solution);
+
+      apply(session);
+      setStatus("ready");
+      setTrial("unavailable");
+    } catch (error) {
+      setStatus("none");
+      setTrial(
+        error instanceof AuthError &&
+          error.message === "Trial already used today"
+          ? "used"
+          : error instanceof AuthError &&
+              error.message === "Trial budget reached"
+            ? "gone"
+            : "failed",
+      );
+    } finally {
+      starting.current = false;
+    }
+  }, [apply]);
+
   return {
     accessToken,
     status,
     authFetch,
+    trial,
+    startTrial,
   };
 }

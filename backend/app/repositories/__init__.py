@@ -26,6 +26,8 @@ from app.repositories.base import (
     RepositoryBase,
     TokenRepository,
     TranscriptRepository,
+    TrialRepository,
+    TrialReservation,
     UserRepository,
 )
 
@@ -36,11 +38,14 @@ __all__ = [
     "RepositoryBase",
     "TokenRepository",
     "TranscriptRepository",
+    "TrialRepository",
+    "TrialReservation",
     "UserRepository",
     "get_conversation_repository",
     "get_refresh_session_repository",
     "get_token_repository",
     "get_transcript_repository",
+    "get_trial_repository",
     "get_user_repository",
 ]
 
@@ -52,3 +57,4 @@ get_token_repository = _backend.provide_token_repository
 get_refresh_session_repository = _backend.provide_refresh_session_repository
 get_transcript_repository = _backend.provide_transcript_repository
 get_conversation_repository = _backend.provide_conversation_repository
+get_trial_repository = _backend.provide_trial_repository

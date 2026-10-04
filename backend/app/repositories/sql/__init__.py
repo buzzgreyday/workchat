@@ -26,12 +26,14 @@ from app.repositories.base import (
     RefreshSessionRepository,
     TokenRepository,
     TranscriptRepository,
+    TrialRepository,
     UserRepository,
 )
 from app.repositories.sql.conversation import SQLConversationRepository
 from app.repositories.sql.refresh_session import SQLRefreshSessionRepository
 from app.repositories.sql.token import SQLTokenRepository
 from app.repositories.sql.transcript import SQLTranscriptRepository
+from app.repositories.sql.trial import SQLTrialRepository
 from app.repositories.sql.user import SQLUserRepository
 
 __all__ = [
@@ -39,11 +41,13 @@ __all__ = [
     "SQLRefreshSessionRepository",
     "SQLTokenRepository",
     "SQLTranscriptRepository",
+    "SQLTrialRepository",
     "SQLUserRepository",
     "provide_conversation_repository",
     "provide_refresh_session_repository",
     "provide_token_repository",
     "provide_transcript_repository",
+    "provide_trial_repository",
     "provide_user_repository",
 ]
 
@@ -82,3 +86,7 @@ def provide_conversation_repository(
     db: AsyncSession = Depends(get_db),
 ) -> ConversationRepository:
     return SQLConversationRepository(db=db)
+
+
+def provide_trial_repository(db: AsyncSession = Depends(get_db)) -> TrialRepository:
+    return SQLTrialRepository(db=db)

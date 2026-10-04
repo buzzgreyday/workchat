@@ -17,6 +17,8 @@ are facts about the application rather than settings: the algorithm the tokens
 are signed with, the cap on tool rounds, the cookie path.
 """
 
+import hashlib
+import hmac
 import os
 from dataclasses import dataclass
 from functools import lru_cache
@@ -52,6 +54,14 @@ ALGORITHM = "HS256"
 # Cap on tool-call round trips per user message. Each round is a paid API call, so an
 # unbounded loop on a model that keeps requesting tools would burn quota indefinitely.
 MAX_TOOL_ROUNDS = 5
+# The longest question anyone may ask, in characters. A question about a CV is a
+# sentence or two; anything longer is more often an attempt to paste a prompt in
+# than a question, and every character is paid for again on every later turn,
+# since the history goes back to the model each time. Only the question being
+# asked is held to it: the replies, and the history they build up, are as long
+# as they need to be. The frontend's composer mirrors this number
+# (frontend/src/lib/limits.ts); change both together.
+MAX_MESSAGE_CHARS = 150
 # Path "/" rather than "/v2/auth" on purpose: behind Caddy the browser sees
 # /api/v2/auth/... while the backend only ever sees /v2/auth/..., so a narrow
 # path would be written for a prefix the browser never requests.
@@ -106,6 +116,40 @@ class Settings:
     token_hashing_secret: str
     secret_key: str
     admin_key: str
+    # Signs the history the server hands back each turn, so a client can only
+    # send back a history the server produced (services/chat/history.py).
+    # Without it the history is whatever the client says it is — padded,
+    # rewritten, or long fake "earlier questions" that cost a model call each.
+    # Optional: unset, it is derived from JWT_SECRET under its own label, so a
+    # deployment that predates it keeps starting. Setting it separates the two,
+    # and rotating it only drops the conversations in flight to a fresh start.
+    history_signing_secret: str
+
+    # --- guest trial (services/trial) ---
+    # Off unless switched on: a visitor without a link can then ask a few
+    # questions after an invisible proof-of-work, once per IP per day, within a
+    # daily ceiling on trials. Every number below bounds a cost; together they
+    # are the most a day of strangers can spend: daily_limit x max_queries.
+    trial_enabled: bool
+    # Required only while trials are on. The root of the keys trials use — one
+    # for signing proof-of-work challenges, one per UTC day for hashing IPs —
+    # each derived with its own label, so neither can stand in for the other.
+    trial_secret: str | None
+    trial_max_queries: int
+    # How long a trial grant lives, after which it is spent whatever is left.
+    trial_ttl_seconds: int
+    # Trials across everyone, per UTC day.
+    trial_daily_limit: int
+    # The proof-of-work's difficulty: the search space a browser covers to find
+    # the answer, on average half of it. 100 000 SHA-256 rounds is well under a
+    # second in a worker on a phone, and a real cost to a script asking for a
+    # thousand trials.
+    trial_pow_max_number: int
+    # Whether the client's address may be read from X-Forwarded-For. True only
+    # behind the Caddy this repo ships, which sets that header itself and is the
+    # only way in; anywhere the backend's port is reachable directly — dev
+    # publishes 8000 — the header is whatever the client chose to send.
+    trust_proxy_headers: bool
 
     # --- token lifetimes (v2 claim/refresh/access flow) ---
     # A v1 token is the whole grant: one long-lived JWT handed out in a link, valid
@@ -173,6 +217,8 @@ class Settings:
         postgres_password = require_env("POSTGRES_PASSWORD")
         postgres_db = require_env("POSTGRES_DB")
 
+        trial_enabled = env_bool("TRIAL_ENABLED", default=False)
+
         allowed_hosts = (
             ["*"] if dev_mode
             else [h.strip() for h in require_env("ALLOWED_HOSTS").split(",") if h.strip()]
@@ -201,6 +247,17 @@ class Settings:
             token_hashing_secret=require_env("TOKEN_HASHING_SECRET"),
             secret_key=require_env("JWT_SECRET"),
             admin_key=require_env("ADMIN_KEY"),
+            history_signing_secret=(
+                os.environ.get("HISTORY_SIGNING_SECRET")
+                or _derive(require_env("JWT_SECRET"), "history")
+            ),
+            trial_enabled=trial_enabled,
+            trial_secret=require_env("TRIAL_SECRET") if trial_enabled else None,
+            trial_max_queries=int(os.environ.get("TRIAL_MAX_QUERIES") or 3),
+            trial_ttl_seconds=int(os.environ.get("TRIAL_TTL_SECONDS") or 60 * 60 * 24),
+            trial_daily_limit=int(os.environ.get("TRIAL_DAILY_LIMIT") or 50),
+            trial_pow_max_number=int(os.environ.get("TRIAL_POW_MAX_NUMBER") or 100_000),
+            trust_proxy_headers=env_bool("TRUST_PROXY_HEADERS", default=False),
             access_token_ttl_seconds=int(os.environ.get("ACCESS_TOKEN_TTL_SECONDS") or 60 * 15),
             refresh_token_ttl_seconds=int(os.environ.get("REFRESH_TOKEN_TTL_SECONDS") or 60 * 60 * 24 * 7),
             refresh_rotation_grace_seconds=int(os.environ.get("REFRESH_ROTATION_GRACE_SECONDS") or 30),
@@ -219,6 +276,16 @@ class Settings:
         if not prompt.strip():
             raise ValueError(f"system prompt at {path} is empty")
         return prompt
+
+
+def _derive(secret: str, label: str) -> str:
+    """
+    A key for one purpose, from a secret kept for another.
+
+    HMAC under a label, so the derived key reveals nothing about the secret and
+    a key derived for one label is useless for any other.
+    """
+    return hmac.new(secret.encode(), f"workchat:{label}".encode(), hashlib.sha256).hexdigest()
 
 
 def _dev_cors_origins() -> list[str]:

@@ -33,6 +33,15 @@ SENSITIVE_KEYS = frozenset(
         "raw_token",
         "api_key",
         "authorization",
+        # A visitor's address is personal data. Nothing logs one on purpose —
+        # guest trials keep only a keyed hash, and not in the logs — so these
+        # are the net under a slip.
+        "ip",
+        "client_ip",
+        "remote_addr",
+        "ip_hash",
+        "x-forwarded-for",
+        "x_forwarded_for",
     }
 )
 

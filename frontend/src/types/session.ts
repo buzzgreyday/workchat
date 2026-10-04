@@ -19,6 +19,27 @@ export type SessionStatus =
   | "none";
 
 /**
+ * A guest trial, for someone with no link: whether one is on offer, and how
+ * the last attempt went. Beside the session status rather than in it, because
+ * a trial is not a kind of session — it is a way to get one — and every
+ * consumer of the status above would otherwise have five more cases to ignore.
+ *
+ *   unavailable  not offered: trials are off, or asking failed
+ *   available    offered, and nothing tried yet
+ *   starting     solving the proof-of-work and opening the session
+ *   used         this address has had today's
+ *   gone         today's are all taken
+ *   failed       it did not work for some other reason; can be tried again
+ */
+export type TrialState =
+  | "unavailable"
+  | "available"
+  | "starting"
+  | "used"
+  | "gone"
+  | "failed";
+
+/**
  * `fetch`, with the access token on it and one refresh-and-retry behind it.
  *
  * Handed to the services rather than imported by them, so nothing below this
