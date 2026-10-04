@@ -12,6 +12,7 @@ services:
     restart: unless-stopped
     environment:
       SITE_DOMAIN: ${SITE_DOMAIN:?SITE_DOMAIN must be set}
+      API_DOMAIN: ${API_DOMAIN:?API_DOMAIN must be set}
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL must be set}
     ports:
       - "80:80"
@@ -100,7 +101,11 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: /api
+        # The API's own host. Inlined into the browser bundle by next build,
+        # so a change here is a rebuild. The browser then calls it cross-origin
+        # — CORS, with ALLOWED_HOSTS listing SITE_DOMAIN's origin — and the
+        # refresh cookie is the API host's, sent because the two are same-site.
+        NEXT_PUBLIC_API_URL: https://${API_DOMAIN:?API_DOMAIN must be set}
     restart: unless-stopped
     environment:
       # Whose CV this is. Read on the server per request, so changing one of

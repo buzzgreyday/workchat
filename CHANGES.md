@@ -7,6 +7,17 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.10.1] - 2026-10-04
+
+### Changed
+
+- **The API has a host of its own**, `API_DOMAIN` (api.mringdal.com). The chat
+  frontend is built to call it, with CORS; `SITE_DOMAIN/api` keeps proxying to
+  the same backend. Both get the same rate limits — shared, so one allowance
+  per client whichever address it uses — security headers and masked access
+  log, now Caddyfile snippets. Session cookies belong to the host that set
+  them, so sessions open at the switch need signing in once more.
+
 ## [0.10.0] - 2026-10-04
 
 ### Added

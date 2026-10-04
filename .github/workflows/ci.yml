@@ -221,7 +221,7 @@ jobs:
       - name: Adapt and assert the rate-limit zones
         run: |
           docker run --rm \
-            -e ACME_EMAIL=ci@example.com -e SITE_DOMAIN=ci.example.com \
+            -e ACME_EMAIL=ci@example.com -e SITE_DOMAIN=ci.example.com -e API_DOMAIN=api.ci.example.com \
             -v "$PWD/Caddyfile:/Caddyfile:ro" caddy-ci:latest \
             caddy adapt --config /Caddyfile --adapter caddyfile > adapted.json
           for zone in chat_zone admin_zone auth_zone session_zone; do
