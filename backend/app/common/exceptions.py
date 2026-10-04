@@ -149,3 +149,39 @@ class ClaimAlreadyUsed(AppError):
 class QuotaExhausted(AppError):
     status_code = 429
     detail = "Query limit reached"
+
+
+# --- Guest trial -------------------------------------------------------------
+#
+# Each says which way the trial was refused in its `detail`, which the frontend
+# reads to word its answer — so the strings are the contract, like "Query limit
+# reached" above. None says anything about the address or the challenge beyond
+# that; the specifics stay in the log at the raise site.
+
+class TrialDisabled(AppError):
+    """Trials are switched off. A 404, as if the endpoint were not there."""
+
+    status_code = 404
+    detail = "Not Found"
+
+
+class TrialChallengeInvalid(AppError):
+    """A proof-of-work that does not check out: forged, expired, wrong, or
+    already spent on a trial."""
+
+    status_code = 400
+    detail = "Trial challenge invalid"
+
+
+class TrialAlreadyUsed(AppError):
+    """This address has had today's trial."""
+
+    status_code = 429
+    detail = "Trial already used today"
+
+
+class TrialBudgetExhausted(AppError):
+    """Today's trials are all gone, for everyone."""
+
+    status_code = 503
+    detail = "Trial budget reached"

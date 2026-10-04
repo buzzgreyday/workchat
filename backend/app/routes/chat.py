@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi import APIRouter, Depends
+from fastapi.security import HTTPAuthorizationCredentials
 from openai import AsyncOpenAI
 from starlette.responses import StreamingResponse
 
@@ -10,10 +11,14 @@ from app.common.logging.logging import logger
 from app.common.models import ChatRequest, TokenContext
 from app.common import sse
 from app.openai.client import get_openai_client
-from app.repositories import get_transcript_repository
-from app.repositories.base import TranscriptRepository
+from app.repositories import (
+    get_refresh_session_repository,
+    get_token_repository,
+    get_transcript_repository,
+)
+from app.repositories.base import RefreshSessionRepository, TokenRepository, TranscriptRepository
 from app.services import chat as chat_service
-from app.services.auth import verify_and_consume
+from app.services.auth import Auth, bearer_scheme, get_auth, verify_and_consume
 from app.services.chat import ChatTooling, TokenProduced, TurnEvent, TurnFailed, TurnFinished
 from app.services.chat.tooling import get_tooling
 
@@ -35,6 +40,7 @@ def wire(event: TurnEvent) -> dict[str, Any] | None:
             "type": "done",
             "reply": event.reply,
             "history": event.history,
+            "history_signature": event.history_signature,
             "usage": event.usage.model_dump(),
             "conversation_id": str(event.conversation_id) if event.conversation_id else None,
         }
@@ -65,7 +71,10 @@ async def frames(events: AsyncIterator[TurnEvent]) -> AsyncIterator[bytes]:
 )
 async def chat_stream(
     req: ChatRequest,
-    token: TokenContext = Depends(verify_and_consume),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    tokens: TokenRepository = Depends(get_token_repository),
+    sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+    auth: Auth = Depends(get_auth),
     client: AsyncOpenAI = Depends(get_openai_client),
     tooling: ChatTooling = Depends(get_tooling),
     transcripts: TranscriptRepository = Depends(get_transcript_repository),
@@ -75,7 +84,14 @@ async def chat_stream(
 
     Client and tooling arrive as dependencies so they can be swapped in tests
     while staying singletons in production.
+
+    The question is spent here, in the body, rather than by a dependency.
+    FastAPI resolves every dependency before it reports a body that failed
+    validation, so a spending dependency charged a question for a request that
+    was then refused — one over the length limit, say. The body only runs once
+    the request is valid, so only a question that is asked is paid for.
     """
+    token: TokenContext = await verify_and_consume(credentials, tokens, sessions, auth)
     logger.info(
         "Chat message received from user",
         extra={

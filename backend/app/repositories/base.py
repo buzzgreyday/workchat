@@ -25,7 +25,8 @@ caller can usefully branch on it.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
+from enum import Enum
 import uuid
 
 from app.common.logging import logging
@@ -161,6 +162,44 @@ class TokenRepository(RepositoryBase):
         the durable credential.
         """
 
+
+
+class TrialReservation(Enum):
+    """How a request for a guest trial came out at the store."""
+
+    RESERVED = "reserved"
+    # This address has had today's trial.
+    ADDRESS_USED = "address_used"
+    # This solved challenge has already paid for a trial.
+    CHALLENGE_USED = "challenge_used"
+    # Today's trials are all gone.
+    BUDGET_SPENT = "budget_spent"
+
+
+class TrialRepository(RepositoryBase):
+    """
+    What the rest of the app is allowed to know about storing guest trials.
+
+    Holds no address and no grant: a day, a keyed hash of an address, the
+    challenge that paid, and a count per day. Which grant a trial opened is not
+    recorded, because nothing needs to know.
+    """
+
+    @abstractmethod
+    async def reserve(
+        self, day: date, ip_hash: str, challenge_hash: str, daily_limit: int
+    ) -> TrialReservation:
+        """
+        Take one of today's trials for this address, paid for by this challenge.
+
+        One decision, made by the store so that no race can break it: at most
+        one trial per address per day, one per challenge, and `daily_limit` in
+        all. Durable on return when RESERVED — a trial a later failure could
+        hand back is a free one — and nothing is taken otherwise.
+
+        Days before `day` are forgotten on the way, so the hashes never outlive
+        the day their key belonged to.
+        """
 
 
 class RefreshSessionRepository(RepositoryBase):

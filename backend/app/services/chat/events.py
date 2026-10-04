@@ -53,6 +53,10 @@ class TurnFinished:
     usage: Usage
     finish_reason: str | None = None
     conversation_id: uuid.UUID | None = None
+    # The server's signature on `history`, so the client can send it back next
+    # turn and be believed (services/chat/history.py). Filled in last, once the
+    # conversation it is bound to is known.
+    history_signature: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

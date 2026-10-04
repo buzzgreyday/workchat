@@ -121,6 +121,11 @@ function toSSEEvent(json: string): SSEEvent | null {
               "string"
                 ? event.conversation_id
                 : null,
+            history_signature:
+              typeof event.history_signature ===
+              "string"
+                ? event.history_signature
+                : null,
           }
         : null;
 
@@ -145,6 +150,7 @@ class ChatService {
         history: ChatHistoryMessage[],
         usage: Usage,
         conversationId: string | null,
+        historySignature: string | null,
       ) => void;
       onError?: (message: string) => void;
     },
@@ -217,6 +223,7 @@ class ChatService {
               event.history,
               event.usage,
               event.conversation_id ?? null,
+              event.history_signature,
             );
             break;
 

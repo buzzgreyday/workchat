@@ -28,6 +28,9 @@ interface Stored {
   grantId: string;
   conversationId: string | null;
   history: ChatHistoryMessage[];
+  // Absent on a conversation saved before histories were signed. Such a
+  // history is dropped by the server on the next turn — a fresh start, once.
+  historySignature?: string | null;
   messages: Array<
     Omit<Message, "createdAt"> & {
       createdAt: string;
@@ -38,6 +41,7 @@ interface Stored {
 export interface Conversation {
   conversationId: string | null;
   history: ChatHistoryMessage[];
+  historySignature: string | null;
   messages: Message[];
 }
 
@@ -65,6 +69,8 @@ export function loadConversation(
     return {
       conversationId: stored.conversationId,
       history: stored.history,
+      historySignature:
+        stored.historySignature ?? null,
       // Dates do not survive JSON. Left as strings they reach a component
       // expecting a Date, which is a crash on the first render after a reload.
       messages: stored.messages.map(
@@ -95,6 +101,8 @@ export function saveConversation(
       conversationId:
         conversation.conversationId,
       history: conversation.history,
+      historySignature:
+        conversation.historySignature,
       messages: conversation.messages.map(
         (message) => ({
           ...message,

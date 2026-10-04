@@ -35,6 +35,49 @@ export const NO_LINK_MESSAGE =
   "You'll need the chat link you were sent to start a session. " +
   "If you had one open, it may just have timed out — ask for a new link.";
 
+// --- guest trials ------------------------------------------------------------
+
+/** The no-link greeting while a trial is on offer: an invitation, not a dead end. */
+export const NO_LINK_TRIAL_MESSAGE =
+  "No link? No problem — you can try me with a few questions first. " +
+  "If you were sent a link, open that instead: it comes with more.";
+
+export const TRIAL_USED_MESSAGE =
+  "You've already had today's trial from this connection. " +
+  "Come back tomorrow, or ask for a link if there's more you'd like to know.";
+
+export const TRIAL_GONE_MESSAGE =
+  "Today's trials have all been taken. " +
+  "Try again tomorrow, or ask for a link if there's more you'd like to know.";
+
+export const TRIAL_FAILED_MESSAGE =
+  "I couldn't start a trial just now — it's not you. Try again in a moment.";
+
+export const OUT_OF_QUESTIONS_TRIAL_MESSAGE =
+  "That's all the questions in this trial. " +
+  "Ask for a link if there's more you'd like to know — it comes with plenty.";
+
+/** The button that starts a trial, where the composer would be. */
+export const TRY_IT = "Try it — ask a few questions";
+
+/**
+ * Said beside that button, because it is true of pressing it and someone
+ * should know before they do. Accurate to the letter: the backend keeps only
+ * an HMAC of the address under a key for that UTC day, and drops it when the
+ * day ends (backend/app/services/trial/keys.py).
+ */
+export const TRIAL_NOTICE =
+  "To keep this fair, a one-way scrambled form of your IP address " +
+  "is kept until the end of the day. Nothing else.";
+
+/** A question over the length limit, refused before it cost anything. */
+export function tooLongMessage(limit: number): string {
+  return (
+    `That one's a bit long for me — keep questions to ${limit} characters ` +
+    `or fewer and ask again. It didn't cost you a question.`
+  );
+}
+
 /**
  * Why the composer is shut.
  *

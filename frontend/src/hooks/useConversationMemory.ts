@@ -32,6 +32,9 @@ interface Memory {
   // per message. The server verifies it belongs to this token before
   // honouring it.
   conversationId: string | null;
+  // The server's signature on `history`, handed back with it next turn. The
+  // server believes only a history it signed.
+  historySignature: string | null;
 }
 
 type MemoryAction = {
@@ -57,6 +60,7 @@ function memoryReducer(
 const EMPTY: Memory = {
   history: [],
   conversationId: null,
+  historySignature: null,
 };
 
 export function useConversationMemory({
@@ -108,6 +112,7 @@ export function useConversationMemory({
       memory: {
         history: saved.history,
         conversationId: saved.conversationId,
+        historySignature: saved.historySignature,
       },
     });
   }, [grantId, dispatch]);
@@ -129,6 +134,7 @@ export function useConversationMemory({
     saveConversation(grantId, {
       conversationId: memory.conversationId,
       history: memory.history,
+      historySignature: memory.historySignature,
       messages,
     });
   }, [grantId, settled, messages, memory]);

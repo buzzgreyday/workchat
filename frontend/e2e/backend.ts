@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { Page, Route } from "@playwright/test";
 
 /**
@@ -20,9 +22,11 @@ import { Page, Route } from "@playwright/test";
 export function fakeToken({
   sub = "Ada Lovelace",
   grantId = "grant-1",
+  kind = "link",
 }: {
   sub?: string;
   grantId?: string;
+  kind?: "link" | "trial";
 } = {}): string {
   const encode = (value: object) =>
     Buffer.from(JSON.stringify(value))
@@ -39,6 +43,7 @@ export function fakeToken({
     ver: 2,
     typ: "access",
     sid: "session-1",
+    knd: kind,
     exp: Math.floor(Date.now() / 1000) + 900,
   });
 
@@ -110,10 +115,30 @@ export function gate(): {
 export interface AuthCalls {
   claim: number;
   refresh: number;
+  trial: number;
 }
 
 export function authCalls(): AuthCalls {
-  return { claim: 0, refresh: 0 };
+  return { claim: 0, refresh: 0, trial: 0 };
+}
+
+/**
+ * A proof-of-work the page can really solve, the way the backend makes one:
+ * `challenge = sha256(salt + number)` for a number it keeps to itself. Small,
+ * so the solve takes no time; the signature is never checked by the mock.
+ */
+export function trialChallenge(number = 7) {
+  const salt = `test-salt?expires=${Math.floor(Date.now() / 1000) + 300}`;
+
+  return {
+    algorithm: "SHA-256",
+    challenge: createHash("sha256")
+      .update(`${salt}${number}`)
+      .digest("hex"),
+    maxnumber: 50,
+    salt,
+    signature: "not-checked-by-the-mock",
+  };
 }
 
 export function sse(
@@ -148,6 +173,7 @@ export const doneFrame = ({
   ],
   usage: { used: max - remaining, remaining, max },
   conversation_id: conversationId,
+  history_signature: `signed:${conversationId}`,
 });
 
 /**
@@ -180,6 +206,17 @@ export type ClaimBehaviour =
   // Anything else that means no session came back.
   | "error";
 
+/** How the guest trial endpoints answer. */
+export type TrialBehaviour =
+  // Switched off: the challenge answers 404, and no trial is offered.
+  | "off"
+  // Offered, and opening one works.
+  | "ok"
+  // Offered, but this address has had today's.
+  | "used"
+  // Offered, but today's are all gone.
+  | "gone";
+
 /** How `/v2/auth/refresh` answers. */
 export type RefreshBehaviour =
   | "ok"
@@ -210,6 +247,10 @@ export interface BackendOptions {
   holdStream?: Promise<void>;
   /** Bumped per auth call, for the assertions no screen can show. */
   calls?: AuthCalls;
+  /** Default "off", which is what every pre-trial test saw. */
+  trial?: TrialBehaviour;
+  /** Bodies sent to /v2/auth/trial, in order. */
+  trialRequests?: Array<Record<string, unknown>>;
 }
 
 export async function mockBackend(
@@ -228,6 +269,8 @@ export async function mockBackend(
     holdClaim,
     holdStream,
     calls,
+    trial = "off",
+    trialRequests,
   } = options;
 
   const token = fakeToken({ sub, grantId });
@@ -317,6 +360,54 @@ export async function mockBackend(
       }
 
       return session(route);
+    },
+  );
+
+  await page.route(
+    "**/v2/auth/trial/challenge",
+    (route) =>
+      trial === "off"
+        ? refuse(route, 404, "Not Found")
+        : route.fulfill({
+            contentType: "application/json",
+            body: JSON.stringify(trialChallenge()),
+          }),
+  );
+
+  await page.route(
+    "**/v2/auth/trial",
+    (route) => {
+      if (calls) {
+        calls.trial += 1;
+      }
+
+      trialRequests?.push(
+        JSON.parse(
+          route.request().postData() ?? "{}",
+        ),
+      );
+
+      if (trial === "used") {
+        return refuse(route, 429, "Trial already used today");
+      }
+
+      if (trial === "gone") {
+        return refuse(route, 503, "Trial budget reached");
+      }
+
+      return route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: fakeToken({
+            sub: "Guest",
+            grantId: "trial-grant",
+            kind: "trial",
+          }),
+          token_type: "bearer",
+          expires_in: 900,
+          refresh_expires_in: 86400,
+        }),
+      });
     },
   );
 

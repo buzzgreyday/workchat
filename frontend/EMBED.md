@@ -248,6 +248,21 @@ keep their reading column, and the host paints the band behind them. The
 element's box is `--chat-bg`; set it to the band's colour, or the element's
 background to `transparent`.
 
+## Guest trials
+
+When the backend has trials switched on, a visitor with no `claim` is offered a
+few questions instead of being told to find a link. The element asks the
+backend whether to offer one and handles all of it — the button, the
+proof-of-work, the session — so a host page sets nothing and changes nothing:
+the contract above is unchanged. Turning trials off is a backend setting.
+
+The proof-of-work runs in a Web Worker made from a `blob:` URL, since a worker
+script must be same-origin with the host page and this bundle is not. A host
+whose Content-Security-Policy has no `worker-src blob:` (or `script-src blob:`)
+still works: the element falls back to solving on the main thread, in short
+slices. Either way it needs a secure context — https, or localhost — because
+it hashes with `crypto.subtle`.
+
 ## Known gaps
 
 - No `greeting` attribute. Overriding the opening message means changing
