@@ -12,14 +12,26 @@ header and therefore has to be able to read it; it is short-lived for exactly
 that reason. So an XSS on the page can steal minutes of access, not a week of it.
 """
 
-from fastapi import APIRouter, Cookie, Depends, Response
+from fastapi import APIRouter, Cookie, Depends, Request, Response
 
+from app.common.client_ip import client_ip
 from app.common.config import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH, get_settings
 from app.common.exceptions import MissingRefreshToken
 from app.common.logging.logging import logger
-from app.common.models import ClaimRequest, RefreshRequest, SessionOut, TokenPair
-from app.repositories import get_refresh_session_repository, get_token_repository
-from app.repositories.base import RefreshSessionRepository, TokenRepository
+from app.common.models import ClaimRequest, RefreshRequest, SessionOut, TokenPair, TrialRequest
+from app.repositories import (
+    get_refresh_session_repository,
+    get_token_repository,
+    get_trial_repository,
+    get_user_repository,
+)
+from app.repositories.base import (
+    RefreshSessionRepository,
+    TokenRepository,
+    TrialRepository,
+    UserRepository,
+)
+from app.services import trial as trial_service
 from app.services.auth import Auth, get_auth
 
 router = APIRouter(prefix="/v2/auth", tags=["Auth"])
@@ -105,4 +117,61 @@ async def refresh(
 
     logger.info("Refresh token presented", extra={"via": "cookie" if refresh_cookie else "body"})
     pair = await auth.refresh(raw, tokens=tokens, sessions=sessions)
+    return _set_refresh_cookie(response, pair)
+
+
+@router.get(
+    "/trial/challenge",
+    response_model=trial_service.Challenge,
+    summary="A proof-of-work for a guest trial",
+    description=(
+        "A signed challenge to solve before asking for a trial: find the number "
+        "`n` for which `sha256(salt + n) == challenge`, at most `maxnumber`. "
+        "Valid for five minutes. Answers 404 while trials are switched off, "
+        "which is also how a client learns whether to offer one."
+    ),
+    responses={404: {"description": "Trials are switched off."}},
+)
+async def trial_challenge() -> trial_service.Challenge:
+    return trial_service.challenge(get_settings())
+
+
+@router.post(
+    "/trial",
+    response_model=SessionOut,
+    summary="Open a guest trial",
+    description=(
+        "Trades a solved challenge for a session on a small grant of its own, "
+        "set up exactly as a claim's: access token in the body, refresh token "
+        "in an httpOnly cookie. One per address per day, one per challenge, "
+        "and a ceiling per day for everyone. Costs no queries."
+    ),
+    responses={
+        400: {"description": "The solution does not hold, has expired, or was already used."},
+        404: {"description": "Trials are switched off."},
+        429: {"description": "This address has had today's trial."},
+        503: {"description": "Today's trials are all gone."},
+    },
+)
+async def trial(
+    req: TrialRequest,
+    request: Request,
+    response: Response,
+    users: UserRepository = Depends(get_user_repository),
+    tokens: TokenRepository = Depends(get_token_repository),
+    sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
+    trials: TrialRepository = Depends(get_trial_repository),
+    auth: Auth = Depends(get_auth),
+) -> SessionOut:
+    logger.info("Trial requested")
+    pair = await trial_service.start_trial(
+        req.solution,
+        client_ip(request),
+        settings=get_settings(),
+        users=users,
+        tokens=tokens,
+        sessions=sessions,
+        trials=trials,
+        auth=auth,
+    )
     return _set_refresh_cookie(response, pair)

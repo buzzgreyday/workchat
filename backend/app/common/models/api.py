@@ -5,6 +5,8 @@ from typing import Any, List, Optional, Literal
 import jwt
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StrictInt
 
+from app.common.config import MAX_MESSAGE_CHARS
+
 class Usage(BaseModel):
     used: int
     remaining: int
@@ -21,12 +23,17 @@ class Record(BaseModel):
                             # {"kubernetes": "Deployed existing services; did not design cluster architecture."}
 
 class ChatRequest(BaseModel):
-    # Bounded so it cannot exceed the chat_messages.content column, and to cap
-    # what a single request can cost in OpenAI tokens.
-    message: str = Field(min_length=1, max_length=4000)
+    # The question being asked, and only it: see MAX_MESSAGE_CHARS for why it is
+    # short. The history below is not held to it — replies are as long as they
+    # need to be — and is trusted only when signed.
+    message: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
     # Parameterised so the shape is stated rather than implied: after pydantic
     # has parsed the request body these really are dicts, whatever the client sent.
     history: list[dict[str, Any]] = []  # [{"role": "user"/"assistant"/"tool", ...}]
+    # The signature the server put on that history when it handed it back
+    # (services/chat/history.py). A non-empty history without a valid one is
+    # dropped, and the turn starts a new conversation.
+    history_signature: str | None = Field(default=None, max_length=128)
     # Echoed back by the server so a client can keep appending to one thread.
     # Unverifiable client input: the server checks it belongs to the bearer's
     # token and silently starts a new conversation if it doesn't.
@@ -151,6 +158,10 @@ class JWT(BaseModel):
     tid: str | None = None
     # The refresh-token row this access token came from. Only set on typ="access".
     sid: str | None = None
+    # The grant's kind, on an access token: "link" or "trial". Lets the client
+    # word things for a guest — "that's all the questions on this trial" rather
+    # than "on this link" — without a second request to ask.
+    knd: Literal["link", "trial"] | None = None
 
     def generate(self, secret_key: str, algorithm: str) -> str:
         return jwt.encode(self.model_dump(exclude_none=True), secret_key, algorithm=algorithm)
@@ -235,6 +246,12 @@ class SessionInfo(BaseModel):
 
 class ClaimRequest(BaseModel):
     claim_token: str = Field(min_length=1, max_length=4096)
+
+
+class TrialRequest(BaseModel):
+    """A solved proof-of-work, as the browser sends it back: base64 of the
+    challenge it was given plus the number it found (services/trial/pow.py)."""
+    solution: str = Field(min_length=1, max_length=4096)
 
 
 class RefreshRequest(BaseModel):

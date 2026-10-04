@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.common.models.utc import UTCDateTime
@@ -31,4 +33,7 @@ class Grant(BaseModel):
     claimed_at: UTCDateTime | None = None
     owner_notified_at: UTCDateTime | None = None
     version: int = 1
+    # "link" for a grant issued to someone, "trial" for one a visitor opened
+    # for themselves (see the tokens.kind column).
+    kind: Literal["link", "trial"] = "link"
     created_at: UTCDateTime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))

@@ -231,6 +231,7 @@ class Auth:
             typ="access",
             tid=str(grant.id),
             sid=str(session_id),
+            knd=grant.kind,
         ).generate(self.secret_key, self.algorithm)
         return token, exp_ts - now_ts
 
@@ -328,6 +329,20 @@ class Auth:
             )
             raise ClaimAlreadyUsed()
 
+        pair = await self.open_session(grant, sessions)
+        logger.info("Claim exchanged for a session", extra={"token_id": grant.id, "subject": grant.subject})
+        return pair
+
+    async def open_session(self, grant: Grant, sessions: RefreshSessionRepository) -> TokenPair:
+        """
+        A first session on a grant: a refresh token, stored, and an access token.
+
+        What a spent claim link buys, and what a guest trial is opened with — the
+        two ways into a grant end in the same pair, so the rest of the app cannot
+        tell a session that began with a link from one that began with a trial.
+
+        Checks nothing. The caller has already decided this grant may be opened.
+        """
         session_id = uuid.uuid4()
         refresh_token, refresh_expires_at, refresh_expires_in = self._mint_refresh(grant, session_id)
         await sessions.add(
@@ -339,11 +354,7 @@ class Auth:
             )
         )
         access_token, expires_in = self._mint_access(grant, session_id)
-
-        logger.info(
-            "Claim exchanged for a session",
-            extra={"token_id": grant.id, "session_id": session_id, "subject": grant.subject},
-        )
+        logger.info("Session opened", extra={"token_id": grant.id, "session_id": session_id})
         return TokenPair(
             access_token=access_token,
             refresh_token=refresh_token,

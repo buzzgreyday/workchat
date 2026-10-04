@@ -54,6 +54,12 @@ os.environ.setdefault("ADMIN_KEY", "test-admin-key")
 os.environ.setdefault("POSTGRES_USER", "test")
 os.environ.setdefault("POSTGRES_PASSWORD", "test")
 os.environ.setdefault("POSTGRES_DB", "test")
+# On for the suite, so the trial endpoints exist to be tested; a test of the
+# switched-off state turns it off for itself.
+os.environ.setdefault("TRIAL_ENABLED", "1")
+os.environ.setdefault("TRIAL_SECRET", "test-trial-secret")
+# Cheap, so a test can solve a challenge in a moment.
+os.environ.setdefault("TRIAL_POW_MAX_NUMBER", "1000")
 
 # Everything the application caches for the life of a process. The suite is one
 # process, so a value built against an earlier test's environment would outlive

@@ -24,6 +24,11 @@ docker compose exec backend alembic upgrade head
 | `refresh_tokens` | One row per session within a grant — a hirer on a laptop and the same hirer on a phone are two rows. Rotation keeps the old row and chains it to its successor through `rotated_to`, which is what makes a replayed token recognisable rather than merely unknown. |
 | `conversations` | One chat session, with `subject`/`company`/`job_title` snapshotted from the token. |
 | `chat_messages` | Two rows per turn — the question as received, and the reply as it finished. |
+| `trial_requests` | One row per guest trial opened today: the day, the challenge that paid for it, and a keyed, day-scoped hash of the visitor's address — never the address. Earlier days are deleted as each new trial is requested. See [privacy.md](privacy.md#guest-trials). |
+| `trial_budget` | Trials opened per UTC day, against `TRIAL_DAILY_LIMIT`. A date and a number. |
+
+`tokens.kind` is `link` for a grant issued to someone, `trial` for one a guest
+opened. Every trial grant belongs to the one user named `Guest (trial)`.
 
 `chat_messages.request_id` is 32 hex characters, W3C trace-id shaped. It ties the
 user row and assistant row of one turn together, and is the column a future
@@ -80,6 +85,11 @@ removed while any surviving row still pointed at it — which is exactly what th
 session purge does when it clears an expired predecessor out from under a live
 successor. Taking a whole chain out in one statement works under either setting;
 this is about partial and single-row deletes.
+
+Guest trials clean up after themselves: `trial_requests` rows only ever hold
+today, because each trial request deletes the earlier days first, and
+`scripts/purge-trial-requests.sh` does the same nightly for days nobody asked. What is in a
+row is described in [privacy.md](privacy.md#guest-trials).
 
 **Backups lag the purge.** `scripts/backup-db.sh` keeps 7 daily, 4 weekly and 6
 monthly dumps, so redacted content survives in backups for up to ~6 months after

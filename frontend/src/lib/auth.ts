@@ -6,6 +6,9 @@ interface JwtClaims {
   // on a v1 token `jti` is both.
   tid?: string;
   jti?: string;
+  // The grant's kind, on a v2 access token: issued as a link, or opened as a
+  // guest trial. Absent on anything older, which was always a link.
+  knd?: "link" | "trial";
 }
 
 /**
@@ -32,5 +35,14 @@ export function getUserName(token: string): string {
     return claims.sub ?? "You";
   } catch {
     return "You";
+  }
+}
+
+/** Whether this token belongs to a guest trial rather than a link. */
+export function isTrial(token: string): boolean {
+  try {
+    return jwtDecode<JwtClaims>(token).knd === "trial";
+  } catch {
+    return false;
   }
 }

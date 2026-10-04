@@ -65,6 +65,13 @@ services:
     restart: unless-stopped
     env_file:
       - ./backend/.env
+    environment:
+      # A fact of this topology, so here rather than in .env: the backend is
+      # only `expose`d, so every request reaches it through Caddy, which writes
+      # X-Forwarded-For itself. That makes the header the visitor's address —
+      # what guest trials are counted by (app/common/client_ip.py). Never set
+      # this where the backend's port is reachable directly.
+      TRUST_PROXY_HEADERS: "true"
     volumes:
       # Read-only: the container scans this at startup and never writes to it.
       # Nothing in the image builds an index or rewrites skills.md any more, so

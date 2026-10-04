@@ -7,6 +7,36 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.10.0] - 2026-10-04
+
+### Added
+
+- **Guest trials.** A visitor with no link can ask a few questions instead of
+  hitting a dead end — earned with an invisible proof-of-work solved in their
+  browser, limited to one per IP address per day, within a daily ceiling for
+  everyone. Off unless `TRIAL_ENABLED`. Addresses are never stored: only a keyed
+  hash under a key that changes daily, deleted when its day ends
+  (`docs/privacy.md`).
+- **Signed history.** The server signs the conversation history it hands back
+  each turn and believes only a history it signed, so a client can no longer
+  send back a padded or rewritten one. A refused history starts a fresh
+  conversation. Optional `HISTORY_SIGNING_SECRET`, derived from `JWT_SECRET`
+  when unset.
+
+### Changed
+
+- **Questions are limited to 150 characters** (`MAX_MESSAGE_CHARS`), down from
+  4000. The composer stops at the limit and shows a counter; replies and the
+  history they build are not limited.
+- Caddy's access log masks visitors' addresses to their network; uvicorn's
+  access log is off.
+
+### Fixed
+
+- A question the server refused as invalid — too long, say — no longer costs a
+  question from the allowance. It used to be spent before the request was
+  validated.
+
 ## [0.9.5] - 2026-09-27
 
 ### Fixed

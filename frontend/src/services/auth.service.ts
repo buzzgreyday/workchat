@@ -1,4 +1,5 @@
 import { apiUrl } from "@/lib/api";
+import type { Challenge } from "@/lib/pow";
 
 export interface Session {
   access_token: string;
@@ -54,6 +55,56 @@ class AuthService {
         body: JSON.stringify({
           claim_token: claimToken,
         }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new AuthError(
+        await detail(response),
+        response.status,
+      );
+    }
+
+    return response.json();
+  }
+
+  /**
+   * A proof-of-work to solve before asking for a guest trial — and whether
+   * trials are offered at all: the backend answers 404 while they are off.
+   * Stores nothing and sets nothing, so asking is free.
+   */
+  async trialChallenge(): Promise<Challenge> {
+    const response = await fetch(
+      `${apiUrl()}/v2/auth/trial/challenge`,
+    );
+
+    if (!response.ok) {
+      throw new AuthError(
+        await detail(response),
+        response.status,
+      );
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Trade a solved challenge for a guest session. Set up exactly as a claim's,
+   * refresh cookie and all, so `credentials: "include"` matters here for the
+   * same reason it does there.
+   */
+  async trial(
+    solution: string,
+  ): Promise<Session> {
+    const response = await fetch(
+      `${apiUrl()}/v2/auth/trial`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ solution }),
       },
     );
 
