@@ -37,9 +37,16 @@ export const NO_LINK_MESSAGE =
 
 // --- guest trials ------------------------------------------------------------
 
-/** The no-link greeting while a trial is on offer: an invitation, not a dead end. */
-export const NO_LINK_TRIAL_MESSAGE =
-  "If you were sent a link, open that instead.";
+/**
+ * The no-link greeting while a trial is on offer: an invitation first, and
+ * only then the aside for someone who has a link.
+ */
+export function noLinkTrialMessage(owner: string): string {
+  return (
+    `Want to chat? Try me! Ask me a few questions about ${owner}'s work.\n\n` +
+    "If you were sent a link, open that instead — it comes with more."
+  );
+}
 
 // The messages that send a guest onward also name `owner`, whose CV this is —
 // the name the chat shows in its header (OWNER_NAME, or the embed's

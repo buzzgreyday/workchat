@@ -3,7 +3,7 @@ import {
   BROKEN_LINK_MESSAGE,
   hello,
   NO_LINK_MESSAGE,
-  NO_LINK_TRIAL_MESSAGE,
+  noLinkTrialMessage,
   SPENT_LINK_MESSAGE,
   TRIAL_FAILED_MESSAGE,
   trialGoneMessage,
@@ -17,8 +17,8 @@ import type { SessionStatus, TrialState } from "@/types/session";
 // reaches here: the session is "loading" then, which shows the typing dots.
 const NO_LINK: Record<TrialState, (owner: string) => string> = {
   unavailable: () => NO_LINK_MESSAGE,
-  available: () => NO_LINK_TRIAL_MESSAGE,
-  starting: () => NO_LINK_TRIAL_MESSAGE,
+  available: noLinkTrialMessage,
+  starting: noLinkTrialMessage,
   used: trialUsedMessage,
   tried: trialTriedMessage,
   gone: trialGoneMessage,
