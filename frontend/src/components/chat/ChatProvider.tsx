@@ -146,7 +146,7 @@ export function ChatProvider({
     usage,
     setInput,
     sendMessage,
-  } = useChat({ ...session, seedQuestion });
+  } = useChat({ ...session, owner: owner.name, seedQuestion });
 
   // Held in a ref and notified from an effect, not called where usage is set.
   // The embed passes a fresh arrow on every attribute change, so a plain

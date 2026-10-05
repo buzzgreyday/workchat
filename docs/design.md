@@ -15,8 +15,7 @@ the page readable at a glance.
 
 | Role | Hex | Used for |
 | --- | --- | --- |
-| **Frame** — steel blue | `#547792` | The page itself: top bar, footer, anything around the content. |
-| **Surface** — navy | `#1b2e42` | Where the content sits: the chat band, cards. |
+| **Surface** — navy | `#1b2e42` | The page and everything on it: the top bar, the chat band, the footer, cards. One colour, no frame of another around it. |
 | **Raised surface** | `#2b3d4f` | Things on the surface: reply bubbles, the input, pills. The navy lifted with 8% white. |
 | **Text** — cream | `#eae0cf` | All body text. |
 | **Muted text** | `#86898f` | Placeholders, footer links, secondary labels. |
@@ -35,9 +34,12 @@ Rules that keep it coherent:
   never a button.
 - **Text is cream, not white.** Pure white is harsher than the rest of the
   palette.
-- **Surfaces step up in lightness:** frame, then navy, then raised. Nothing
-  lighter than the raised surface sits on navy except text and the two
+- **Two surfaces, not three:** navy, then raised. The bars are the page's
+  navy with no line under or over them, so the title and links float on it.
+  Nothing lighter than the raised surface sits on navy except text and the two
   signal colours.
+- **No steel blue.** It framed the page once (`#547792`) and read as
+  corporate; mringdal.com keeps it only for its story's headings.
 
 ### Readability
 
@@ -51,10 +53,10 @@ Measured contrast. 4.5:1 is the guideline for body text, 3:1 for large text
 | Pale gold status text on its pill | 7.2:1 |
 | Coral button against navy | 5.2:1 |
 | Navy icon on coral | 5.2:1 |
-| Pale gold title on steel blue | 3.0:1 — large text only, and at the limit: lighten the gold rather than darken it |
+| Pale gold title on navy | 8.9:1 |
 
-Muted text on steel blue (the footer links) is low. Keep it to small print
-nobody needs to read.
+Muted text on navy (the footer links, the trial notice) is 4.0:1: fine
+for small print, not for anything someone has to read to use the page.
 
 ## Type
 
@@ -98,9 +100,9 @@ public repository.
 | Reading width | 56rem (896px) at most |
 | Shadows | Small only: `0 1px 3px rgb(0 0 0 / 0.1)` on bubbles, pills and the button |
 
-Layout on chat.mringdal.com: a full-width top bar in the frame colour, the
-content in a navy band edge to edge with a centred reading column, and a
-slim footer in the frame colour with the profile links.
+Layout on chat.mringdal.com: a full-width top bar, the content edge to edge
+with a centred reading column, and a slim footer with the profile links — all
+the one navy, with no lines between them, as mringdal.com draws its own page.
 
 ## Using it on mringdal.com (Next.js + Tailwind 4)
 
@@ -138,7 +140,7 @@ the embedded chat (step 3).
 ### 2. Tokens, in `app/globals.css`
 
 The existing names stay, so nothing that already reads them changes. The page
-is navy with cream text; the steel blue frames it (header, footer).
+is navy with cream text, the bars included.
 
 ```css
 @import "tailwindcss";
@@ -206,7 +208,7 @@ fonts, set up the way chat.mringdal.com is:
 
 ```css
 workchat-chat {
-  --chat-bg: var(--frame);
+  --chat-bg: var(--bg);
   --chat-panel: var(--bg);
   --chat-panel-alt: var(--surface);
   --chat-border: var(--line);

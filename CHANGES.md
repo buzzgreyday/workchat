@@ -7,6 +7,30 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [Unreleased]
+
+### Added
+
+- **A browser that has had a guest trial is remembered for 30 days**
+  (`TRIAL_COOKIE_DAYS`) by a signed, httpOnly cookie holding only the trial's
+  date, so the per-day address limit resetting overnight no longer offers the
+  same browser a new trial every morning. The chat says so instead of offering
+  one. Strictly necessary for the trial, so no consent banner
+  (`docs/privacy.md`).
+
+### Changed
+
+- **chat.mringdal.com looks like mringdal.com**: one navy throughout — the bar
+  and footer included, with no lines between them — and the site's gold and
+  coral. The steel-blue frame is gone, and so is `viewport-fit=cover`, which
+  in DuckDuckGo on Android left a blank row above the bar.
+- The trial's wording: a new button ("Try me! Ask a few questions"), a notice
+  that mentions the trial cookie, and messages that point a guest to the owner
+  by name ("…or ask Michael"). The greeting asks what you'd like to know about
+  them.
+- chat.mringdal.com's footer links to the owner's own site first
+  (`OWNER_WEBSITE_URL`, mringdal.com by default), in the same tab.
+
 ## [0.10.1] - 2026-10-04
 
 ### Changed

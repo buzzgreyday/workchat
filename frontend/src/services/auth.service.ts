@@ -70,12 +70,18 @@ class AuthService {
 
   /**
    * A proof-of-work to solve before asking for a guest trial — and whether
-   * trials are offered at all: the backend answers 404 while they are off.
-   * Stores nothing and sets nothing, so asking is free.
+   * one is offered at all: the backend answers 404 while trials are off, and
+   * 429 to a browser that has had one recently. Stores nothing and sets
+   * nothing, so asking is free.
+   *
+   * `credentials: "include"` so the trial cookie goes with it: it is what
+   * says this browser has had its trial, and without it every visit would be
+   * offered a new one.
    */
   async trialChallenge(): Promise<Challenge> {
     const response = await fetch(
       `${apiUrl()}/v2/auth/trial/challenge`,
+      { credentials: "include" },
     );
 
     if (!response.ok) {

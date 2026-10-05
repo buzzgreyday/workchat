@@ -215,7 +215,9 @@ export type TrialBehaviour =
   // Offered, but this address has had today's.
   | "used"
   // Offered, but today's are all gone.
-  | "gone";
+  | "gone"
+  // Not offered: this browser carries the trial cookie of a recent one.
+  | "tried";
 
 /** How `/v2/auth/refresh` answers. */
 export type RefreshBehaviour =
@@ -368,7 +370,9 @@ export async function mockBackend(
     (route) =>
       trial === "off"
         ? refuse(route, 404, "Not Found")
-        : route.fulfill({
+        : trial === "tried"
+          ? refuse(route, 429, "Trial already used in this browser")
+          : route.fulfill({
             contentType: "application/json",
             body: JSON.stringify(trialChallenge()),
           }),

@@ -28,16 +28,21 @@
 
 :root {
   /* ---- Palette ---------------------------------------------------------- */
-  --chat-bg: oklch(0.553 0.058 242.232);
-  --chat-panel: oklch(0.295 0.044 250.55);
-  /* The panel lifted with a little white, so replies, the input and the
-     questions-left pill read as raised above it. Derived, so it follows the
-     panel; raise the white share for more lift. */
-  --chat-panel-alt: color-mix(in oklab, var(--chat-panel) 92%, white);
+  /* mringdal.com's own palette, to the hex (its app/globals.css), so the chat
+     looks the same on its own page as it does in the window on that site:
+     navy everywhere, the bars included — no steel-blue frame — with the gold
+     and the coral as the only colours on it. */
+  --chat-bg: #1b2e42;
+  --chat-panel: #1b2e42;
+  /* Navy lifted, so replies, the input and the questions-left pill read as
+     raised above it. */
+  --chat-panel-alt: #2b3d4f;
   --chat-border: oklch(1 0 0 / 10%);
   --chat-text: #eae0cf;
-  --chat-text-muted: oklch(0.63 0.01 260);
-  --chat-accent: oklch(0.75 0.04 224.461);
+  --chat-text-muted: #86898f;
+  /* Only tints your own questions (mixed into the navy) and colours links in
+     replies; nothing on the page is painted with it. */
+  --chat-accent: #94b4c1;
   /* The send button's colour, on its own: the title and the avatar have a
      colour of their own now, so this can change without moving them. The
      pill text and the input's focus follow the button. */
@@ -45,9 +50,8 @@
 
   /* ---- Parts: the chat -------------------------------------------------- */
   /* The title's pale gold, and the avatar's too — they belong together, and
-     stay put whatever the button does. #C29C37 lightened halfway to white:
-     3:1 on the steel-blue top bar, so lighten rather than darken it. */
-  --chat-title-color: color-mix(in oklab, #C29C37 50%, white);
+     stay put whatever the button does. mringdal.com's identity gold. */
+  --chat-title-color: #e0cea1;
 
   /* Your questions */
   /* Halfway between the accent and the panel, so the send button — full
@@ -85,7 +89,7 @@
   /* The action colour from the palette, so the one thing to press reads
      first. The title, the pill text and the input's focus follow this. */
   --chat-send-bg: var(--chat-action);
-  --chat-send-icon: var(--chat-panel);
+  --chat-send-icon: #1b2e42;
 
   /* The "questions left" pill */
   --chat-badge-bg: var(--chat-panel-alt);
@@ -93,12 +97,15 @@
   --chat-badge-text: var(--chat-title-color);
 
   /* ---- Parts: this page's frame ---------------------------------------- */
+  /* The bars as mringdal.com draws its own: the page's navy, and no line
+     between them and the chat, so the title and the links float on one
+     colour. */
   --site-bar-bg: var(--chat-bg);
-  --site-bar-border: var(--chat-border);
+  --site-bar-border: transparent;
   /* The band the chat sits in, edge to edge. */
   --site-chat-bg: var(--chat-panel);
   --site-footer-bg: var(--chat-bg);
-  --site-footer-border: var(--chat-border);
+  --site-footer-border: transparent;
   --site-link: var(--chat-text-muted);
   --site-link-hover: var(--chat-accent);
 

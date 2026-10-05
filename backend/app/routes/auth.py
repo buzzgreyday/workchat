@@ -15,7 +15,12 @@ that reason. So an XSS on the page can steal minutes of access, not a week of it
 from fastapi import APIRouter, Cookie, Depends, Request, Response
 
 from app.common.client_ip import client_ip
-from app.common.config import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH, get_settings
+from app.common.config import (
+    REFRESH_COOKIE_NAME,
+    REFRESH_COOKIE_PATH,
+    TRIAL_COOKIE_NAME,
+    get_settings,
+)
 from app.common.exceptions import MissingRefreshToken
 from app.common.logging.logging import logger
 from app.common.models import ClaimRequest, RefreshRequest, SessionOut, TokenPair, TrialRequest
@@ -128,12 +133,18 @@ async def refresh(
         "A signed challenge to solve before asking for a trial: find the number "
         "`n` for which `sha256(salt + n) == challenge`, at most `maxnumber`. "
         "Valid for five minutes. Answers 404 while trials are switched off, "
-        "which is also how a client learns whether to offer one."
+        "and 429 to a browser that has had one recently — which is also how a "
+        "client learns whether to offer one."
     ),
-    responses={404: {"description": "Trials are switched off."}},
+    responses={
+        404: {"description": "Trials are switched off."},
+        429: {"description": "This browser has had a trial recently."},
+    },
 )
-async def trial_challenge() -> trial_service.Challenge:
-    return trial_service.challenge(get_settings())
+async def trial_challenge(
+    trial_cookie: str | None = Cookie(default=None, alias=TRIAL_COOKIE_NAME),
+) -> trial_service.Challenge:
+    return trial_service.challenge(get_settings(), remembered=trial_cookie)
 
 
 @router.post(
@@ -144,12 +155,13 @@ async def trial_challenge() -> trial_service.Challenge:
         "Trades a solved challenge for a session on a small grant of its own, "
         "set up exactly as a claim's: access token in the body, refresh token "
         "in an httpOnly cookie. One per address per day, one per challenge, "
-        "and a ceiling per day for everyone. Costs no queries."
+        "one per browser for TRIAL_COOKIE_DAYS (a second cookie, holding "
+        "only the date), and a ceiling per day for everyone. Costs no queries."
     ),
     responses={
         400: {"description": "The solution does not hold, has expired, or was already used."},
         404: {"description": "Trials are switched off."},
-        429: {"description": "This address has had today's trial."},
+        429: {"description": "This address has had today's trial, or this browser one recently."},
         503: {"description": "Today's trials are all gone."},
     },
 )
@@ -162,16 +174,31 @@ async def trial(
     sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
     trials: TrialRepository = Depends(get_trial_repository),
     auth: Auth = Depends(get_auth),
+    trial_cookie: str | None = Cookie(default=None, alias=TRIAL_COOKIE_NAME),
 ) -> SessionOut:
     logger.info("Trial requested")
+    settings = get_settings()
     pair = await trial_service.start_trial(
         req.solution,
         client_ip(request),
-        settings=get_settings(),
+        remembered=trial_cookie,
+        settings=settings,
         users=users,
         tokens=tokens,
         sessions=sessions,
         trials=trials,
         auth=auth,
+    )
+    # Remember that this browser has had its trial. The same flags as the
+    # refresh cookie, and for the same reasons; nothing else ever reads it.
+    value, max_age = trial_service.trial_cookie(settings)
+    response.set_cookie(
+        key=TRIAL_COOKIE_NAME,
+        value=value,
+        max_age=max_age,
+        httponly=True,
+        secure=settings.refresh_cookie_secure,
+        samesite="strict",
+        path=REFRESH_COOKIE_PATH,
     )
     return _set_refresh_cookie(response, pair)

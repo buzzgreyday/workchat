@@ -46,6 +46,14 @@ log masks addresses to their network (/16 for IPv4, /32 for IPv6). No third
 party is involved: the bot check is a proof-of-work solved in the visitor's own
 browser, with no captcha service and no tracking.
 
+**The trial cookie.** After a trial, the browser is given `cv_trial` (the
+name is configurable as `TRIAL_COOKIE_NAME`) for `TRIAL_COOKIE_DAYS`, 30 by
+default. It holds the date of the trial and an HMAC signature of that date —
+no identifier — and the server keeps no record of it. While a browser carries
+a valid one, no new trial is offered. It is what keeps the per-day address
+limit from handing the same browser a fresh trial every morning; clearing it
+is possible, and the daily ceiling bounds what that is worth.
+
 **The trial itself** is an ordinary grant with the subject "Guest": its
 questions and answers are kept like anyone's, under the same 30-day scrub, and
 attributed to no one.
@@ -58,10 +66,19 @@ starts a trial.
 
 ## Cookies
 
-One, `cv_refresh` (the name is configurable): an httpOnly session cookie that
-keeps a conversation going across a reload. Strictly necessary for the service
-the visitor asked for, so it needs no consent banner. Nothing else is set, by
-this application or for anyone else.
+Two, both set by the API's host, both httpOnly and SameSite=Strict, and
+neither read by anything but the endpoints that set them:
+
+- `cv_refresh`: the session. Keeps a conversation going across a reload, for
+  as long as the grant lasts.
+- `cv_trial`: set only after a guest trial, for 30 days. The trial's date and a
+  signature, nothing else (see above).
+
+Both are strictly necessary to a service the visitor asked for — a
+conversation, and a trial on the terms it is offered on — which is the
+ePrivacy exemption (art. 5(3)): no consent banner is needed. Neither is used
+for analytics, advertising or anything else, and nothing is set for anyone
+else. The notice beside the trial button says both things the trial keeps.
 
 ## Backups
 

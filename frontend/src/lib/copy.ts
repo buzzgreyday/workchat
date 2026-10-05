@@ -39,36 +39,56 @@ export const NO_LINK_MESSAGE =
 
 /** The no-link greeting while a trial is on offer: an invitation, not a dead end. */
 export const NO_LINK_TRIAL_MESSAGE =
-  "No link? No problem — you can try me with a few questions first. " +
-  "If you were sent a link, open that instead: it comes with more.";
+  "If you were sent a link, open that instead.";
 
-export const TRIAL_USED_MESSAGE =
-  "You've already had today's trial from this connection. " +
-  "Come back tomorrow, or ask for a link if there's more you'd like to know.";
+// The messages that send a guest onward also name `owner`, whose CV this is —
+// the name the chat shows in its header (OWNER_NAME, or the embed's
+// `owner-name`, "Michael" by default). Functions for that reason only.
 
-export const TRIAL_GONE_MESSAGE =
-  "Today's trials have all been taken. " +
-  "Try again tomorrow, or ask for a link if there's more you'd like to know.";
+export function trialUsedMessage(owner: string): string {
+  return (
+    "You've already had today's trial from this connection. " +
+    `Ask for a link, or ask ${owner}, if there's more you'd like to know.`
+  );
+}
+
+export function trialTriedMessage(owner: string): string {
+  return (
+    "You've had a trial in this browser recently. " +
+    `Ask for a link for more questions, or ask ${owner}, if there's more you'd like to know.`
+  );
+}
+
+export function trialGoneMessage(owner: string): string {
+  return (
+    "Today's trials have all been taken. " +
+    `Try again tomorrow, ask for a link, or ask ${owner}.`
+  );
+}
 
 export const TRIAL_FAILED_MESSAGE =
   "I couldn't start a trial just now — it's not you. Try again in a moment.";
 
-export const OUT_OF_QUESTIONS_TRIAL_MESSAGE =
-  "That's all the questions in this trial. " +
-  "Ask for a link if there's more you'd like to know — it comes with plenty.";
+export function outOfQuestionsTrialMessage(owner: string): string {
+  return (
+    "That's all the questions in this trial. " +
+    `Ask for a link, or ask ${owner}, if there's more you'd like to know.`
+  );
+}
 
 /** The button that starts a trial, where the composer would be. */
-export const TRY_IT = "Try it — ask a few questions";
+export const TRY_IT = "Try me! Ask a few questions";
 
 /**
  * Said beside that button, because it is true of pressing it and someone
  * should know before they do. Accurate to the letter: the backend keeps only
  * an HMAC of the address under a key for that UTC day, and drops it when the
- * day ends (backend/app/services/trial/keys.py).
+ * day ends (backend/app/services/trial/keys.py); and it sets a cookie holding
+ * the trial's date, for TRIAL_COOKIE_DAYS (services/trial/cookie.py).
  */
 export const TRIAL_NOTICE =
-  "To keep this fair, a one-way scrambled form of your IP address " +
-  "is kept until the end of the day. Nothing else.";
+  "To keep this fair, a scrambled form of your IP address is kept until the " +
+  "end of the day, and this browser remembers your trial for 30 days.";
 
 /** A question over the length limit, refused before it cost anything. */
 export function tooLongMessage(limit: number): string {
@@ -96,9 +116,13 @@ export const NO_SESSION = "Link can't start a session";
 /** The composer's prompt. Short for the same reason as the two above. */
 export const COMPOSER_PLACEHOLDER = "Ask a question…";
 
-/** The greeting, once there is a name to use. */
-export function hello(name: string): string {
-  return `Hi ${name}! 👋`;
+/**
+ * The greeting, once there is a name to use. Markdown, like every message: a
+ * blank line is what starts the second paragraph — a single newline is read
+ * as a space.
+ */
+export function hello(name: string, owner: string): string {
+  return `Hi ${name}! 👋\n\nWhat would you like to know about ${owner}?`;
 }
 
 /**
