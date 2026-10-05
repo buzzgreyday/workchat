@@ -55,19 +55,20 @@ const bebas = Bebas_Neue({
 export const viewport: Viewport = {
   colorScheme: "dark",
 
-  // theme.css's --chat-bg converted to sRGB, so the browser chrome does not
-  // sit a shade off the page it frames. Hand-converted and hardcoded because
-  // a meta tag cannot read a custom property — if that `--chat-bg` moves,
-  // this has to move with it.
-  themeColor: "#547792",
+  // theme.css's --chat-bg, so the browser chrome is the page's navy rather
+  // than a shade off it. Hardcoded because a meta tag cannot read a custom
+  // property — if that `--chat-bg` moves, this has to move with it.
+  themeColor: "#1b2e42",
 
   interactiveWidget: "resizes-content",
 
-  // Paint under the notch and the home indicator. Only safe because the
-  // `.shell-*` rules pad the content back off them with
-  // `env(safe-area-inset-*)` — and those insets only become non-zero once
-  // this is set. Neither half is any use without the other.
-  viewportFit: "cover",
+  // No `viewportFit: "cover"`. It painted the old steel-blue bar up under
+  // the notch; with the bar the page's navy, the browser's own fill around
+  // the page is the same colour, so nothing is lost. And it cost a blank row:
+  // DuckDuckGo on Android reports the status bar as `safe-area-inset-top`
+  // even with the page below it, and the bar padded itself down by that much
+  // — fixed the same way on mringdal.com. Without it every inset is 0, so the
+  // `.shell-*` rules' env() terms are simply inert.
 };
 
 export async function generateMetadata(): Promise<Metadata> {

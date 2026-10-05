@@ -20,9 +20,9 @@ import pytest
 from httpx import ASGITransport
 from sqlalchemy import func, select
 
-from app.common.config import ALGORITHM, REFRESH_COOKIE_NAME, get_settings
+from app.common.config import ALGORITHM, REFRESH_COOKIE_NAME, TRIAL_COOKIE_NAME, get_settings
 from app.common.schemas import DatabaseToken, DatabaseTrialBudget, DatabaseTrialRequest
-from app.services.trial import keys, pow
+from app.services.trial import cookie, keys, pow
 from tests.conftest import ask
 
 
@@ -39,6 +39,12 @@ async def solution(client) -> str:
     resp = await client.get("/v2/auth/trial/challenge")
     assert resp.status_code == 200, resp.text
     return solve(resp.json())
+
+
+def forget(client) -> None:
+    """A browser with its cookies cleared: no trial cookie, so what is under
+    test is the address limit, not the browser one."""
+    client.cookies.clear()
 
 
 async def start(client, payload: str | None = None):
@@ -170,6 +176,7 @@ async def test_forwarded_for_is_ignored_unless_trusted(app, client, settings_wit
         json={"solution": await solution(client)},
         headers={"X-Forwarded-For": "203.0.113.1"},
     )
+    forget(client)
     second = await client.post(
         "/v2/auth/trial",
         json={"solution": await solution(client)},
@@ -177,6 +184,7 @@ async def test_forwarded_for_is_ignored_unless_trusted(app, client, settings_wit
     )
     assert first.status_code == 200
     assert second.status_code == 429, "same peer, so same address, whatever the header says"
+    assert second.json()["detail"] == "Trial already used today"
 
 
 async def test_forwarded_for_is_believed_behind_the_proxy(app, client, monkeypatch):
@@ -184,6 +192,7 @@ async def test_forwarded_for_is_believed_behind_the_proxy(app, client, monkeypat
     monkeypatch.setattr("app.common.client_ip.get_settings", lambda: trusted)
 
     async def from_(address):
+        forget(client)
         return await client.post(
             "/v2/auth/trial",
             json={"solution": await solution(client)},
@@ -262,6 +271,7 @@ async def test_the_daily_ceiling_holds_for_everyone(app, client, settings_with):
 async def test_a_refused_trial_spends_none_of_the_budget(app, client, session_maker):
     async with visitor(app, "203.0.113.7") as v:
         await start(v)
+        forget(v)
         await start(v)  # same address, refused
 
     async with session_maker() as s:
@@ -284,6 +294,62 @@ async def test_no_address_reaches_the_logs(app, client, caplog):
     caplog.set_level(logging.DEBUG)
     async with visitor(app, "203.0.113.77") as v:
         await start(v)
+        forget(v)
         await start(v)
 
     assert "203.0.113.77" not in caplog.text
+
+
+# --- the trial cookie ------------------------------------------------------------------
+
+async def test_a_trial_leaves_a_cookie_holding_only_the_date(client):
+    resp = await start(client)
+
+    header = next(h for h in resp.headers.get_list("set-cookie") if h.startswith(f"{TRIAL_COOKIE_NAME}="))
+    value = header.split(";")[0].split("=", 1)[1]
+    stamp, _, signature = value.partition(".")
+
+    assert date.fromisoformat(stamp) == datetime.now(timezone.utc).date()
+    assert len(signature) == 64
+    flags = header.lower()
+    assert "httponly" in flags
+    assert "samesite=strict" in flags
+    assert f"max-age={get_settings().trial_cookie_days * 86400}" in flags
+
+
+async def test_a_browser_that_has_had_a_trial_is_not_offered_another(app, client):
+    async with visitor(app, "203.0.113.7") as v:
+        assert (await start(v)).status_code == 200
+
+        # A new address — tomorrow's network, a VPN — but the same browser.
+        jar = v.cookies
+
+    async with visitor(app, "198.51.100.9") as elsewhere:
+        elsewhere.cookies = jar
+        challenge = await elsewhere.get("/v2/auth/trial/challenge")
+        assert challenge.status_code == 429
+        assert challenge.json()["detail"] == "Trial already used in this browser"
+
+        # And asking anyway, with a solution from elsewhere, is refused too.
+        async with visitor(app, "192.0.2.1") as fresh:
+            payload = await solution(fresh)
+        refused = await start(elsewhere, payload)
+        assert refused.status_code == 429
+        assert refused.json()["detail"] == "Trial already used in this browser"
+
+
+async def test_a_forged_trial_cookie_is_ignored(app, client):
+    client.cookies.set(TRIAL_COOKIE_NAME, f"{date.today().isoformat()}.{'0' * 64}")
+    assert (await client.get("/v2/auth/trial/challenge")).status_code == 200
+
+
+def test_the_trial_cookie_wears_off():
+    key = keys.cookie_key(get_settings().trial_secret)
+    days = get_settings().trial_cookie_days
+    today = date(2026, 10, 5)
+
+    assert cookie.remembers(key, cookie.make(key, today - timedelta(days=days - 1)), today, days)
+    assert not cookie.remembers(key, cookie.make(key, today - timedelta(days=days)), today, days)
+    assert not cookie.remembers(key, cookie.make(key, today + timedelta(days=1)), today, days)
+    assert not cookie.remembers(key, "garbage", today, days)
+

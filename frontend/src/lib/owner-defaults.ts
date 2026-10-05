@@ -15,4 +15,5 @@ export const DEFAULT_OWNER: Owner = {
   githubUrl: "https://github.com/buzzgreyday",
   linkedinUrl:
     "https://linkedin.com/in/michael-ringdal",
+  websiteUrl: "https://mringdal.com",
 };

@@ -51,6 +51,20 @@ test("a configured link is followed, and an empty one is not rendered", async ({
   ).toHaveCount(0);
 });
 
+test("the owner's own site is linked first, by its name, in this tab", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  await openChat(page);
+
+  // OWNER_WEBSITE_URL in playwright.config.ts.
+  const site = page.getByRole("link", { name: "ada.example.com" });
+
+  await expect(site).toHaveAttribute("href", "https://ada.example.com");
+  // Where someone who came for the chat goes next: not a new tab.
+  await expect(site).not.toHaveAttribute("target", /.*/);
+});
+
 test("the site's top bar is the only header", async ({
   page,
 }) => {

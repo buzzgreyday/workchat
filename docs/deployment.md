@@ -81,6 +81,7 @@ git clone https://github.com/buzzgreyday/workchat.git && cd workchat
       OWNER_NAME=Your Name
       OWNER_GITHUB_URL=https://github.com/your-handle
       OWNER_LINKEDIN_URL=https://linkedin.com/in/your-handle
+      OWNER_WEBSITE_URL=https://your-site.example
       ```
       The frontend reads them per request, so changing one later is
       `docker compose -f docker-compose.prod.yaml restart frontend` — no

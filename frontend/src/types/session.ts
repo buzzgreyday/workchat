@@ -28,6 +28,7 @@ export type SessionStatus =
  *   available    offered, and nothing tried yet
  *   starting     solving the proof-of-work and opening the session
  *   used         this address has had today's
+ *   tried        this browser has had one recently (the trial cookie)
  *   gone         today's are all taken
  *   failed       it did not work for some other reason; can be tried again
  */
@@ -36,6 +37,7 @@ export type TrialState =
   | "available"
   | "starting"
   | "used"
+  | "tried"
   | "gone"
   | "failed";
 

@@ -138,8 +138,9 @@ test("the browser is told to resize the layout for the keyboard", async ({
   // Headless Chromium has no on-screen keyboard, so what is checked is the
   // instruction rather than the effect. `interactive-widget=resizes-content`
   // is what makes `dvh` shrink when a keyboard opens instead of leaving the
-  // composer behind it; `viewport-fit=cover` is what makes the safe-area
-  // insets the `.shell-*` rules pad with resolve to anything at all.
+  // composer behind it. And no `viewport-fit=cover`: DuckDuckGo on Android
+  // reports the status bar as a top inset with the page already below it, so
+  // with `cover` the bar padded a blank row above itself.
   const content = await page
     .locator('meta[name="viewport"]')
     .getAttribute("content");
@@ -147,7 +148,7 @@ test("the browser is told to resize the layout for the keyboard", async ({
   expect(content).toContain(
     "interactive-widget=resizes-content",
   );
-  expect(content).toContain("viewport-fit=cover");
+  expect(content).not.toContain("viewport-fit");
 });
 
 test("the composer starts as one line, and does not scroll", async ({

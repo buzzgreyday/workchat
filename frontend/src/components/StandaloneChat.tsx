@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import Chat from "@/components/chat/Chat";
 import UsageBadge from "@/components/chat/UsageBadge";
-import OwnerLinks from "@/components/OwnerLinks";
+import OwnerLinks, { hasOwnerLinks } from "@/components/OwnerLinks";
 import RollingTitle from "@/components/RollingTitle";
 import type { Owner } from "@/lib/owner";
 import type { Usage } from "@/types/chat";
@@ -72,7 +72,7 @@ export default function StandaloneChat({
 
           No links configured, no footer — rather than an empty strip. The
           chat's band then reaches the bottom, which is padded instead. */}
-      {owner.githubUrl || owner.linkedinUrl ? (
+      {hasOwnerLinks(owner) ? (
         <footer className="site-footer shell-bottom shell-sides flex w-full shrink-0 justify-center border-t border-[var(--site-footer-border)] bg-[var(--site-footer-bg)] pt-2">
           <OwnerLinks owner={owner} />
         </footer>

@@ -180,6 +180,13 @@ class TrialAlreadyUsed(AppError):
     detail = "Trial already used today"
 
 
+class TrialAlreadyTried(AppError):
+    """This browser has had a trial recently (it carries the trial cookie)."""
+
+    status_code = 429
+    detail = "Trial already used in this browser"
+
+
 class TrialBudgetExhausted(AppError):
     """Today's trials are all gone, for everyone."""
 

@@ -80,6 +80,7 @@ export default defineConfig({
       // Explicitly empty: an owner with no LinkedIn must get no link, not the
       // author's.
       OWNER_LINKEDIN_URL: "",
+      OWNER_WEBSITE_URL: "https://ada.example.com",
     },
   },
 });

@@ -92,7 +92,7 @@ else runs on both.
 ## Configuration
 
 `NEXT_PUBLIC_API_URL` is baked in at build time, so it belongs to the image.
-`OWNER_NAME`, `OWNER_GITHUB_URL` and `OWNER_LINKEDIN_URL` are read on the server
+`OWNER_NAME`, `OWNER_GITHUB_URL`, `OWNER_LINKEDIN_URL` and `OWNER_WEBSITE_URL` are read on the server
 per request, so changing one is a restart — see
 [`../docs/deployment.md`](../docs/deployment.md). An owner variable that is set
 but empty means "there isn't one" and hides the link; unset means "use the

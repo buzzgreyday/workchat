@@ -16,10 +16,12 @@ export function useTranscript({
   status,
   accessToken,
   trial,
+  owner,
 }: {
   status: SessionStatus;
   accessToken: string;
   trial: TrialState;
+  owner: string;
 }) {
   // Lazily initialised from the real status and token rather than a blank: a
   // v1 link *is* the access token, so it is present on this first render and
@@ -27,7 +29,7 @@ export function useTranscript({
   // show them the typing dots for a session that was never being opened.
   const [messages, dispatch] = useReducer(
     transcriptReducer,
-    greeting(status, accessToken, trial),
+    greeting(status, accessToken, trial, owner),
     initialTranscript,
   );
 
@@ -39,9 +41,9 @@ export function useTranscript({
   useEffect(() => {
     dispatch({
       type: "greeting/set",
-      greeting: greeting(status, accessToken, trial),
+      greeting: greeting(status, accessToken, trial, owner),
     });
-  }, [status, accessToken, trial]);
+  }, [status, accessToken, trial, owner]);
 
   return { messages, dispatch };
 }
