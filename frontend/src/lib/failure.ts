@@ -4,7 +4,7 @@ import {
   GENERIC_FAILURE_MESSAGE,
   LINK_EXPIRED_MESSAGE,
   OUT_OF_QUESTIONS_MESSAGE,
-  OUT_OF_QUESTIONS_TRIAL_MESSAGE,
+  outOfQuestionsTrialMessage,
   rateLimitedMessage,
   SESSION_ENDED_MESSAGE,
   tooLongMessage,
@@ -47,6 +47,8 @@ export function failureMessage(
   // A guest trial runs out the same way a link does, but "ask for a new link"
   // is the wrong thing to tell someone who never had one.
   trial = false,
+  // Whose CV this is: a guest out of questions is pointed to them.
+  owner = "",
 ): string {
   if (!(error instanceof ChatError)) {
     return GENERIC_FAILURE_MESSAGE;
@@ -55,7 +57,7 @@ export function failureMessage(
   if (error.status === 429) {
     return isQuotaExhausted(error)
       ? trial
-        ? OUT_OF_QUESTIONS_TRIAL_MESSAGE
+        ? outOfQuestionsTrialMessage(owner)
         : OUT_OF_QUESTIONS_MESSAGE
       : rateLimitedMessage(error.retryAfter);
   }

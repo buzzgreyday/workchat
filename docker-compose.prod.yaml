@@ -118,6 +118,7 @@ services:
       OWNER_NAME: ${OWNER_NAME-Michael}
       OWNER_GITHUB_URL: ${OWNER_GITHUB_URL-https://github.com/buzzgreyday}
       OWNER_LINKEDIN_URL: ${OWNER_LINKEDIN_URL-https://linkedin.com/in/michael-ringdal}
+      OWNER_WEBSITE_URL: ${OWNER_WEBSITE_URL-https://mringdal.com}
     expose:
       - "3000"
     depends_on:

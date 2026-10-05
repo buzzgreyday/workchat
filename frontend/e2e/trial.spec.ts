@@ -23,10 +23,10 @@ test("with no link and trials on, the chat offers one instead of a dead end", as
   await page.goto("/");
 
   await expect(
-    page.getByText("No link? No problem"),
+    page.getByText("If you were sent a link, open that instead"),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: /Try it/ }),
+    page.getByRole("button", { name: /Try me/ }),
   ).toBeVisible();
   // Said before pressing, because it is true of pressing.
   await expect(
@@ -48,10 +48,13 @@ test("pressing it solves the challenge and opens a guest session", async ({
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: /Try it/ }).click();
+  await page.getByRole("button", { name: /Try me/ }).click();
 
   await waitForReady(page);
   await expect(page.getByText("Hi Guest! 👋")).toBeVisible();
+  await expect(
+    page.getByText("What would you like to know about Ada Lovelace?"),
+  ).toBeVisible();
 
   // One trial, paid with the right number: the mock's challenge hides 7.
   expect(calls.trial).toBe(1);
@@ -72,7 +75,7 @@ test("pressing twice opens one trial, not two", async ({
   await mockBackend(page, { refresh: "gone", trial: "ok", calls });
 
   await page.goto("/");
-  const tryIt = page.getByRole("button", { name: /Try it/ });
+  const tryIt = page.getByRole("button", { name: /Try me/ });
   await tryIt.dblclick();
 
   await waitForReady(page);
@@ -85,14 +88,18 @@ test("a second trial from the same address the same day is explained", async ({
   await mockBackend(page, { refresh: "gone", trial: "used" });
 
   await page.goto("/");
-  await page.getByRole("button", { name: /Try it/ }).click();
+  await page.getByRole("button", { name: /Try me/ }).click();
 
   await expect(
     page.getByText("You've already had today's trial"),
   ).toBeVisible();
+  // Pointed onward to whose CV this is (OWNER_NAME in playwright.config.ts).
+  await expect(
+    page.getByText("or ask Ada Lovelace"),
+  ).toBeVisible();
   // A dead end now, so no button to press again.
   await expect(
-    page.getByRole("button", { name: /Try it/ }),
+    page.getByRole("button", { name: /Try me/ }),
   ).toHaveCount(0);
 });
 
@@ -102,7 +109,7 @@ test("when today's trials are all gone, it says so", async ({
   await mockBackend(page, { refresh: "gone", trial: "gone" });
 
   await page.goto("/");
-  await page.getByRole("button", { name: /Try it/ }).click();
+  await page.getByRole("button", { name: /Try me/ }).click();
 
   await expect(
     page.getByText("Today's trials have all been taken"),
@@ -120,7 +127,7 @@ test("with trials off, no link is the dead end it always was", async ({
     page.getByText("You'll need the chat link you were sent"),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: /Try it/ }),
+    page.getByRole("button", { name: /Try me/ }),
   ).toHaveCount(0);
 });
 
@@ -137,7 +144,7 @@ test("running out in a trial is worded for a guest, not a link", async ({
   );
 
   await page.goto("/");
-  await page.getByRole("button", { name: /Try it/ }).click();
+  await page.getByRole("button", { name: /Try me/ }).click();
   await waitForReady(page);
 
   await page.getByLabel("Your question").fill("One more?");
@@ -146,4 +153,19 @@ test("running out in a trial is worded for a guest, not a link", async ({
   await expect(
     page.getByText("That's all the questions in this trial"),
   ).toBeVisible();
+});
+
+test("a browser that has had a trial is told so, with nothing to press", async ({
+  page,
+}) => {
+  await mockBackend(page, { refresh: "gone", trial: "tried" });
+
+  await page.goto("/");
+
+  await expect(
+    page.getByText("You've had a trial in this browser recently"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Try me/ }),
+  ).toHaveCount(0);
 });

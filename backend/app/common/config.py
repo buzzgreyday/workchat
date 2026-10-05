@@ -74,6 +74,10 @@ DEV_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 # has to be known at import or not at all. Reading it here is still import-safe:
 # an optional variable with a default cannot fail the way require_env can.
 REFRESH_COOKIE_NAME = os.environ.get("REFRESH_COOKIE_NAME") or "cv_refresh"
+# The cookie that says this browser has had a guest trial (services/trial/
+# cookie.py). A Cookie alias on the trial routes, so known at import for the
+# same reason as the refresh cookie's name.
+TRIAL_COOKIE_NAME = os.environ.get("TRIAL_COOKIE_NAME") or "cv_trial"
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +142,10 @@ class Settings:
     trial_max_queries: int
     # How long a trial grant lives, after which it is spent whatever is left.
     trial_ttl_seconds: int
+    # How long a browser that has had a trial is remembered as having had one
+    # (the trial cookie). The per-address limit resets every day; this is what
+    # stops the same browser coming back for another the next morning.
+    trial_cookie_days: int
     # Trials across everyone, per UTC day.
     trial_daily_limit: int
     # The proof-of-work's difficulty: the search space a browser covers to find
@@ -255,6 +263,7 @@ class Settings:
             trial_secret=require_env("TRIAL_SECRET") if trial_enabled else None,
             trial_max_queries=int(os.environ.get("TRIAL_MAX_QUERIES") or 3),
             trial_ttl_seconds=int(os.environ.get("TRIAL_TTL_SECONDS") or 60 * 60 * 24),
+            trial_cookie_days=int(os.environ.get("TRIAL_COOKIE_DAYS") or 30),
             trial_daily_limit=int(os.environ.get("TRIAL_DAILY_LIMIT") or 50),
             trial_pow_max_number=int(os.environ.get("TRIAL_POW_MAX_NUMBER") or 100_000),
             trust_proxy_headers=env_bool("TRUST_PROXY_HEADERS", default=False),

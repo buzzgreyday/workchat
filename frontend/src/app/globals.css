@@ -312,9 +312,10 @@ html {
  * insets alone, with no floor: its background is meant to reach the edge,
  * and its column is already narrower than the screen wherever that shows.
  *
- * Paired with `viewportFit: "cover"` in the layout's viewport export. Without
- * `cover` every inset here resolves to 0; with `cover` and without these, the
- * bars sit under the notch. The two go together or not at all.
+ * The layout no longer sets `viewportFit: "cover"` (see its viewport export),
+ * so every inset here resolves to 0 and the floors are what apply: the
+ * browser itself keeps the page clear of the notch and the home indicator.
+ * The env() terms stay so that turning `cover` back on needs no change here.
  */
 .shell-top {
   padding-block-start: max(0.75rem, env(safe-area-inset-top));

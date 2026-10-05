@@ -38,12 +38,15 @@ export function useChat({
   status,
   authFetch,
   trial = "unavailable",
+  owner = "",
   seedQuestion,
 }: {
   accessToken: string;
   status: SessionStatus;
   authFetch: AuthFetch;
   trial?: TrialState;
+  /** Whose CV this is, for the messages that name them. */
+  owner?: string;
   seedQuestion?: string;
 }) {
   // Hook order is load-bearing. The greeting rewrite is an effect inside
@@ -54,6 +57,7 @@ export function useChat({
     status,
     accessToken,
     trial,
+    owner,
   });
 
   const {
@@ -215,6 +219,7 @@ export function useChat({
         content: failureMessage(
           error,
           isTrial(accessToken),
+          owner,
         ),
       });
     }

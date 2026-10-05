@@ -61,6 +61,17 @@ function stripCredentialParams(): void {
   );
 }
 
+// The backend's refusals of a trial, by the `detail` each carries — the
+// strings are the contract (backend/app/common/exceptions.py), as "Query
+// limit reached" is for the quota.
+const TRIED = "Trial already used in this browser";
+
+const TRIAL_REFUSALS: Record<string, TrialState> = {
+  "Trial already used today": "used",
+  [TRIED]: "tried",
+  "Trial budget reached": "gone",
+};
+
 /**
  * Owns the access token and how it gets renewed.
  *
@@ -275,11 +286,17 @@ export function useSession({
 
     let cancelled = false;
 
-    // A 404 means trials are off; anything else failing means we cannot
-    // tell. Either way nothing is offered, and the no-link message stands.
+    // A 404 means trials are off, and anything else failing means we cannot
+    // tell: either way nothing is offered, and the no-link message stands.
+    // The one refusal worth saying out loud is a browser that has had its
+    // trial — that is an answer, not a failure.
     authService.trialChallenge().then(
       () => !cancelled && setTrial("available"),
-      () => undefined,
+      (error) =>
+        !cancelled &&
+        error instanceof AuthError &&
+        error.message === TRIED &&
+        setTrial("tried"),
     );
 
     return () => {
@@ -315,13 +332,9 @@ export function useSession({
     } catch (error) {
       setStatus("none");
       setTrial(
-        error instanceof AuthError &&
-          error.message === "Trial already used today"
-          ? "used"
-          : error instanceof AuthError &&
-              error.message === "Trial budget reached"
-            ? "gone"
-            : "failed",
+        error instanceof AuthError
+          ? (TRIAL_REFUSALS[error.message] ?? "failed")
+          : "failed",
       );
     } finally {
       starting.current = false;

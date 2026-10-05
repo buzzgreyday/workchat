@@ -21,6 +21,11 @@ def pow_key(secret: str) -> bytes:
     return _derive(secret, "pow")
 
 
+def cookie_key(secret: str) -> bytes:
+    """What the trial cookie is signed with."""
+    return _derive(secret, "cookie")
+
+
 def address_hash(secret: str, day: date, address: str) -> str:
     """
     An address, as the trial store keeps it: an HMAC under a key for one UTC day.

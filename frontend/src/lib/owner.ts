@@ -17,6 +17,8 @@ export interface Owner {
   name: string;
   githubUrl: string;
   linkedinUrl: string;
+  /** The owner's own site — where someone who came for the chat goes next. */
+  websiteUrl: string;
 }
 
 /**
@@ -47,6 +49,10 @@ export function readOwner(): Owner {
     linkedinUrl: configured(
       process.env.OWNER_LINKEDIN_URL,
       DEFAULT_OWNER.linkedinUrl,
+    ),
+    websiteUrl: configured(
+      process.env.OWNER_WEBSITE_URL,
+      DEFAULT_OWNER.websiteUrl,
     ),
   };
 }

@@ -13,6 +13,10 @@ a different abuse, and all checked before a grant exists:
   - a ceiling on trials per day across everyone, so the worst a day of
     strangers can spend is `trial_daily_limit` x `trial_max_queries` questions.
 
+And a browser that has had one is told so for `trial_cookie_days` after, by a
+signed cookie holding only the date (`cookie`), so the per-day address limit
+resetting overnight does not hand the same browser a new trial every morning.
+
 Then it is an ordinary grant — `kind="trial"`, already claimed, opened straight
 into a session — and the chat cannot tell it from any other, beyond its access
 token saying `knd: "trial"` so the client can word things for a guest.
@@ -27,6 +31,7 @@ from datetime import date, datetime, timedelta, timezone
 from app.common.config import Settings
 from app.common.crypto import hash_token
 from app.common.exceptions import (
+    TrialAlreadyTried,
     TrialAlreadyUsed,
     TrialBudgetExhausted,
     TrialChallengeInvalid,
@@ -42,7 +47,7 @@ from app.repositories.base import (
     UserRepository,
 )
 from app.services.auth import Auth
-from app.services.trial import keys, pow
+from app.services.trial import cookie, keys, pow
 from app.services.trial.pow import Challenge
 
 # The user every trial grant belongs to (created by the migration that added
@@ -50,7 +55,7 @@ from app.services.trial.pow import Challenge
 TRIAL_USER_NAME = "Guest (trial)"
 TRIAL_SUBJECT = "Guest"
 
-__all__ = ["Challenge", "challenge", "start_trial", "TRIAL_SUBJECT"]
+__all__ = ["Challenge", "challenge", "start_trial", "trial_cookie", "TRIAL_SUBJECT"]
 
 
 def _secret(settings: Settings) -> str:
@@ -60,15 +65,36 @@ def _secret(settings: Settings) -> str:
     return settings.trial_secret
 
 
-def challenge(settings: Settings) -> Challenge:
-    """A fresh proof-of-work for a visitor to solve. Stores nothing."""
-    return pow.create_challenge(keys.pow_key(_secret(settings)), settings.trial_pow_max_number)
+def _refuse_if_tried(settings: Settings, secret: str, remembered: str | None, today: date) -> None:
+    """A browser carrying a valid trial cookie is not offered another."""
+    if cookie.remembers(keys.cookie_key(secret), remembered, today, settings.trial_cookie_days):
+        logger.info("Trial refused: this browser has had one")
+        raise TrialAlreadyTried()
+
+
+def challenge(settings: Settings, remembered: str | None = None, now: datetime | None = None) -> Challenge:
+    """
+    A fresh proof-of-work for a visitor to solve. Stores nothing.
+
+    Refused to a browser that has had a trial, which is also how the chat
+    learns not to offer one: it asks for a challenge to decide.
+    """
+    secret = _secret(settings)
+    _refuse_if_tried(settings, secret, remembered, (now or datetime.now(timezone.utc)).date())
+    return pow.create_challenge(keys.pow_key(secret), settings.trial_pow_max_number)
+
+
+def trial_cookie(settings: Settings, now: datetime | None = None) -> tuple[str, int]:
+    """The trial cookie's value for a trial opened now, and its max-age in seconds."""
+    day = (now or datetime.now(timezone.utc)).date()
+    return cookie.make(keys.cookie_key(_secret(settings)), day), settings.trial_cookie_days * 86400
 
 
 async def start_trial(
     solution: str,
     address: str,
     *,
+    remembered: str | None = None,
     settings: Settings,
     users: UserRepository,
     tokens: TokenRepository,
@@ -85,11 +111,16 @@ async def start_trial(
     solution that does not hold. Then the store decides address, challenge and
     budget in one durable step, and only then is a grant made.
 
-    Raises TrialDisabled, TrialChallengeInvalid, TrialAlreadyUsed or
-    TrialBudgetExhausted.
+    `remembered` is the trial cookie the browser sent, if any. Checked first:
+    it costs nothing to read, and a browser that has had a trial gets the same
+    answer whatever else is true.
+
+    Raises TrialDisabled, TrialAlreadyTried, TrialChallengeInvalid,
+    TrialAlreadyUsed or TrialBudgetExhausted.
     """
     secret = _secret(settings)
     now = now or datetime.now(timezone.utc)
+    _refuse_if_tried(settings, secret, remembered, now.date())
 
     solved = pow.verify_solution(keys.pow_key(secret), solution, now=now.timestamp())
     if solved is None:

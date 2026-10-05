@@ -8,6 +8,27 @@ function GithubIcon() {
   );
 }
 
+function WebsiteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
+/**
+ * How a site is named in the footer: its host, without a leading "www.", so
+ * the link says where it goes. The URL as given if it will not parse.
+ */
+function siteName(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 function LinkedinIcon() {
   return (
     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
@@ -25,13 +46,17 @@ function LinkedinIcon() {
  *
  * A link with no URL configured is left out rather than rendered dead — an
  * owner without a GitHub is not an owner with a broken GitHub link.
+ *
+ * The owner's own site comes first, and opens in this tab rather than a new
+ * one: it is where someone who came for the chat goes next, not a profile on
+ * another service to glance at and come back from.
  */
 export default function OwnerLinks({
   owner,
 }: {
   owner: Owner;
 }) {
-  if (!owner.githubUrl && !owner.linkedinUrl) {
+  if (!hasOwnerLinks(owner)) {
     return null;
   }
 
@@ -40,6 +65,15 @@ export default function OwnerLinks({
       aria-label={`${owner.name} elsewhere`}
       className="flex items-center gap-4"
     >
+      {owner.websiteUrl && (
+        <a
+          href={owner.websiteUrl}
+          className="chat-ui flex items-center gap-1.5 text-meta text-[var(--site-link)] transition hover:text-[var(--site-link-hover)]"
+        >
+          <WebsiteIcon />
+          {siteName(owner.websiteUrl)}
+        </a>
+      )}
       {owner.githubUrl && (
         <a
           href={owner.githubUrl}
@@ -64,4 +98,9 @@ export default function OwnerLinks({
       )}
     </nav>
   );
+}
+
+/** Whether there is anything for the footer to show. */
+export function hasOwnerLinks(owner: Owner): boolean {
+  return Boolean(owner.websiteUrl || owner.githubUrl || owner.linkedinUrl);
 }
