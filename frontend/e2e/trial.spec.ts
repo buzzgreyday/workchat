@@ -23,7 +23,7 @@ test("with no link and trials on, the chat offers one instead of a dead end", as
   await page.goto("/");
 
   await expect(
-    page.getByText("If you were sent a link, open that instead"),
+    page.getByText("Want to chat? Try me! Ask me a few questions about Ada Lovelace's work"),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: /Try me/ }),

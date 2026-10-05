@@ -7,6 +7,14 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.11.1] - 2026-10-05
+
+### Changed
+
+- The trial greeting invites before it explains: "Want to chat? Try me! Ask
+  me a few questions about Michael's work.", then the note for anyone who was
+  sent a link.
+
 ## [0.11.0] - 2026-10-05
 
 ### Added
