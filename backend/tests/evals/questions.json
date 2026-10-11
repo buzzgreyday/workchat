@@ -12,7 +12,12 @@
     "",
     "must_include_any  - at least one must appear in the reply, or it is a MISSED FACT.",
     "caveat_any        - scope caveat that should appear. Reported, never fails a run.",
-    "deny_any          - overrides the generic denial regex for this question."
+    "deny_any          - overrides the generic denial regex for this question.",
+    "since             - YYYY-MM start month, for an answer that moves with the calendar:",
+    "                      the accepted durations are worked out from it on the day the",
+    "                      eval runs (duration_phrases), in place of must_include_any.",
+    "",
+    "Replies are matched after normalise(): curly quotes straightened, n't spelt ' not'."
   ],
   "questions": [
     {
@@ -72,14 +77,8 @@
       "probes": "direct",
       "question": "How long has he been at iEDI?",
       "expect": "covered",
-      "must_include_any": [
-        "11 month",
-        "eleven month",
-        "almost a year",
-        "nearly a year",
-        "just under a year"
-      ],
-      "note": "Started September 2025. Guards the date-injection fix from 0.1.10."
+      "since": "2025-09",
+      "note": "Started September 2025. Guards the date-injection fix from 0.1.10. The accepted durations are worked out from `since` on the day the eval runs, so the right answer cannot go stale — '11 months' was right in August 2026 and wrong by October."
     },
     {
       "id": 9,
@@ -176,7 +175,9 @@
         "hasn't mentored",
         "no mentoring",
         "not something",
-        "no formal"
+        "no formal",
+        "not had mentoring",
+        "not had any mentoring"
       ],
       "note": "iedi.md states mentoring is not part of the job. A sourced no, not a miss."
     },
@@ -227,8 +228,8 @@
       "probes": "depth",
       "question": "How deep is his Pyramid experience?",
       "expect": "covered",
-      "must_include_any": ["worked in", "regularly"],
-      "note": "Body-only: frameworks.md grades depth as built with / worked in / used. 'regularly' accepted because the record reads 'worked in, regularly at iEDI' and a reply carrying the substance in other words is not a miss."
+      "must_include_any": ["worked in", "regularly", "regular", "day-to-day", "day to day", "daily"],
+      "note": "Body-only: frameworks.md grades depth as built with / worked in / used. 'regularly' accepted because the record reads 'worked in, regularly at iEDI' and a reply carrying the substance in other words is not a miss — 'regular', 'daily' and 'day-to-day' likewise."
     },
     {
       "id": 25,
@@ -243,8 +244,8 @@
       "probes": "depth",
       "question": "Why were warehouse picks the wrong source of data for despatch advices?",
       "expect": "covered",
-      "must_include_any": ["assembling", "left the building"],
-      "note": "Body-only: the case summary names the fix, not why picks were wrong."
+      "must_include_any": ["assembl", "left the building", "left the warehouse", "actually shipped", "physically left"],
+      "note": "Body-only: the case summary names the fix, not why picks were wrong. The point in other words counts: picks record what was gathered to assemble an order, not what actually left."
     }
   ]
 }
