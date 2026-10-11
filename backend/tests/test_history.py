@@ -146,3 +146,25 @@ async def test_a_history_is_bound_to_its_grant(client, issued_token, openai_mock
         history_signature=mine["history_signature"],
     )
     assert [m["content"] for m in last_model_call(openai_mock) if m["role"] == "user"] == ["theirs"]
+
+
+# --- reasoning effort, as sent -----------------------------------------------
+
+async def test_the_configured_reasoning_effort_reaches_the_model(client, issued_token, openai_mock, monkeypatch):
+    from dataclasses import replace
+
+    from app.common.config import get_settings
+
+    for effort in ["high", None]:
+        changed = replace(get_settings(), openai_reasoning_effort=effort)
+        monkeypatch.setattr("app.services.chat.turn.get_settings", lambda: changed)
+
+        await a_turn(client, issued_token)
+
+        sent = openai_mock.chat.completions.create.call_args.kwargs
+        if effort:
+            assert sent["reasoning_effort"] == effort
+        else:
+            # Left out, not sent empty: a model that does not reason rejects it.
+            assert "reasoning_effort" not in sent
+

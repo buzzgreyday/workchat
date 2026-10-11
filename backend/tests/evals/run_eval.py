@@ -19,13 +19,18 @@ Overrides:
   EVAL_BASE_URL  backend to hit (default: http://localhost:8000)
   ADMIN_KEY      admin key used to mint this run's access token (from the env)
 
-The model is not one of them. This harness drives whichever backend is already
-running, so an arm is whatever that server was started with — and a dev server
-defaults to the cheap model. Set OPENAI_MODEL in backend/.env and restart the
-backend before comparing arms, or the run will quietly measure nano and label
-the report accordingly:
+The model is not one of them, and neither is its reasoning effort. This harness
+drives whichever backend is already running, so an arm is whatever that server
+was started with — and a dev server defaults to the cheap model. Set
+OPENAI_MODEL (and, for a reasoning model, OPENAI_REASONING_EFFORT) in
+backend/.env and restart the backend before comparing arms, or the run will
+quietly measure the dev default and label the report accordingly:
 
-  OPENAI_MODEL=gpt-4.1-mini docker compose up -d backend
+  OPENAI_MODEL=gpt-4.1-mini OPENAI_REASONING_EFFORT= docker compose up -d backend
+  OPENAI_MODEL=gpt-6-luna OPENAI_REASONING_EFFORT=none docker compose up -d backend
+
+The label is read from this process's own settings (backend/.env), so it is only
+right when the server was started from the same file.
 
 Writes one transcript per run to tests/evals/results/, which is gitignored — the
 replies are run artifacts, not source. Each run mints one access token and
@@ -248,16 +253,18 @@ def main() -> int:
     try:
         from app.common.config import get_settings
 
-        model = get_settings().openai_model
+        settings = get_settings()
+        model = settings.openai_model
+        effort = settings.openai_reasoning_effort
     except Exception:  # noqa: BLE001 - the harness must run without app config
-        model = "unknown"
+        model, effort = "unknown", None
 
     results = []
     with httpx.Client(base_url=BASE_URL, timeout=120.0) as client:
         token = issue_token(client, len(questions))
         auth = {"Authorization": f"Bearer {token}"}
 
-        print(f"\narm={args.arm}  model={model}  questions={len(questions)}  {BASE_URL}\n")
+        print(f"\narm={args.arm}  model={model}  effort={effort or '-'}  questions={len(questions)}  {BASE_URL}\n")
         print(f"{'id':>3}  {'probes':<17} {'verdict':<15} why")
         print("-" * 78)
 
@@ -323,7 +330,7 @@ def main() -> int:
     out = RESULTS_DIR / f"{args.arm}-{time.strftime('%Y%m%d-%H%M%S')}.json"
     out.write_text(
         json.dumps(
-            {"arm": args.arm, "model": model, "tally": tally, "results": results},
+            {"arm": args.arm, "model": model, "reasoning_effort": effort, "tally": tally, "results": results},
             indent=2,
         )
     )

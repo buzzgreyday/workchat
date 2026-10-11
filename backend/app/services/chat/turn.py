@@ -61,6 +61,7 @@ async def run_turn(
         response = await client.chat.completions.create(
             model=get_settings().openai_model,
             messages=messages,
+            **_reasoning(),
             tools=await tooling.schemas(),
             stream=True,
         )
@@ -95,6 +96,7 @@ async def run_turn(
         response = await client.chat.completions.create(
             model=get_settings().openai_model,
             messages=messages,
+            **_reasoning(),
             tools=await tooling.schemas(),
             tool_choice="none",
             stream=True,
@@ -116,6 +118,17 @@ async def run_turn(
         usage=usage,
         finish_reason=finish_reason,
     )
+
+
+def _reasoning() -> dict[str, Any]:
+    """
+    `reasoning_effort` for the chat call, when one is configured, and nothing
+    otherwise — a model that does not reason rejects the parameter, so it is
+    left out rather than sent empty. Set centrally (OPENAI_REASONING_EFFORT,
+    Settings.openai_reasoning_effort); every call in a turn uses the same.
+    """
+    effort = get_settings().openai_reasoning_effort
+    return {"reasoning_effort": effort} if effort else {}
 
 
 def _accumulate_tool_calls(
