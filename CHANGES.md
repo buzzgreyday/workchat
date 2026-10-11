@@ -7,6 +7,24 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.11.2] - 2026-10-11
+
+### Changed
+
+- **The dev default model is gpt-6-luna**, replacing gpt-4.1-nano, which OpenAI
+  shuts down on 23 October 2026. About nano's price; a reasoning model.
+  Production stays on gpt-4.1-mini, which has no shutdown date.
+
+### Added
+
+- **`OPENAI_REASONING_EFFORT`**, one central setting for the reasoning effort
+  sent with every chat call: a level, empty for none sent (what gpt-4.1-mini
+  needs), or unset for the default model's own. A misspelt level stops the
+  backend at start. Over Chat Completions with tools — how every chat call is
+  made — OpenAI's reasoning models accept only `none`, so that is gpt-6-luna's
+  default; thinking harder would need the Responses API.
+- The eval report records the reasoning effort beside the model.
+
 ## [0.11.1] - 2026-10-05
 
 ### Changed

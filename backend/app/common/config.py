@@ -66,6 +66,23 @@ MAX_MESSAGE_CHARS = 150
 # /api/v2/auth/... while the backend only ever sees /v2/auth/..., so a narrow
 # path would be written for a prefix the browser never requests.
 REFRESH_COOKIE_PATH = "/"
+# The chat model when OPENAI_MODEL does not name one, and the reasoning effort
+# that goes with each (None: not a reasoning model, so no effort is sent — a
+# model that does not reason rejects the parameter outright). See `openai_model`.
+#
+# gpt-6-luna's is "none", and has to be sent: on /v1/chat/completions, which is
+# what this backend calls, OpenAI refuses function tools together with any other
+# effort — and its default, sent nothing, is "medium". Measured 2026-10-11:
+# "none" streams and calls tools; nothing, "low" and up answer 400. Thinking
+# harder needs the Responses API (/v1/responses), a migration of its own.
+PRODUCTION_MODEL = "gpt-4.1-mini"
+DEV_MODEL = "gpt-6-luna"
+DEFAULT_REASONING_EFFORT: dict[str, str | None] = {
+    PRODUCTION_MODEL: None,
+    DEV_MODEL: "none",
+}
+# What OPENAI_REASONING_EFFORT may say: the levels the OpenAI SDK accepts.
+REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 # Browsers refuse a credentialed request whose Access-Control-Allow-Origin is
 # "*", so the dev wildcard has to become a concrete list once cookies are in play.
 DEV_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
@@ -188,17 +205,32 @@ class Settings:
     # input price and about a second slower per answer, which at a 20-query token
     # per hiring manager is a latency decision rather than a cost one.
     #
-    # So mini is what a hirer gets, and nano is the default while dev_mode is on.
-    # That is not a reversal of the measurement above — locally the question being
-    # asked is "does the tool round-trip work", not "is the answer good", and a
-    # reload loop against a paid endpoint is an easy way to spend real money on
-    # answers nobody reads.
+    # So mini is what a hirer gets, and a cheap model is the default while dev_mode
+    # is on. That is not a reversal of the measurement above — locally the question
+    # being asked is "does the tool round-trip work", not "is the answer good", and
+    # a reload loop against a paid endpoint is an easy way to spend real money on
+    # answers nobody reads. The cheap model was nano until OpenAI shut gpt-4.1-nano
+    # down (23 October 2026); it is now gpt-6-luna, about nano's price — a
+    # reasoning model, so it comes with a reasoning effort (below).
     #
     # Set OPENAI_MODEL to override either default. That is also how to run an eval
     # arm against a specific model: run_eval.py drives the running server and only
     # reads this value to label its report, so the arm is whatever the server was
     # started with.
     openai_model: str
+    # How hard a reasoning model thinks before it answers — sent as
+    # `reasoning_effort` with every chat call, or not at all when None. Set
+    # centrally with OPENAI_REASONING_EFFORT: a level from REASONING_EFFORTS, or
+    # empty for none sent (what a model that does not reason, like
+    # gpt-4.1-mini, needs). Unset, the default model's own effort
+    # (DEFAULT_REASONING_EFFORT) — and none for a model named by OPENAI_MODEL,
+    # which is not this file's to guess about.
+    #
+    # Over Chat Completions with tools, which is how every chat call here is
+    # made, OpenAI's reasoning models accept only "none" (see
+    # DEFAULT_REASONING_EFFORT). The setting stays a level rather than a switch
+    # so that moving to the Responses API needs no new configuration.
+    openai_reasoning_effort: str | None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -226,6 +258,8 @@ class Settings:
         postgres_db = require_env("POSTGRES_DB")
 
         trial_enabled = env_bool("TRIAL_ENABLED", default=False)
+        named_model = os.environ.get("OPENAI_MODEL")
+        model = named_model or (DEV_MODEL if dev_mode else PRODUCTION_MODEL)
 
         allowed_hosts = (
             ["*"] if dev_mode
@@ -273,7 +307,8 @@ class Settings:
             owner_notify_throttle_seconds=int(os.environ.get("OWNER_NOTIFY_THROTTLE_SECONDS") or 60 * 60),
             # No Secure flag in dev, where the frontend is plain http on localhost.
             refresh_cookie_secure=not dev_mode,
-            openai_model=os.environ.get("OPENAI_MODEL") or ("gpt-4.1-nano" if dev_mode else "gpt-4.1-mini"),
+            openai_model=model,
+            openai_reasoning_effort=_reasoning_effort(model, named=bool(named_model)),
         )
 
     @staticmethod
@@ -285,6 +320,28 @@ class Settings:
         if not prompt.strip():
             raise ValueError(f"system prompt at {path} is empty")
         return prompt
+
+
+def _reasoning_effort(model: str, named: bool) -> str | None:
+    """
+    The reasoning effort to send, from OPENAI_REASONING_EFFORT or the default.
+
+    Checked here, when the settings are built, rather than left for OpenAI to
+    refuse: a misspelt level would otherwise fail every chat request, one at a
+    time, long after the deploy looked healthy.
+    """
+    raw = os.environ.get("OPENAI_REASONING_EFFORT")
+    if raw is None:
+        return None if named else DEFAULT_REASONING_EFFORT.get(model)
+    effort = raw.strip().lower()
+    if not effort:
+        return None
+    if effort not in REASONING_EFFORTS:
+        raise ValueError(
+            f"OPENAI_REASONING_EFFORT must be one of {', '.join(REASONING_EFFORTS)}, "
+            f"or empty for none; got {raw!r}"
+        )
+    return effort
 
 
 def _derive(secret: str, label: str) -> str:
