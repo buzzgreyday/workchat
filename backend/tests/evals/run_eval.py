@@ -42,6 +42,7 @@ import os
 import re
 import sys
 import time
+from datetime import date
 from pathlib import Path
 
 import httpx
@@ -81,9 +82,64 @@ DENIAL = re.compile(
     | (?:don't|do\s+not|doesn't|does\s+not)\s+have\s+(?:any\s+)?information
     | (?:does\s+not|doesn't|did\s+not|didn't)\s+(?:show|turn\s+up|indicate|include)
     | no\s+mention
+    | not\s+have\s+any\s+mention
     """,
     re.I | re.X,
 )
+
+# Typography a model is free to choose, and the scorer should not care about:
+# curly quotes and apostrophes (gpt-6-luna writes "isn’t"), and the "n't" of a
+# contraction, spelt out — so "isn't listed" meets "not listed", "aren't on
+# file" meets "not on file", without every pattern listing every contraction.
+QUOTES = str.maketrans({"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"'})
+CONTRACTION = re.compile(r"n't\b", re.I)
+
+
+def normalise(text: str) -> str:
+    return CONTRACTION.sub(" not", text.translate(QUOTES))
+
+
+# How long ago a month was, in the words a reply might use for it. For a
+# question whose right answer moves with the calendar ("how long has he been
+# at iEDI?"): the set states the start month (`since`), and the accepted
+# phrasings are worked out on the day the eval runs, rather than written down
+# once and wrong a month later.
+MONTH_WORDS = [
+    "zero", "one", "two", "three", "four", "five", "six",
+    "seven", "eight", "nine", "ten", "eleven", "twelve",
+]
+
+
+def duration_phrases(since: str, today: date | None = None) -> list[str]:
+    today = today or date.today()
+    start = date.fromisoformat(f"{since}-01")
+    months = (today.year - start.year) * 12 + (today.month - start.month)
+    years, rest = divmod(months, 12)
+
+    phrases = [f"{months} month"]
+    if months <= 12:
+        phrases.append(f"{MONTH_WORDS[months]} month")
+    if 10 <= months < 12:
+        phrases += ["almost a year", "nearly a year", "just under a year"]
+    if years >= 1:
+        if rest == 0:
+            phrases += [f"{years} year", f"{MONTH_WORDS[min(years, 12)]} year"]
+        else:
+            phrases += [
+                f"year and {rest} month",
+                f"year and {MONTH_WORDS[rest]} month",
+                f"years and {rest} month",
+                f"years and {MONTH_WORDS[rest]} month",
+            ]
+        if years == 1 and rest <= 3:
+            phrases += [f"{lead} {one} year" for lead in ("over", "more than") for one in ONE]
+    if abs(months - 12) <= 2:
+        phrases += [f"{lead} {one} year" for lead in ("about", "around", "roughly") for one in ONE]
+    return phrases
+
+
+# "a year", "one year", "1 year": the same span, however a reply spells it.
+ONE = ("a", "one", "1")
 
 
 def issue_token(client: httpx.Client, count: int) -> str:
@@ -173,13 +229,21 @@ def attribute(trace: dict) -> str:
     return "C: read the entry, still wrong"
 
 
-def score(question: dict, reply: str) -> tuple[str, str]:
+def score(question: dict, reply: str, on: date | None = None) -> tuple[str, str]:
+    """
+    One reply's verdict. `on` is the day the reply was given, for a question
+    whose right answer moves with the calendar (`since`); today if not given.
+    """
+    reply = normalise(reply)
     low = reply.lower()
     # deny_any extends the generic patterns rather than replacing them. As a
     # replacement it scored three correct refusals as failures — "Michael is not
     # part of an on-call rotation" is the right answer and was not in the list.
     denied = bool(DENIAL.search(reply)) or any(d in low for d in question.get("deny_any", []))
-    wanted = question.get("must_include_any", [])
+    wanted = (
+        duration_phrases(question["since"], on) if "since" in question
+        else question.get("must_include_any", [])
+    )
     found = [s for s in wanted if s in low]
     expect = question["expect"]
 
@@ -214,10 +278,15 @@ def rescore_saved() -> int:
     spec = {q["id"]: q for q in json.loads(QUESTIONS_PATH.read_text())["questions"]}
     for path in sorted(RESULTS_DIR.glob("*.json")):
         run = json.loads(path.read_text())
+        # Judged as of the day the run was made, which its name records
+        # (<arm>-YYYYMMDD-HHMMSS.json): "11 months at iEDI" was right in August
+        # and must not turn wrong by being re-read in October.
+        stamp = re.search(r"-(\d{8})-\d{6}\.json$", path.name)
+        on = date(int(stamp[1][:4]), int(stamp[1][4:6]), int(stamp[1][6:])) if stamp else None
         tally: dict[str, int] = {}
         for result in run["results"]:
             question = spec.get(result["id"], result)
-            verdict, why = score(question, result["reply"])
+            verdict, why = score(question, result["reply"], on)
             if verdict != "ok":
                 why = f"{why} [{attribute(result['trace'])}]"
             result["verdict"], result["why"] = verdict, why
