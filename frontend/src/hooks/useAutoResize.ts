@@ -32,7 +32,7 @@ export function useAutoResize(value: string) {
     // measures the last answer rather than the current text.
     box.style.height = "auto";
 
-    // `scrollHeight` is content plus padding and stops there, but Tailwind
+    // `scrollHeight` is content plus padding and stops there, but the reset
     // sets `box-sizing: border-box`, so `height` has to cover the border as
     // well. Assigning one to the other loses exactly the border, and the field
     // scrolls by that much for ever after — two pixels, on a box that looks

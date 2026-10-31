@@ -1,18 +1,12 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { build, context } from "esbuild";
+
 /**
- * The version check, and why the real imports below are dynamic.
- *
- * Tailwind's node bindings use `module.isBuiltin`, which arrived in 18.6. On
- * anything older the failure is a linker error sixty lines into a minified
- * bundle, naming a symbol nobody here wrote and no file anybody here owns.
- *
- * A guard at the top of this file cannot prevent that: static imports are
- * linked before a single line of it runs, so the crash happens first. Loading
- * them on demand is what buys the chance to say something useful — which is
- * the whole reason this is not the ordinary import block it looks like it
- * should be.
+ * The same floor as Next and the Dockerfile, said plainly rather than left to
+ * whichever dependency trips over it first.
  */
 const MINIMUM_NODE = 20;
 
@@ -32,11 +26,6 @@ if (
   process.exit(1);
 }
 
-const { build, context } = await import("esbuild");
-const { default: postcss } = await import("postcss");
-const { default: tailwindcss } = await import(
-  "@tailwindcss/postcss"
-);
 
 /**
  * The element, as one file the site can load at runtime.
@@ -71,52 +60,37 @@ const forShadowRoot = (css) =>
   css.replace(/(?<![\w-]):root\b/g, ":host, :root");
 
 /**
- * Tailwind runs here rather than as a separate script.
+ * The stylesheet, joined here rather than as a separate script.
  *
- * `globals.css` is source, not a stylesheet — `@import "tailwindcss"`, a
- * `@theme` block, `@apply` in the base layer. Handing that text to
- * `replaceSync` gets a shadow root full of at-rules the browser has no plugin
- * for, and `CSSStyleSheet` drops `@import` outright, so even the parts that
- * are real CSS would leave without saying goodbye.
+ * `embed.css` imports `globals.css`, which imports the rest. Handing that text
+ * to `replaceSync` would lose them: `CSSStyleSheet` drops `@import` outright. So
+ * a CSS file is built on its own into one sheet, and arrives in the bundle as a
+ * string, for the shadow root to adopt.
  *
  * As a plugin rather than a build step because it keeps `--watch` honest: the
- * dependencies Tailwind reports are handed to esbuild, so editing a component
- * re-runs the scan that decides which utilities exist.
+ * files that went into the sheet are handed to esbuild to watch.
  */
-const tailwind = {
-  name: "tailwind",
+const stylesheet = {
+  name: "stylesheet",
   setup(esbuild) {
-    esbuild.onLoad(
-      { filter: /\.css$/ },
-      async (args) => {
-        const result = await postcss([
-          tailwindcss(),
-        ]).process(
-          readFileSync(args.path, "utf8"),
-          { from: args.path },
-        );
+    esbuild.onLoad({ filter: /\.css$/ }, async (args) => {
+      const result = await build({
+        entryPoints: [args.path],
+        bundle: true,
+        minify: true,
+        write: false,
+        metafile: true,
+        outdir: here("../public"),
+      });
 
-        const files = [];
-        const dirs = [];
-
-        for (const message of result.messages) {
-          if (message.type === "dependency") {
-            files.push(message.file);
-          } else if (
-            message.type === "dir-dependency"
-          ) {
-            dirs.push(message.dir);
-          }
-        }
-
-        return {
-          contents: forShadowRoot(result.css),
-          loader: "text",
-          watchFiles: files,
-          watchDirs: dirs,
-        };
-      },
-    );
+      return {
+        contents: forShadowRoot(result.outputFiles[0].text),
+        loader: "text",
+        watchFiles: Object.keys(result.metafile.inputs).map((file) =>
+          resolve(file),
+        ),
+      };
+    });
   },
 };
 
@@ -138,7 +112,7 @@ const options = {
   // The app's own, so `@/*` resolves here exactly as it does under Next.
   tsconfig: here("../tsconfig.json"),
 
-  plugins: [tailwind],
+  plugins: [stylesheet],
   define: {
     "process.env.NODE_ENV": '"production"',
 

@@ -1,21 +1,9 @@
 /*
- * The chat's stylesheet, compiled for a shadow root.
- *
- * Not `globals.css` handed over as text: that file is Tailwind *source*, and a
- * shadow root has no build step. It is imported here so there is still exactly
- * one stylesheet in this project, and `build.mjs` runs Tailwind over the
- * result before esbuild ever sees it.
+ * The chat's stylesheet, for a shadow root: `globals.css` and what it imports,
+ * joined into one by `build.mjs`, so there is still one stylesheet in this
+ * project.
  */
 @import "../../src/app/globals.css";
-
-/*
- * Tailwind's automatic source detection starts from the entry file, and this
- * one sits in a folder containing no components at all. Without this the scan
- * finds no `bg-panel`, no `h-full`, nothing — and emits a stylesheet with a
- * palette and no utilities, which looks like a broken import rather than an
- * empty scan.
- */
-@source "../../src";
 
 /*
  * What `html` does for the app, done for the element.
@@ -35,7 +23,7 @@
  * inherits from the element's parent — the page's own text. This is the one
  * place that happens: `globals.css` never declares `--chat-font`, because a
  * default there would be rewritten onto `:host` and win over the page.
- * Declared here, it also outranks Tailwind's preflight, which would otherwise
+ * Declared here, unlayered, it also outranks the reset, which would otherwise
  * set `:host` to the system stack.
  */
 :host {

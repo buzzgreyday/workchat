@@ -147,15 +147,15 @@ cd frontend && npm install && npm run build:embed
 Writes `frontend/public/embed.js`, which the deployment serves at `/embed.js`.
 `npm run build` builds it before `next build`, and `build:standalone` goes
 through `npm run build`, so a deploy cannot ship an HTML change without the
-matching element. `npm run watch:embed` rebuilds on change, components
-included — the Tailwind scan is part of the bundle graph.
+matching element. `npm run watch:embed` rebuilds on change, components and
+stylesheets included.
 
 There is no separate install for the embed: it builds with the app's own
-esbuild, Tailwind and React, against the app's `tsconfig.json`. One React, one
-Tailwind, one version of the chat. Needs Node 20+, same as Next.
+esbuild and React, against the app's `tsconfig.json`. One React, one version of
+the chat. Needs Node 20+, same as Next.
 
-The stylesheet is compiled, not copied. `embed/src/embed.css` imports
-`globals.css`, Tailwind runs over it inside the esbuild plugin, and `:root` is
+The stylesheet is plain CSS, joined rather than copied. `embed/src/embed.css`
+imports `globals.css`, esbuild makes one sheet of them in a plugin, and `:root` is
 rewritten to reach `:host` — inside a shadow root there is no `:root` to
 declare a palette on. The result is adopted by the shadow root, so the host
 page's stylesheets are untouched in both directions.

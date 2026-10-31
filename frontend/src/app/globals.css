@@ -1,19 +1,6 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "./styles/reset.css";
 @import "./styles/page.css";
 @import "./styles/chat.css";
-
-/*
- * Kept, with nothing to apply it to.
- *
- * Darkness here comes from the palette and from `color-scheme`, never from a
- * class: there is no `.dark` on any element and no theme toggle. This variant
- * exists so the `dark:` utilities inside `ui/button.tsx` stay inert. Delete the
- * line and they fall back to Tailwind's built-in `prefers-color-scheme`
- * variant, and start applying on any machine whose OS is in dark mode.
- */
-@custom-variant dark (&:is(.dark *));
 
 /* ==========================================================================
    The scheme.
@@ -25,13 +12,7 @@
   /* ---- Palette -----------------------------------------------------------
      The defaults, and deliberately plain. These are what an embedding page
      gets when it sets nothing; the standalone site's own look lives in
-     `theme.css`, which overrides them there and reaches nowhere else.
-
-     The source of truth. `@theme` below only gives these names Tailwind can
-     build utilities from; it does not redefine them. That split is not
-     tidiness — Tailwind tree-shakes `@theme` variables it sees no utility for,
-     and the hand-written recipes at the bottom of this file read the palette
-     directly, so the palette has to live somewhere that always emits. */
+     `theme.css`, which overrides them there and reaches nowhere else. */
   --chat-bg: oklch(0.16 0.01 260);
   --chat-panel: oklch(0.2 0.012 260);
   --chat-panel-alt: oklch(0.25 0.014 260);
@@ -89,7 +70,7 @@
   --chat-badge-bg: var(--chat-panel-alt);
   --chat-badge-text: var(--chat-text-muted);
 
-  /* ---- Geometry that is not a Tailwind namespace ----------------------- */
+  /* ---- Geometry -------------------------------------------------------- */
   --radius: 0.625rem;
   /* 700px. Below a modern phone's viewport, which is why it only applies
      once the chat itself is 40rem wide — measured on the chat's container,
@@ -101,8 +82,7 @@
 
   /* ---- Motion -------------------------------------------------------------
      How long things take. Named, so a new effect picks a pace rather than a
-     number. Tailwind's own `transition` reads the first (`@theme` below). Not
-     part of EMBED.md's contract: these are the chat's own. */
+     number. Not part of EMBED.md's contract: these are the chat's own. */
   --motion-fast: 150ms;
   --motion-spin: 2.4s;
   --motion-bounce: 1.2s;
@@ -135,146 +115,10 @@
   --shadow-card: 0 25px 50px -12px rgb(0 0 0 / 0.25);
 }
 
-@theme inline {
-  --default-transition-duration: var(--motion-fast);
-
-  /* ---- Colour, as utilities -------------------------------------------- */
-  --color-canvas: var(--chat-bg);
-  --color-panel: var(--chat-panel);
-  --color-panel-raised: var(--chat-panel-alt);
-  --color-line: var(--chat-border);
-  --color-ink: var(--chat-text);
-  --color-ink-muted: var(--chat-text-muted);
-  --color-accent: var(--chat-accent);
-  --color-on-accent: var(--chat-on-accent);
-
-  /* The parts, as utilities. `heading` rather than `title`: `text-title` is
-     already the title's size, and a colour of the same name would collide
-     with it. */
-  --color-heading: var(--chat-title-color);
-  --color-bubble-user: var(--chat-user-bubble-bg);
-  --color-bubble-user-ink: var(--chat-user-bubble-text);
-  --color-bubble-bot: var(--chat-bot-bubble-bg);
-  --color-bubble-bot-ink: var(--chat-bot-bubble-text);
-  --color-bubble-bot-line: var(--chat-bot-bubble-border);
-  --color-avatar: var(--chat-avatar-bg);
-  --color-avatar-ink: var(--chat-avatar-icon);
-  --color-typing: var(--chat-typing);
-  --color-field: var(--chat-input-bg);
-  --color-field-ink: var(--chat-input-text);
-  --color-field-placeholder: var(--chat-input-placeholder);
-  --color-field-line: var(--chat-input-border);
-  --color-badge: var(--chat-badge-bg);
-  --color-badge-ink: var(--chat-badge-text);
-
-  /* shadcn's semantic names, pointed at the same palette.
-     Not an alias layer for its own sake: `ui/button.tsx` reads these, and they
-     used to hold the stock *light* values — which is why the send button had
-     to be repainted at the call site with a class `tailwind-merge` could not
-     see, leaving its real colour to a CSS layer-ordering accident. Primary
-     *is* the accent here, so the button renders this app's colours unaided. */
-  --color-background: var(--chat-bg);
-  --color-foreground: var(--chat-text);
-  /* Primary is the send button, the one button this app has. */
-  --color-primary: var(--chat-send-bg);
-  --color-primary-foreground: var(--chat-send-icon);
-  --color-secondary: var(--chat-panel-alt);
-  --color-secondary-foreground: var(--chat-text);
-  --color-muted: var(--chat-panel-alt);
-  --color-muted-foreground: var(--chat-text-muted);
-  --color-border: var(--chat-border);
-  --color-input: var(--chat-border);
-  --color-ring: var(--chat-accent);
-  --color-destructive: oklch(0.704 0.191 22.216);
-
-  /* ---- Type -------------------------------------------------------------
-     Fonts are the host's to choose, through five optional variables:
-     `--chat-font`, `--chat-font-weight`, `--chat-font-title`,
-     `--chat-font-title-weight` and `--chat-font-title-size`. None of them is
-     declared anywhere in this file, and that is the design, not an omission:
-     a default declared on `:root` would be rewritten onto `:host` too, and
-     then an embed could no longer inherit the page it sits in.
-
-     `--font-sans` has a real fallback stack, because it reaches <html>
-     through Tailwind's preflight and <html> has no parent to inherit from —
-     a family with no fallback there lands on the UA's default font, which is
-     how Geist once went unused for a whole release.
-
-     `--font-display` has none, on purpose. Unset, the declaration is invalid
-     at computed-value time, `font-family` is inherited, and so the title is
-     in the body face. Only the title uses it, and a title always has a
-     parent.
-
-     The next/font variables (`--font-nunito`, `--font-bebas`) are never
-     named here; `theme.css` hands them over. A theme key must also never
-     share a name with the variable it reads — `--font-sans: var(--font-sans)`
-     is a cycle, and computes to nothing.
-
-     Four sizes and two weights is this app's entire inventory. Naming them by
-     role is what stops a fifth appearing by accident. */
-  --font-sans: var(
-    --chat-font,
-    ui-sans-serif,
-    system-ui,
-    sans-serif
-  );
-  --font-display: var(--chat-font-title);
-
-  --text-title: var(--chat-font-title-size, 1.25rem);
-  --text-title--line-height: 1.4;
-  --text-title--font-weight: var(--chat-font-title-weight, 600);
-
-  /* 16px, and not a style opinion: below it, iOS Safari zooms the page when a
-     field takes focus and does not zoom back out, which leaves the layout
-     offset behind the keyboard. The composer is `text-body` at every width,
-     the same size as the bubbles, and must never go below it on a phone. */
-  --text-body: 1rem;
-  --text-body--line-height: calc(1.5 / 1);
-
-  --text-meta: 0.875rem;
-  --text-meta--line-height: calc(1.25 / 0.875);
-
-  --text-micro: 0.75rem;
-  --text-micro--line-height: calc(1 / 0.75);
-
-  /* ---- Space ------------------------------------------------------------
-     Three adjacent panels of one card had three paddings — `px-6 py-5`, `p-6`
-     and `p-4` — none of them named, so nobody could tell whether that was a
-     decision or a drift. Named here at the values they already had, so the
-     question can now be answered by changing three numbers in one place. */
-  --spacing-gutter-sm: 1rem;
-  --spacing-gutter: 1.25rem;
-  --spacing-gutter-lg: 1.5rem;
-
-  /* The height of a one-line composer — its line, its padding (`py-3`) and
-     its border — so the send button beside it is exactly as tall, and the
-     field never shrinks below it. The line follows the message size, which
-     the composer does too (never under 1rem), so the two stay matched when a
-     theme makes the text larger. 50px at the default size: over the 44px a
-     tap target needs, which is what this used to be, fixed, and a few pixels
-     short of the field it sat beside. */
-  --spacing-control: calc(
-    max(1rem, var(--chat-font-message-size, 1rem)) * 1.5 + 1.5rem + 2px
-  );
-  --spacing-composer-max: 8rem;
-
-  /* ---- Radius ----------------------------------------------------------
-     `--radius` drives sm/md/lg, which `ui/button.tsx` and the bubble corners
-     read; the three below are what this app's own surfaces round by. */
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-control: calc(var(--radius) * 1.4);
-  --radius-bubble: calc(var(--radius) * 1.8);
-  --radius-card: calc(var(--radius) * 2.2);
-
-  /* ---- Measure --------------------------------------------------------- */
-  --container-chat: 56rem;
-}
-
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--chat-border);
+    outline-color: color-mix(in oklab, var(--chat-accent) 50%, transparent);
   }
 
   html {
@@ -284,7 +128,8 @@
 
   body {
     height: 100%;
-    @apply bg-background text-foreground;
+    background: var(--chat-bg);
+    color: var(--chat-text);
   }
 
   /* The body weight, when a host names one. Unset, this is invalid at
@@ -295,18 +140,10 @@
     font-weight: var(--chat-font-weight);
   }
 
-  /* No `html { @apply font-sans }` here.
-     It emitted `font-family: var(--font-sans)` with *no* fallback, so once
-     that variable was invalid the declaration was invalid at computed-value
-     time — which for an inherited property means `inherit`, and <html> has no
-     parent, so it landed on the UA's default font. Tailwind's own preflight
-     already sets the family from `--default-font-family` (which resolves to
-     `--font-sans`) *with* a real fallback list, so this rule only ever took
-     that safety net away. */
 }
 
 /* ==========================================================================
-   The shell, and the recipes that are not single utilities.
+   The shell, and the recipes.
    ========================================================================== */
 
 /**
@@ -409,9 +246,9 @@ html {
 /**
  * The composer's focus state.
  *
- * A class rather than utilities because it is one decision made of three
+ * One class because it is one decision made of three
  * declarations — the default outline goes, the border takes the accent, and a
- * ring is drawn outside it. Split across `focus:` utilities, two thirds of it
+ * ring is drawn outside it. Split across rules, two thirds of it
  * could be changed without the third.
  */
 .chat-field:focus {
@@ -426,7 +263,7 @@ html {
 /**
  * Type, by part.
  *
- * Classes rather than utilities because each is three properties read from
+ * Each is three properties read from
  * optional variables, and the unset case is the design: with no fallback, a
  * family or weight nobody named is invalid at computed-value time and simply
  * inherits — the chat's own `--chat-font`, or the host page's font. So a host
