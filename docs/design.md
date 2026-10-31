@@ -81,7 +81,7 @@ Both faces are on Google Fonts under the OFL, so any project can load them:
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@300;400;600&display=swap" rel="stylesheet">
 ```
 
-In a Next.js project, load them with `next/font/google` instead (below),
+In a Next.js project, load them with `next/font/google` instead,
 which serves them from your own domain. Use the Google copies either way:
 the Fontshare downloads of Bebas (and Sentient) in
 this repo's working folder are under a licence that forbids putting them in a
@@ -105,140 +105,33 @@ Layout on chat.mringdal.com: a full-width top bar, the content edge to edge
 with a centred reading column, and a slim footer with the profile links — all
 the one navy, with no lines between them, as mringdal.com draws its own page.
 
-## Using it on mringdal.com (Next.js + Tailwind 4)
+## On mringdal.com (Next.js + plain CSS)
 
-The website already has the right structure: a few tokens on `:root` in
-`app/styles/tokens.css`, applied to `html` and `body`, and handed to the embedded
-chat on the `workchat-chat` element. Its values are placeholders. Three
-steps replace them with this scheme.
+The website already uses this scheme, in plain CSS. Its own files are the
+reference, rather than a copy here that could drift from them:
 
-### 1. Fonts, in `app/layout.tsx`
+| File, in `mringdal-site` | Holds |
+| --- | --- |
+| `app/layout.tsx` | The two faces, through `next/font/google` |
+| `app/styles/tokens.css` | The colours, faces, radii and motion, on `:root` |
+| `app/styles/base.css` | `html` and `body`: the navy, the cream and the body type |
+| `app/styles/buttons.css` | `.action`, the one thing to press on a view |
+| `app/styles/chat.css` | The `--chat-*` variables, on the `workchat-chat` element |
 
-```tsx
-import { Bebas_Neue, Nunito } from "next/font/google";
+Three things it does differently from chat.mringdal.com, on purpose:
 
-const nunito = Nunito({
-  variable: "--font-nunito",
-  subsets: ["latin"],
-  weight: ["300", "400", "600"],
-});
+- **Body text is Nunito at 600**, not 300, and bold needs 800 to read as bold.
+- **Its titles ask Bebas for 800**, a weight the browser fakes.
+- **The site's boxes round at 14px**: the story box and the chat window, with
+  the buttons. The chat's own bubbles stay 18px.
 
-const bebas = Bebas_Neue({
-  variable: "--font-bebas",
-  subsets: ["latin"],
-  weight: "400",
-});
-
-// on <html>:
-// className={`${nunito.variable} ${bebas.variable}`}
-```
-
-The variables are set on `<html>` and inherit into the chat's shadow root,
-and next/font's `@font-face` rules live in the document, where the shadow
-root can use them. So loading the fonts here also makes them available to
-the embedded chat (step 3).
-
-### 2. Tokens, in `app/styles/tokens.css`
-
-The existing names stay, so nothing that already reads them changes. The page
-is navy with cream text, the bars included.
-
-```css
-@import "tailwindcss";
-
-:root {
-  --frame: #547792;
-  --bg: #1b2e42;
-  --surface: #2b3d4f;
-  --line: rgb(255 255 255 / 0.1);
-  --text: #eae0cf;
-  --muted: #86898f;
-  --accent: #94b4c1;
-  --identity: #e0cea1;
-  --action: #e0876a;
-  --on-action: #1b2e42;
-}
-
-/* Utilities: bg-frame, bg-surface, text-identity, bg-action, font-display… */
-@theme inline {
-  --color-frame: var(--frame);
-  --color-canvas: var(--bg);
-  --color-surface: var(--surface);
-  --color-line: var(--line);
-  --color-ink: var(--text);
-  --color-ink-muted: var(--muted);
-  --color-accent: var(--accent);
-  --color-identity: var(--identity);
-  --color-action: var(--action);
-  --color-on-action: var(--on-action);
-
-  --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-bebas), "Arial Narrow", sans-serif;
-
-  --radius-control: 14px;
-  /* The site's story box and chat window, not a message: 14px for now, with
-     the buttons. The chat's own bubbles stay 18px. */
-  --radius-bubble: 14px;
-}
-
-html,
-body {
-  background: var(--bg);
-  color: var(--text);
-}
-
-body {
-  font-family: var(--font-sans);
-  font-weight: 300;
-  line-height: 1.5;
-}
-```
-
-`@theme inline` rather than plain `@theme`, so the utilities read the
-variables at run time and a change on `:root` reaches them. The theme key
-and the next/font variable must have different names (`--font-sans` reads
-`--font-nunito`): a variable that reads itself is a cycle and computes to
-nothing.
-
-Headings then take `font-display text-identity`, the one call to action on a
-page `bg-action text-on-action rounded-control`, and cards
-`bg-surface border border-line rounded-bubble`.
-
-### 3. The embedded chat, in `app/styles/chat.css`
-
-Replace the `workchat-chat` block. It gives the chat the site's colours and
-fonts, set up the way chat.mringdal.com is:
-
-```css
-workchat-chat {
-  --chat-bg: var(--bg);
-  --chat-panel: var(--bg);
-  --chat-panel-alt: var(--surface);
-  --chat-border: var(--line);
-  --chat-text: var(--text);
-  --chat-text-muted: var(--muted);
-  --chat-accent: var(--accent);
-
-  --chat-title-color: var(--identity);
-  --chat-avatar-bg: var(--identity);
-  --chat-avatar-icon-display: none;
-  --chat-badge-text: var(--identity);
-  --chat-user-bubble-bg: color-mix(in oklab, var(--accent) 45%, var(--bg));
-  --chat-send-bg: var(--action);
-  --chat-send-icon: var(--on-action);
-  --chat-input-focus: color-mix(in oklab, var(--action) 40%, var(--bg));
-
-  --chat-font: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
-  --chat-font-weight: 300;
-  --chat-font-title: var(--font-bebas), "Arial Narrow", sans-serif;
-  --chat-font-title-weight: 400;
-}
-```
-
-The dialog shows the chat with `header="none"` and draws its own header, so
-style that header with the page's tokens: the title in `font-display
-text-identity`, the questions-left count in `text-identity`. `EMBED.md` lists
-every `--chat-*` variable the element reads.
+The faces are loaded in the page, so their variables inherit into the chat's
+shadow root and its `@font-face` rules are the document's, where the shadow root
+can use them. The element sets no `--chat-font`: it inherits the page's. The
+palette is handed over on the element rather than `:root`, because the element
+declares its own defaults on `:host` and an inherited value loses to those. The
+chat window draws its own bar, so the chat is told `header="none"`. `EMBED.md`
+lists every `--chat-*` variable the element reads.
 
 ## Trying changes
 
