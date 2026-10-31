@@ -60,6 +60,13 @@ const forShadowRoot = (css) =>
   css.replace(/(?<![\w-]):root\b/g, ":host, :root");
 
 /**
+ * What the sheet is written down for: esbuild adds the prefixes these still need
+ * (`-webkit-user-select`, for one) and rewrites what they cannot read. Every
+ * iPhone browser is Safari underneath, which is the one that matters here.
+ */
+const CSS_TARGET = ["safari16.4", "chrome111", "firefox128"];
+
+/**
  * The stylesheet, joined here rather than as a separate script.
  *
  * `embed.css` imports `globals.css`, which imports the rest. Handing that text
@@ -79,6 +86,7 @@ const stylesheet = {
         bundle: true,
         minify: true,
         write: false,
+        target: CSS_TARGET,
         metafile: true,
         outdir: here("../public"),
       });
