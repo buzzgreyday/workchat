@@ -96,9 +96,20 @@
   --bubble-max-width: 80%;
   /* The floor under the safe-area insets in the `.shell-*` rules. */
   --edge: 1rem;
+
+  /* ---- Motion -------------------------------------------------------------
+     How long things take. Named, so a new effect picks a pace rather than a
+     number. Tailwind's own `transition` reads the first (`@theme` below). Not
+     part of EMBED.md's contract: these are the chat's own. */
+  --motion-fast: 150ms;
+  --motion-spin: 2.4s;
+  --motion-bounce: 1.2s;
+  --motion-stagger: 0.15s;
 }
 
 @theme inline {
+  --default-transition-duration: var(--motion-fast);
+
   /* ---- Colour, as utilities -------------------------------------------- */
   --color-canvas: var(--chat-bg);
   --color-panel: var(--chat-panel);
@@ -447,7 +458,7 @@ html {
     transparent 65%,
     var(--chat-avatar-bg)
   );
-  animation: chat-ring-spin 2.4s linear infinite;
+  animation: chat-ring-spin var(--motion-spin) linear infinite;
   z-index: -1;
 }
 
@@ -466,13 +477,22 @@ html {
 }
 
 .chat-typing-dot {
-  animation: chat-typing-bounce 1.2s ease-in-out infinite;
+  animation: chat-typing-bounce var(--motion-bounce) ease-in-out infinite;
 }
 
 .chat-typing-dot:nth-child(2) {
-  animation-delay: 0.15s;
+  animation-delay: var(--motion-stagger);
 }
 
 .chat-typing-dot:nth-child(3) {
-  animation-delay: 0.3s;
+  animation-delay: calc(var(--motion-stagger) * 2);
+}
+
+/* With reduced motion asked for, both hold still. The dots stay, so a reply
+   being written still shows. */
+@media (prefers-reduced-motion: reduce) {
+  .chat-avatar-glow::before,
+  .chat-typing-dot {
+    animation: none;
+  }
 }

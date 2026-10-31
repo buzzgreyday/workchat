@@ -99,6 +99,7 @@ public repository.
 | Controls | 50px tall — a one-line input and its button match. Never under 44px: a tap target. |
 | Reading width | 56rem (896px) at most |
 | Shadows | Small only: `0 1px 3px rgb(0 0 0 / 0.1)` on bubbles, pills and the button |
+| Motion | Named `--motion-*` durations, each project its own. Anything that moves holds still under `prefers-reduced-motion: reduce` |
 
 Layout on chat.mringdal.com: a full-width top bar, the content edge to edge
 with a centred reading column, and a slim footer with the profile links — all
