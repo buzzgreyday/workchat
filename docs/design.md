@@ -105,7 +105,7 @@ Layout on chat.mringdal.com: a full-width top bar, the content edge to edge
 with a centred reading column, and a slim footer with the profile links — all
 the one navy, with no lines between them, as mringdal.com draws its own page.
 
-## Using it on mringdal.com (Next.js + Tailwind 4)
+## Using it on mringdal.com (Next.js + plain CSS)
 
 The website already has the right structure: a few tokens on `:root` in
 `app/styles/tokens.css`, applied to `html` and `body`, and handed to the embedded
@@ -144,8 +144,7 @@ The existing names stay, so nothing that already reads them changes. The page
 is navy with cream text, the bars included.
 
 ```css
-@import "tailwindcss";
-
+/* app/styles/tokens.css */
 :root {
   --frame: #547792;
   --bg: #1b2e42;
@@ -157,23 +156,9 @@ is navy with cream text, the bars included.
   --identity: #e0cea1;
   --action: #e0876a;
   --on-action: #1b2e42;
-}
 
-/* Utilities: bg-frame, bg-surface, text-identity, bg-action, font-display… */
-@theme inline {
-  --color-frame: var(--frame);
-  --color-canvas: var(--bg);
-  --color-surface: var(--surface);
-  --color-line: var(--line);
-  --color-ink: var(--text);
-  --color-ink-muted: var(--muted);
-  --color-accent: var(--accent);
-  --color-identity: var(--identity);
-  --color-action: var(--action);
-  --color-on-action: var(--on-action);
-
-  --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-bebas), "Arial Narrow", sans-serif;
+  --body-face: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  --display-face: var(--font-bebas), "Arial Narrow", sans-serif;
 
   --radius-control: 14px;
   /* The site's story box and chat window, not a message: 14px for now, with
@@ -181,6 +166,7 @@ is navy with cream text, the bars included.
   --radius-bubble: 14px;
 }
 
+/* app/styles/base.css */
 html,
 body {
   background: var(--bg);
@@ -188,21 +174,20 @@ body {
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--body-face);
   font-weight: 300;
   line-height: 1.5;
 }
 ```
 
-`@theme inline` rather than plain `@theme`, so the utilities read the
-variables at run time and a change on `:root` reaches them. The theme key
-and the next/font variable must have different names (`--font-sans` reads
-`--font-nunito`): a variable that reads itself is a cycle and computes to
-nothing.
+The face variables and the next/font variables have different names
+(`--body-face` reads `--font-nunito`): a variable that reads itself is a cycle
+and computes to nothing.
 
-Headings then take `font-display text-identity`, the one call to action on a
-page `bg-action text-on-action rounded-control`, and cards
-`bg-surface border border-line rounded-bubble`.
+Rules then read the tokens directly. Headings take `--display-face` and
+`--identity`, the one call to action on a page `--action`, `--on-action` and
+`--radius-control`, and cards `--surface`, a `--line` border and
+`--radius-bubble`. `.action` in `app/styles/buttons.css` is the button.
 
 ### 3. The embedded chat, in `app/styles/chat.css`
 
@@ -236,8 +221,8 @@ workchat-chat {
 ```
 
 The dialog shows the chat with `header="none"` and draws its own header, so
-style that header with the page's tokens: the title in `font-display
-text-identity`, the questions-left count in `text-identity`. `EMBED.md` lists
+style that header with the page's tokens: the title in `--display-face`
+and `--identity`, the questions-left count in `--identity`. `EMBED.md` lists
 every `--chat-*` variable the element reads.
 
 ## Trying changes
