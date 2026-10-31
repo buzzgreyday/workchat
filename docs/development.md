@@ -36,24 +36,24 @@ tags on any record, and commit the result.
 Three tiers, and code moves one way through them:
 
 ```
-experimental/*  ──PR──>  development  ──PR──>  main
-    CI (fast)              CI (full)          CI (full) + deploy
+feat|fix|chore/*  ──PR──>  development  ──PR──>  main
+    CI (fast)                CI (full)          CI (full) + deploy
 ```
 
 | Branch | Purpose | What runs |
 |---|---|---|
 | `main` | Production. Its HEAD is what is on the server. | Full CI, then a deploy that waits for approval, then a release tag if the version bumped |
 | `development` | Integration. Everything lands here first and is judged here. | Full CI |
-| `experimental/*` | Anything in progress — a feature, a spike, a refactor. | Backend, frontend and the secret scan on each push |
+| `feat/*`, `fix/*`, `chore/*` | Anything in progress — a feature, a fix, a release or a spike. | Backend, frontend and the secret scan on each push |
 
 **`main` accepts merges from `development` and nothing else.** Branch protection
 can require a pull request and a green build, but it cannot say where the pull
 request came from, so the `Branch policy` job in CI fails any PR into `main`
 whose head is not `development`.
 
-### Why experimental/* gets less
+### Why work branches get less
 
-Pushes to `experimental/*` skip the migration, Caddy and image-build jobs. They
+Pushes to any branch other than `development` and `main` skip the migration, Caddy and image-build jobs. They
 are the slow ones and they rarely catch anything mid-spike; skipping them keeps
 a push under a minute. Nothing is lost, because they run again on the PR into
 `development` — the branch is short-lived, the gate is at the merge, and the
@@ -66,7 +66,7 @@ the moment it lands, whatever branch it landed on.
 
 ```bash
 git switch development && git pull
-# ... merge your experimental/* PRs here, let CI go green ...
+# ... merge your work-branch PRs here, let CI go green ...
 gh pr create --base main --head development --title "Release: <what changed>"
 ```
 
@@ -94,6 +94,24 @@ cd backend && uv run mypy
 The frontend is checked by `npx tsc --noEmit` and linted by `npx eslint`, both
 from `frontend/`. `next build` runs the type check itself, so a green build
 implies a green `tsc`.
+
+## Evals
+
+`backend/tests/evals/` measures how often the chat denies something the CV
+actually contains, and blames each failure on the retrieval step that let it
+through. It is not part of the test run: it drives a live backend with the real
+model, so every run costs API calls and leaves one conversation per question in
+the database.
+
+```bash
+docker compose exec backend python -m tests.evals.run_eval
+docker compose exec backend python -m tests.evals.run_eval --only 1,6,16   # smoke test
+```
+
+It measures whatever model the running backend was started with, and a dev
+backend starts with the cheap one — set `OPENAI_MODEL` in `backend/.env` and
+restart before comparing. The `run_eval.py` docstring has the rest.
+Transcripts go to `tests/evals/results/`, which is gitignored.
 
 ## API docs
 
