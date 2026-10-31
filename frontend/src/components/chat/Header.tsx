@@ -14,19 +14,19 @@ export default function ChatHeader() {
   const { usage, owner } = useControls();
 
   return (
-    <div className="bg-panel border-line border-b px-gutter-lg py-gutter">
-      <div className="flex items-center gap-3">
-        <div className="bg-avatar text-avatar-ink flex size-10 shrink-0 items-center justify-center rounded-full shadow-sm">
+    <div className="chat-header">
+      <div className="chat-header-row">
+        <div className="chat-header-avatar">
           <Bot size={20} />
         </div>
 
-        <h1 className="text-heading text-title font-display">
+        <h1 className="chat-title">
             Workchat
         </h1>
-        <p className={"font-sans"}>with {owner.name.toUpperCase()}</p>
+        <p className="chat-owner">with {owner.name.toUpperCase()}</p>
       </div>
 
-      {usage && <UsageBadge usage={usage} className="mt-3" />}
+      {usage && <UsageBadge usage={usage} />}
     </div>
   );
 }

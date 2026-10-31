@@ -94,9 +94,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${nunito.variable} ${bebas.variable} antialiased`}
+      className={`${nunito.variable} ${bebas.variable}`}
     >
-      <body className="h-full">{children}</body>
+      <body>{children}</body>
     </html>
   );
 }

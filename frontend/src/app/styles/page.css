@@ -1,0 +1,114 @@
+/* chat.mringdal.com's own page (components/StandaloneChat): a bar, the chat's
+   band, and a footer. In the embed's sheet too, where nothing uses them. */
+@layer components {
+  /* A container, so what sizes itself inside does so by this space. `height`
+     takes what `html` was given rather than asserting one: that is the *visual*
+     viewport where the browser reports it, which is what keeps the composer
+     above an iOS keyboard. */
+  .page {
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--chat-bg);
+  }
+
+  /* Wraps rather than squeezing: on a phone the count drops to a line of its
+     own instead of breaking the title in two. */
+  .site-bar {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 1rem;
+    width: 100%;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--site-bar-border);
+    background: var(--site-bar-bg);
+  }
+
+  .site-bar .usage-badge {
+    flex-shrink: 0;
+    margin-inline-start: auto;
+  }
+
+  /* Held at its designed size when a browser enlarges text by itself.
+     DuckDuckGo's Text Size follows the phone's own text size and, on iOS,
+     applies it as `-webkit-text-size-adjust` on the page: this title then
+     outgrew the bar it was drawn for. It is display type, already sized to the
+     bar, so it opts out; the messages, the badge and the links keep following
+     the reader's text size. Browser zoom still scales everything. */
+  .site-title {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* The two words, stacked in one place, one cross-fading into the other. How
+     long it takes is RollingTitle's, whose timer depends on it. */
+  .rolling-title {
+    display: inline-grid;
+  }
+
+  .rolling-title-layer {
+    grid-area: 1 / 1;
+    opacity: 0;
+    transition-property: opacity;
+    transition-timing-function: var(--motion-ease);
+  }
+
+  .rolling-title-layer[data-shown] {
+    opacity: 1;
+  }
+
+  /* The chat's band, edge to edge; the chat keeps a readable column inside. */
+  .site-chat {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    width: 100%;
+    min-height: 0;
+    background: var(--site-chat-bg);
+  }
+
+  /* Steps aside while the on-screen keyboard is up (globals.css). */
+  .site-footer {
+    flex-shrink: 0;
+    width: 100%;
+  }
+
+  .site-footer-links {
+    display: flex;
+    justify-content: center;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--site-footer-border);
+    background: var(--site-footer-bg);
+  }
+
+  /* No links configured: the chat's band reaches the bottom instead. */
+  .site-footer-empty {
+    background: var(--site-chat-bg);
+  }
+
+  .owner-links {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .owner-link {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--site-link);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition: var(--motion-colors);
+  }
+
+  /* Only under a mouse: a touch screen keeps :hover on the last link tapped. */
+  @media (hover: hover) {
+    .owner-link:hover {
+      color: var(--site-link-hover);
+    }
+  }
+}

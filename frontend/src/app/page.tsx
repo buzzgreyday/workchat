@@ -22,16 +22,10 @@ export default async function Home({
   const owner = readOwner();
 
   return (
-    // `h-full`, taking the height `html` was given rather than asserting one.
-    // That height is the *visual* viewport where the browser reports it, which
-    // is what keeps the composer above an iOS keyboard; three elements each
-    // naming their own `dvh` is how they drift apart when it changes.
-    //
     // Edge to edge: the top bar, the chat and the footer are
     // `StandaloneChat`'s, which needs the browser to hold the allowance. Each
-    // pads itself off the screen's edges (`.shell-*` in globals.css). A
-    // container, so what sizes itself inside does so by this space.
-    <main className="bg-canvas @container flex h-full flex-col">
+    // pads itself off the screen's edges (`.shell-*` in globals.css).
+    <main className="page">
       <StandaloneChat
         token={token}
         claim={claim}

@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./styles/page.css";
+@import "./styles/chat.css";
 
 /*
  * Kept, with nothing to apply it to.
@@ -105,6 +107,32 @@
   --motion-spin: 2.4s;
   --motion-bounce: 1.2s;
   --motion-stagger: 0.15s;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-colors:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease);
+  --motion-all: all var(--motion-fast) var(--motion-ease);
+
+  /* ---- Shape and space -------------------------------------------------- */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-control: calc(var(--radius) * 1.4);
+  --radius-bubble: calc(var(--radius) * 1.8);
+  --radius-card: calc(var(--radius) * 2.2);
+  --gutter-sm: 1rem;
+  --gutter: 1.25rem;
+  --gutter-lg: 1.5rem;
+  /* The height of a one-line composer: its line, its padding and its border. So
+     the send button beside it is exactly as tall, and the field never shrinks
+     below it. 50px at the default size, over the 44px a tap target needs. */
+  --control-height: calc(
+    max(1rem, var(--chat-font-message-size, 1rem)) * 1.5 + 1.5rem + 2px
+  );
+  --composer-max: 8rem;
+  --chat-column: 56rem;
+  --shadow-small: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card: 0 25px 50px -12px rgb(0 0 0 / 0.25);
 }
 
 @theme inline {
@@ -249,7 +277,13 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
+    height: 100%;
     @apply bg-background text-foreground;
   }
 
