@@ -26,9 +26,11 @@ module whose shape looks odd; it is usually odd on purpose.
 
 - Work on a `feat/*`, `fix/*` or `chore/*` branch cut from `development`.
   Commit there.
-- **Do not merge, push to `development` or `main`, tag, or cut a release.** The
-  owner does those. `main` takes pull requests from `development` only (CI
-  enforces it), and a green `main` queues a production deploy for approval.
+- Push a work branch or open a pull request only when asked.
+- **Merge, tag or cut a release only when told to, each time, and never push
+  directly to `development` or `main`.** `main` takes pull requests from
+  `development` only (CI enforces it), and a green `main` queues a production
+  deploy for approval.
 - Commit subjects are conventional, with a scope where one fits —
   `fix(frontend):`, `feat(embed):`, `fix(eval):`, `chore(release):` — followed
   by a plain sentence saying what is now true:
