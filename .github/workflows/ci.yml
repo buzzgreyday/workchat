@@ -84,9 +84,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Matches frontend/Dockerfile's node:22-alpine, so CI compiles on the
-          # same major that production is built with.
-          node-version: 22
+          # .nvmrc, which must match frontend/Dockerfile's node:22-alpine, so CI
+          # compiles on the same major that production is built with. Resolved
+          # from the repository root, not the job's working directory.
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
