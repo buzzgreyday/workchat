@@ -41,6 +41,9 @@ module whose shape looks odd; it is usually odd on purpose.
 
 ## Checking a change
 
+Node 22 for the frontend, from `.nvmrc` — run `nvm use` first. The shell's
+default Node may be older than Next 16 accepts.
+
 On the host — the images are built without dev dependencies, so neither
 `pytest` nor `mypy` exists inside a container:
 
