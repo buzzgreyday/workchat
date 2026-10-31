@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 jobs:
-  # The promotion chain is experimental/* -> development -> main. Branch
+  # The promotion chain is feat|fix|chore/* -> development -> main. Branch
   # protection can require a pull request and a green build, but it has no notion
   # of where that pull request came *from*, so the last link is enforced here:
   # main takes development and nothing else.
@@ -84,9 +84,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Matches frontend/Dockerfile's node:22-alpine, so CI compiles on the
-          # same major that production is built with.
-          node-version: 22
+          # .nvmrc, which must match frontend/Dockerfile's node:22-alpine, so CI
+          # compiles on the same major that production is built with. Resolved
+          # from the repository root, not the job's working directory.
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -129,7 +130,7 @@ jobs:
   migrations:
     name: Migrations — apply and check for drift
     # Slow job, so it is scoped: every pull request and both long-lived branches
-    # run it, pushes to experimental/* do not. Nothing reaches development or
+    # run it, pushes to work branches do not. Nothing reaches development or
     # main without having passed this — the promotion PR is where it bites.
     if: >-
       github.event_name != 'push' ||

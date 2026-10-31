@@ -591,7 +591,7 @@ Typical development workflow:
    after `pyproject.toml`/`uv.lock`, or `frontend` after `package.json`.
 6. Commit code and migration files together, so a checkout never has models and
    schema out of step.
-7. Work on an `experimental/*` branch and open a pull request into
+7. Work on a `feat/*`, `fix/*` or `chore/*` branch and open a pull request into
    `development`. `main` is production and takes merges from `development`
    only — see [Branches](docs/development.md#branches).
 
@@ -708,12 +708,12 @@ Possible future enhancements include:
 * Move the hardcoded conditional prompts from the code to separate files
 * Resource search scoring
 * ~~CI/CD pipeline~~ — done: GitHub Actions runs types, tests, migration drift,
-  Caddyfile, secret scanning and image builds. Work happens on `experimental/*`,
-  integrates on `development` and reaches production through `main`, where a
+  Caddyfile, secret scanning and image builds. Work happens on `feat/*`, `fix/*`
+  and `chore/*`, integrates on `development` and reaches production through `main`, where a
   green run queues a deploy for approval. See
   [branches](docs/development.md#branches) and
   [`docs/deployment.md`](docs/deployment.md#cicd)
-* ~~Automated testing~~ — done: 100 backend tests, run in CI
+* ~~Automated testing~~ — done: the backend suite, run in CI
 * Background workers
 * Monitoring and metrics
 * Centralized logging
