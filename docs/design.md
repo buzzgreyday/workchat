@@ -99,6 +99,7 @@ public repository.
 | Controls | 50px tall — a one-line input and its button match. Never under 44px: a tap target. |
 | Reading width | 56rem (896px) at most |
 | Shadows | Small only: `0 1px 3px rgb(0 0 0 / 0.1)` on bubbles, pills and the button |
+| Motion | Named `--motion-*` durations, each project its own. Anything that moves holds still under `prefers-reduced-motion: reduce` |
 
 Layout on chat.mringdal.com: a full-width top bar, the content edge to edge
 with a centred reading column, and a slim footer with the profile links — all
@@ -107,7 +108,7 @@ the one navy, with no lines between them, as mringdal.com draws its own page.
 ## Using it on mringdal.com (Next.js + Tailwind 4)
 
 The website already has the right structure: a few tokens on `:root` in
-`app/globals.css`, applied to `html` and `body`, and handed to the embedded
+`app/styles/tokens.css`, applied to `html` and `body`, and handed to the embedded
 chat on the `workchat-chat` element. Its values are placeholders. Three
 steps replace them with this scheme.
 
@@ -137,7 +138,7 @@ and next/font's `@font-face` rules live in the document, where the shadow
 root can use them. So loading the fonts here also makes them available to
 the embedded chat (step 3).
 
-### 2. Tokens, in `app/globals.css`
+### 2. Tokens, in `app/styles/tokens.css`
 
 The existing names stay, so nothing that already reads them changes. The page
 is navy with cream text, the bars included.
@@ -175,7 +176,9 @@ is navy with cream text, the bars included.
   --font-display: var(--font-bebas), "Arial Narrow", sans-serif;
 
   --radius-control: 14px;
-  --radius-bubble: 18px;
+  /* The site's story box and chat window, not a message: 14px for now, with
+     the buttons. The chat's own bubbles stay 18px. */
+  --radius-bubble: 14px;
 }
 
 html,
@@ -201,7 +204,7 @@ Headings then take `font-display text-identity`, the one call to action on a
 page `bg-action text-on-action rounded-control`, and cards
 `bg-surface border border-line rounded-bubble`.
 
-### 3. The embedded chat, in the same file
+### 3. The embedded chat, in `app/styles/chat.css`
 
 Replace the `workchat-chat` block. It gives the chat the site's colours and
 fonts, set up the way chat.mringdal.com is:

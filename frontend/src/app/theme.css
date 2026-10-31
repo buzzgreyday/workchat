@@ -28,7 +28,7 @@
 
 :root {
   /* ---- Palette ---------------------------------------------------------- */
-  /* mringdal.com's own palette, to the hex (its app/globals.css), so the chat
+  /* mringdal.com's own palette, to the hex (its app/styles/tokens.css), so the chat
      looks the same on its own page as it does in the window on that site:
      navy everywhere, the bars included — no steel-blue frame — with the gold
      and the coral as the only colours on it. */
