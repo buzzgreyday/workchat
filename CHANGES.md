@@ -7,6 +7,16 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.13.3] - 2026-11-01
+
+### Changed
+
+- Every button is one rule, in its own colour: a gradient to a slightly darker
+  foot, a line of light along the top, a dark edge along the bottom, a tight
+  shadow and a soft glow. The darker shades keep the colour's saturation and
+  hue, so its darkest edge is never grey. Pressed, a button goes flat, moves down
+  a pixel and takes a dark inset shadow. Reduced motion keeps it still.
+
 ## [0.13.2] - 2026-11-01
 
 ### Fixed
