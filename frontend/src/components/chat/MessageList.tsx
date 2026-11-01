@@ -40,7 +40,7 @@ export default function MessageList() {
         <button
           type="button"
           onClick={() => retry()}
-          className="chat-button chat-button-wide chat-retry"
+          className="button button-wide button-retry"
         >
           {RETRY}
         </button>
