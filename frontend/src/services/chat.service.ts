@@ -144,6 +144,9 @@ class ChatService {
   async stream(
     authFetch: AuthFetch,
     request: ChatRequest,
+    // Names this question to the server. Sending it again is a retry, which
+    // does not cost a second question.
+    questionKey: string,
     callbacks: {
       onToken: (value: string) => void;
       onDone: (
@@ -161,6 +164,7 @@ class ChatService {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Idempotency-Key": questionKey,
         },
         body: JSON.stringify(request),
       },
@@ -178,6 +182,7 @@ class ChatService {
     const decoder = new TextDecoder();
 
     let buffer = "";
+    let finished = false;
 
     while (true) {
       const { value, done } =
@@ -219,6 +224,7 @@ class ChatService {
             break;
 
           case "done":
+            finished = true;
             callbacks.onDone(
               event.history,
               event.usage,
@@ -228,12 +234,20 @@ class ChatService {
             break;
 
           case "error":
+            finished = true;
             callbacks.onError?.(
               event.message,
             );
             break;
         }
       }
+    }
+
+    // The server always ends a turn with a frame saying how it went, so a stream
+    // without one was cut off, however politely. Returning here would leave the
+    // bubble streaming and the composer shut until a reload.
+    if (!finished) {
+      throw new Error("Stream ended without a result");
     }
   }
 }

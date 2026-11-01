@@ -171,6 +171,224 @@ test("Shift+Enter writes a second line instead of sending", async ({
   );
 });
 
+const RETRY = /Try again/;
+
+/** Answers each question from `answers`, and notes what each request carried. */
+async function scriptedStream(
+  page: import("@playwright/test").Page,
+  answers: Array<(route: import("@playwright/test").Route) => Promise<void>>,
+) {
+  const sent: Array<{ key: string | undefined; message: unknown }> = [];
+
+  // Added after mockBackend, so it is the one that answers.
+  await page.route("**/chat/stream", (route) => {
+    const request = route.request();
+
+    if (request.method() !== "POST") {
+      return route.fallback();
+    }
+
+    sent.push({
+      key: request.headers()["x-idempotency-key"],
+      message: request.postDataJSON().message,
+    });
+
+    const answer = answers[sent.length - 1];
+
+    return answer ? answer(route) : route.abort();
+  });
+
+  return sent;
+}
+
+const answerWith =
+  (...frames: Array<Record<string, unknown>>) =>
+  (route: import("@playwright/test").Route) =>
+    route.fulfill({
+      contentType: "text/event-stream",
+      body: frames
+        .map((frame) => `data: ${JSON.stringify(frame)}\n\n`)
+        .join(""),
+    });
+
+const finished = answerWith(
+  { type: "token", value: "Backend work." },
+  doneFrame({ reply: "Backend work." }),
+);
+
+const dropped = (route: import("@playwright/test").Route) => route.abort("connectionreset");
+
+test("each question goes out once, with a key of its own", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  const sent = await scriptedStream(page, [finished, finished]);
+
+  await openChat(page);
+  await ask(page, "First?");
+  await expect(page.getByText("Backend work.")).toBeVisible();
+  await ask(page, "Second?");
+
+  await expect.poll(() => sent.length).toBe(2);
+  expect(sent[0]?.key).toBeTruthy();
+  expect(sent[1]?.key).toBeTruthy();
+  expect(sent[1]?.key).not.toBe(sent[0]?.key);
+});
+
+test("two sends in one tick ask the question once", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  const sent = await scriptedStream(page, [finished, finished]);
+
+  await openChat(page);
+  await page.getByLabel("Your question").fill("Once?");
+
+  // In one task, so React has no chance to render between them: the guard that
+  // reads `loading` would let both through.
+  await page.getByLabel("Send question").evaluate((button: HTMLElement) => {
+    button.click();
+    button.click();
+  });
+
+  await expect(page.getByText("Backend work.")).toBeVisible();
+  expect(sent).toHaveLength(1);
+});
+
+test("a dropped connection offers a retry of the same question under the same key", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  const sent = await scriptedStream(page, [dropped, finished]);
+
+  await openChat(page);
+  await ask(page, "What does he do?");
+
+  const retry = page.getByRole("button", { name: RETRY });
+
+  await retry.click();
+
+  await expect(page.getByText("Backend work.")).toBeVisible();
+  await expect(retry).toHaveCount(0);
+  expect(sent).toHaveLength(2);
+  expect(sent[1]).toEqual(sent[0]);
+
+  // The failure was replaced, not left above the answer, and the question is
+  // on the page once.
+  await expect(page.getByText("Something went wrong")).toHaveCount(0);
+  await expect(page.getByText("What does he do?")).toHaveCount(1);
+});
+
+test("an error frame offers a retry too", async ({ page }) => {
+  await mockBackend(page);
+  const sent = await scriptedStream(page, [
+    answerWith({ type: "error", message: "It broke." }),
+    finished,
+  ]);
+
+  await openChat(page);
+  await ask(page, "What does he do?");
+  await page.getByRole("button", { name: RETRY }).click();
+
+  await expect(page.getByText("Backend work.")).toBeVisible();
+  expect(sent[1]?.key).toBe(sent[0]?.key);
+});
+
+test("a stream cut off with no result reopens the composer and offers a retry", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  await scriptedStream(page, [
+    answerWith({ type: "token", value: "Half an ans" }),
+  ]);
+
+  await openChat(page);
+  await ask(page, "What does he do?");
+
+  await expect(page.getByRole("button", { name: RETRY })).toBeVisible();
+  await expect(page.getByLabel("Your question")).toBeEnabled();
+});
+
+test("a new question after a failure drops the retry and gets its own key", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  const sent = await scriptedStream(page, [dropped, finished]);
+
+  await openChat(page);
+  await ask(page, "What does he do?");
+  await expect(page.getByRole("button", { name: RETRY })).toBeVisible();
+
+  await ask(page, "Something else?");
+
+  await expect(page.getByText("Backend work.")).toBeVisible();
+  await expect(page.getByRole("button", { name: RETRY })).toHaveCount(0);
+  expect(sent[1]?.key).not.toBe(sent[0]?.key);
+});
+
+test("the last question can be retried with the composer shut", async ({
+  page,
+}) => {
+  await mockBackend(page);
+
+  // One left on arrival, none once the re-read after the failure comes back.
+  let sessionCalls = 0;
+
+  await page.route("**/session", (route) => {
+    sessionCalls += 1;
+
+    const used = sessionCalls === 1 ? 0 : 1;
+
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        subject: "Ada Lovelace",
+        version: 2,
+        usage: { used, remaining: 1 - used, max: 1 },
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+        session_id: "session-1",
+      }),
+    });
+  });
+
+  const sent = await scriptedStream(page, [dropped, finished]);
+
+  await openChat(page);
+  await ask(page, "My last one?");
+
+  await expect(page.getByLabel("Your question")).toBeDisabled();
+
+  await page.getByRole("button", { name: RETRY }).click();
+
+  await expect(page.getByText("Backend work.")).toBeVisible();
+  expect(sent[1]).toEqual(sent[0]);
+});
+
+test("a question out of attempts says so and stops offering", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  await scriptedStream(page, [
+    dropped,
+    (route) =>
+      route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({
+          detail: "This question has been retried too many times",
+        }),
+      }),
+  ]);
+
+  await openChat(page);
+  await ask(page, "What does he do?");
+  await page.getByRole("button", { name: RETRY }).click();
+
+  await expect(page.getByText("as many times as I can")).toBeVisible();
+  await expect(page.getByRole("button", { name: RETRY })).toHaveCount(0);
+  await expect(page.getByLabel("Your question")).toBeEnabled();
+});
+
 /** How far the transcript is from showing its last line, in pixels. */
 async function transcriptGap(
   page: import("@playwright/test").Page,

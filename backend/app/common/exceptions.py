@@ -144,6 +144,25 @@ class ClaimAlreadyUsed(AppError):
     detail = "This link has already been used. Ask for a new one."
 
 
+class RetriesExhausted(AppError):
+    """One question, run as many times as it may be. The allowance is untouched."""
+
+    status_code = 409
+    detail = "This question has been retried too many times"
+
+
+class IdempotencyKeyReused(AppError):
+    """
+    A key already paid for one question, presented with another.
+
+    Refused because a retry is free: if the key were all it took, one spent
+    question would buy any number of different ones.
+    """
+
+    status_code = 422
+    detail = "This idempotency key belongs to a different question"
+
+
 # --- Quota -------------------------------------------------------------------
 
 class QuotaExhausted(AppError):

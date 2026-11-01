@@ -460,6 +460,12 @@ Properties worth knowing:
   or moving device needs a new link.
 * **Quota is per grant, not per token.** Claiming and refreshing cost nothing;
   only a question spends a query.
+* **A question is paid for once.** `POST /chat/stream` requires an
+  `X-Idempotency-Key`, a UUID the client makes for each question. Sending it again
+  retries without spending: the model runs again, up to three times in all, and
+  only for the same question, which the server checks against its own hash. Any
+  other message under that key is a 422, and a fourth attempt a 409. Without this
+  a dropped connection cost a question and gave nothing back.
 * **Nothing derived outlives its grant.** Access and refresh expiries are both
   clamped to `tokens.expires_at`.
 * **Rotation has a grace window.** A refresh token re-presented within

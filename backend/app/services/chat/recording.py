@@ -37,6 +37,7 @@ async def record_question(
     conversation_id: uuid.UUID | None,
     endpoint: str,
     request_id: str,
+    question_key: uuid.UUID | None = None,
 ) -> uuid.UUID | None:
     """
     Store the question before the model is called.
@@ -55,6 +56,7 @@ async def record_question(
             message=message,
             endpoint=endpoint,
             request_id=request_id,
+            question_key=question_key,
         )
     except Exception:
         logger.exception("Failed to record user message", extra={"request_id": request_id})

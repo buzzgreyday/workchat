@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.common.db import transaction
 from app.common.exceptions import InvalidToken
 from app.common.schemas import (
+    DatabaseQuestionKey,
     DatabaseChatMessage,
     DatabaseConversation,
     DatabaseToken,
@@ -48,6 +49,7 @@ class SQLTranscriptRepository(TranscriptRepository):
         message: str,
         endpoint: str,
         request_id: str,
+        question_key: uuid.UUID | None = None,
     ) -> uuid.UUID:
         content, truncated = _truncate(message, MAX_CONTENT_CHARS)
         async with transaction(self.factory) as db:
@@ -68,6 +70,15 @@ class SQLTranscriptRepository(TranscriptRepository):
                 )
             )
             await self._bump(resolved, db)
+            if question_key is not None:
+                await db.execute(
+                    update(DatabaseQuestionKey)
+                    .where(
+                        DatabaseQuestionKey.token_id == token_id,
+                        DatabaseQuestionKey.key == question_key,
+                    )
+                    .values(conversation_id=resolved)
+                )
         self.logger.info(
             "Recorded user message",
             extra={

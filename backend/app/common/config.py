@@ -54,6 +54,10 @@ ALGORITHM = "HS256"
 # Cap on tool-call round trips per user message. Each round is a paid API call, so an
 # unbounded loop on a model that keeps requesting tools would burn quota indefinitely.
 MAX_TOOL_ROUNDS = 5
+# How many times one question may run for the price of one: the first attempt and
+# two retries. A retry is free to the hirer and not to whoever pays for the model,
+# and a client that keeps hanging up could otherwise run the same question for ever.
+MAX_QUESTION_ATTEMPTS = 3
 # The longest question anyone may ask, in characters. A question about a CV is a
 # sentence or two; anything longer is more often an attempt to paste a prompt in
 # than a question, and every character is paid for again on every later turn,

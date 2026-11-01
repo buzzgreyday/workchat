@@ -14,6 +14,19 @@ text is scrubbed after `CHAT_RETENTION_DAYS`, 30 by default. The details are in
 [database.md](database.md#retention-and-erasure), including how to erase one
 person on request.
 
+## Retrying a question
+
+**What is stored:** in `question_keys`, a random key the browser chose for the
+question, an unkeyed SHA-256 of its text, how many times it has run, and the
+conversation it belongs to. No text. The hash exists so that a free retry can only
+ever be the same question.
+
+**How long:** a day, then `scripts/purge-question-keys.sh` deletes it. Redacting a
+conversation does not touch the row, so its hash can outlive the text by up to a
+day. A hash of a short question could be matched by someone guessing that exact
+question, but anyone able to read this table can also read `chat_messages`, which
+holds the text itself.
+
 ## Guest trials
 
 When trials are on (`TRIAL_ENABLED`), a visitor with no link can ask a few

@@ -1,3 +1,4 @@
+import uuid
 """
 Shared fixtures.
 
@@ -228,10 +229,15 @@ def done_frame(response) -> dict:
     return next(f for f in sse_frames(response) if f["type"] == "done")
 
 
-async def ask(client, token: str, **body):
-    """POST one question to the only chat endpoint."""
+async def ask(client, token: str, question_key: str | None = None, **body):
+    """POST one question to the only chat endpoint: a new one, unless a key is named."""
     return await client.post(
         "/chat/stream",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {token}", **key_header(question_key)},
         json={"message": "hi", **body},
     )
+
+
+def key_header(question_key: str | None = None) -> dict[str, str]:
+    """What names a question to the chat endpoint. A new one unless told otherwise."""
+    return {"X-Idempotency-Key": question_key or str(uuid.uuid4())}

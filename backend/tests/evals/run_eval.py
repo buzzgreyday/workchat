@@ -42,6 +42,7 @@ import os
 import re
 import sys
 import time
+import uuid
 from datetime import date
 from pathlib import Path
 
@@ -340,7 +341,9 @@ def main() -> int:
         for question in questions:
             started = time.monotonic()
             resp = client.post(
-                "/chat/stream", headers=auth, json={"message": question["question"]}
+                "/chat/stream",
+                headers={**auth, "X-Idempotency-Key": str(uuid.uuid4())},
+                json={"message": question["question"]},
             )
             resp.raise_for_status()
             body = done_frame(resp.text)

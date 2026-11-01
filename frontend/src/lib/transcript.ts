@@ -35,6 +35,8 @@ export type TranscriptAction =
   | { type: "assistant/token"; value: string }
   | { type: "assistant/completed" }
   | { type: "assistant/failed"; content: string }
+  /** A retry: the failed bubble goes back to waiting, rather than a second one. */
+  | { type: "assistant/reopened" }
   /** Everything sessionStorage had, replacing what is here. */
   | {
       type: "transcript/restored";
@@ -145,6 +147,13 @@ export function transcriptReducer(
         ...message,
         content: action.content,
         status: "error",
+      }));
+
+    case "assistant/reopened":
+      return mapLast(messages, (message) => ({
+        ...message,
+        content: "",
+        status: "streaming",
       }));
 
     // Wholesale, not merged: what is in storage is the whole transcript

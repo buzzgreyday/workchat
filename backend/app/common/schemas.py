@@ -190,6 +190,39 @@ class DatabaseChatMessage(Base):
     )
 
 
+class DatabaseQuestionKey(Base):
+    """
+    One question a client has paid for, named by the key the client chose for it.
+
+    What makes a retry free. The composite key is the race arbiter: two requests
+    with the same key cannot both insert, so a question is spent once however it
+    is raced.
+
+    `message_hash` is computed here, from the body, and never accepted from the
+    client: it is what ties a free retry to the question that was paid for. It
+    holds no text, and rows go after a day (scripts/purge-question-keys.sh).
+
+    `conversation_id` is where the first attempt recorded the question, so a retry
+    neither stores it twice nor opens a second conversation when the first turn
+    never reached the client.
+    """
+    __tablename__ = "question_keys"
+
+    token_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tokens.id", ondelete="RESTRICT"), primary_key=True
+    )
+    key: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    message_hash: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conversations.id", ondelete="RESTRICT"), nullable=True
+    )
+    # Purging reads by age.
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
 class DatabaseTrialRequest(Base):
     """
     One guest trial opened, on one day, from one address.

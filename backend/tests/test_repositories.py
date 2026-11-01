@@ -10,15 +10,23 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
 
-from app.common.schemas import DatabaseChatMessage, DatabaseRefreshToken
+from app.common.config import MAX_QUESTION_ATTEMPTS
+from app.common.schemas import (
+    DatabaseChatMessage,
+    DatabaseQuestionKey,
+    DatabaseRefreshToken,
+    DatabaseToken,
+)
 
 from app.common.exceptions import (
+    IdempotencyKeyReused,
     InvalidRefreshToken,
     InvalidToken,
     QuotaExhausted,
     RefreshTokenReplayed,
+    RetriesExhausted,
     RotationInProgress,
     TokenExpired,
     TokenRevoked,
@@ -27,6 +35,7 @@ from app.common.models import Grant, RefreshSession, User
 from app.repositories.base import (
     RefreshSessionRepository,
     ReplyOutcome,
+    SpentQuestion,
     TokenRepository,
     UserRepository,
 )
@@ -142,20 +151,25 @@ async def test_token_add_keeps_the_id_it_was_given(users, tokens):
 # --- spending a grant ----------------------------------------------------
 
 
-async def test_consume_query_spends_one(tokens, grant):
-    spent = await tokens.consume_query(grant.id)
+async def _spend(tokens, token_id, key=None, message_hash="a-question", **kwargs):
+    """Pay for one question. A new one, unless a key is named."""
+    return await tokens.spend_question(token_id, key or uuid.uuid4(), message_hash, **kwargs)
+
+
+async def test_spend_question_spends_one(tokens, grant):
+    spent = (await _spend(tokens, grant.id)).grant
 
     assert spent.used_queries == 1
     assert spent.max_queries == grant.max_queries
 
 
-async def test_consume_query_is_durable_on_return(tokens, grant, db_session):
+async def test_spend_question_is_durable_on_return(tokens, grant, db_session):
     """
     The contract that makes the spend safe. If this were merely flushed, a
     request failing afterwards would hand the question back — and a client that
     aborts its stream would ask for free.
     """
-    await tokens.consume_query(grant.id)
+    await _spend(tokens, grant.id)
     await db_session.rollback()
 
     still = await tokens.get(grant.id)
@@ -163,44 +177,128 @@ async def test_consume_query_is_durable_on_return(tokens, grant, db_session):
     assert still.used_queries == 1
 
 
-async def test_consume_query_raises_when_the_quota_is_gone(tokens, grant):
+async def test_spend_question_raises_when_the_quota_is_gone(tokens, grant):
     for _ in range(grant.max_queries):
-        await tokens.consume_query(grant.id)
+        await _spend(tokens, grant.id)
 
     with pytest.raises(QuotaExhausted):
-        await tokens.consume_query(grant.id)
+        await _spend(tokens, grant.id)
 
 
-async def test_consume_query_raises_on_a_revoked_grant(tokens, grant):
+async def test_spend_question_raises_on_a_revoked_grant(tokens, grant):
     await tokens.revoke(grant.id)
 
     with pytest.raises(TokenRevoked):
-        await tokens.consume_query(grant.id)
+        await _spend(tokens, grant.id)
 
 
-async def test_consume_query_raises_on_an_expired_grant(users, tokens):
+async def test_spend_question_raises_on_an_expired_grant(users, tokens):
     user = await users.add(name="Stale", email=None, phone=None)
     expired = await tokens.add(
         make_grant(user.id, expires_at=datetime.now(tz=timezone.utc) - timedelta(days=1))
     )
 
     with pytest.raises(TokenExpired):
-        await tokens.consume_query(expired.id)
+        await _spend(tokens, expired.id)
 
 
-async def test_consume_query_rejects_a_version_mismatch_without_spending(tokens, grant):
+async def test_spend_question_rejects_a_version_mismatch_without_spending(tokens, grant):
     """A v1-shaped token against a v2 grant must not cost one of its questions."""
     with pytest.raises(InvalidToken):
-        await tokens.consume_query(grant.id, expected_version=2)
+        await _spend(tokens, grant.id, expected_version=2)
 
     unspent = await tokens.get(grant.id)
     assert unspent is not None
     assert unspent.used_queries == 0
 
 
-async def test_consume_query_raises_for_an_unknown_grant(tokens):
+async def test_spend_question_raises_for_an_unknown_grant(tokens):
     with pytest.raises(InvalidToken):
-        await tokens.consume_query(uuid.uuid4())
+        await _spend(tokens, uuid.uuid4())
+
+
+async def test_a_key_seen_before_spends_nothing(tokens, grant):
+    key = uuid.uuid4()
+    await _spend(tokens, grant.id, key)
+
+    retried = await _spend(tokens, grant.id, key)
+
+    assert retried.grant.used_queries == 1
+
+
+async def test_a_retry_is_allowed_with_the_allowance_at_zero(tokens, grant):
+    """The question that failed may have been the last one."""
+    for _ in range(grant.max_queries - 1):
+        await _spend(tokens, grant.id)
+    last = uuid.uuid4()
+    await _spend(tokens, grant.id, last)
+
+    retried = await _spend(tokens, grant.id, last)
+
+    assert retried.grant.used_queries == grant.max_queries
+
+
+async def test_a_key_buys_only_the_question_it_paid_for(tokens, grant):
+    """Otherwise one spent question buys any number of free ones."""
+    key = uuid.uuid4()
+    await _spend(tokens, grant.id, key)
+
+    with pytest.raises(IdempotencyKeyReused):
+        await _spend(tokens, grant.id, key, message_hash="another-question")
+
+
+async def test_a_question_runs_a_limited_number_of_times(tokens, grant):
+    key = uuid.uuid4()
+    for _ in range(MAX_QUESTION_ATTEMPTS):
+        await _spend(tokens, grant.id, key)
+
+    with pytest.raises(RetriesExhausted):
+        await _spend(tokens, grant.id, key)
+
+
+async def test_a_retry_is_refused_on_a_revoked_grant(tokens, grant):
+    key = uuid.uuid4()
+    await _spend(tokens, grant.id, key)
+    await tokens.revoke(grant.id)
+
+    with pytest.raises(TokenRevoked):
+        await _spend(tokens, grant.id, key)
+
+
+async def test_a_retry_is_refused_on_an_expired_grant(tokens, grant, db_session):
+    key = uuid.uuid4()
+    await _spend(tokens, grant.id, key)
+    await db_session.execute(
+        update(DatabaseToken)
+        .where(DatabaseToken.id == grant.id)
+        .values(expires_at=datetime.now(tz=timezone.utc) - timedelta(days=1))
+    )
+    await db_session.commit()
+
+    with pytest.raises(TokenExpired):
+        await _spend(tokens, grant.id, key)
+
+
+async def test_a_key_belongs_to_its_own_grant(users, tokens, grant):
+    """The same key from another grant is that grant's own new question."""
+    user = await users.add(name="Other", email=None, phone=None)
+    other = await tokens.add(make_grant(user.id))
+    key = uuid.uuid4()
+    await _spend(tokens, grant.id, key)
+
+    spent = await _spend(tokens, other.id, key, message_hash="another-question")
+
+    assert spent.grant.used_queries == 1
+
+
+async def test_a_refused_spend_leaves_no_key(tokens, grant, db_session):
+    """A key kept here would let the refused question run later for nothing."""
+    await tokens.revoke(grant.id)
+    with pytest.raises(TokenRevoked):
+        await _spend(tokens, grant.id)
+
+    rows = (await db_session.execute(select(DatabaseQuestionKey))).scalars().all()
+    assert rows == []
 
 
 async def test_claim_once_wins_exactly_once(tokens, grant):
@@ -357,9 +455,13 @@ class FakeTokenRepository(TokenRepository):
     async def get(self, token_id: uuid.UUID) -> Grant | None:
         return self._find(token_id)
 
-    async def consume_query(
-        self, token_id: uuid.UUID, expected_version: int | None = None
-    ) -> Grant:
+    async def spend_question(
+        self,
+        token_id: uuid.UUID,
+        key: uuid.UUID,
+        message_hash: str,
+        expected_version: int | None = None,
+    ) -> SpentQuestion:
         grant = self._find(token_id)
         if grant is None:
             raise InvalidToken()
@@ -373,7 +475,7 @@ class FakeTokenRepository(TokenRepository):
             raise QuotaExhausted()
         spent = grant.model_copy(update={"used_queries": grant.used_queries + 1})
         self.rows[self.rows.index(grant)] = spent
-        return spent
+        return SpentQuestion(grant=spent)
 
     async def claim_once(self, token_id: uuid.UUID) -> bool:
         grant = self._find(token_id)

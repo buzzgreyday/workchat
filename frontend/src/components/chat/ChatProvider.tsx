@@ -54,6 +54,10 @@ interface ControlsValue {
   disabledReason: string | null;
   setInput: (value: string) => void;
   sendMessage: (question?: string) => void;
+  /** Whether the last question failed in a way asking again could fix. */
+  canRetry: boolean;
+  /** Ask it again, for no second question. */
+  retry: () => void;
   /** Whether a guest trial is on offer, and how the last attempt went. */
   trial: TrialState;
   /** Solve the proof-of-work and open a guest session. */
@@ -144,8 +148,10 @@ export function ChatProvider({
     disabled,
     disabledReason,
     usage,
+    canRetry,
     setInput,
     sendMessage,
+    retry,
   } = useChat({ ...session, owner: owner.name, seedQuestion });
 
   // Held in a ref and notified from an effect, not called where usage is set.
@@ -176,6 +182,8 @@ export function ChatProvider({
         disabledReason,
         setInput,
         sendMessage,
+        canRetry,
+        retry,
         trial: session.trial,
         startTrial: session.startTrial,
       }}

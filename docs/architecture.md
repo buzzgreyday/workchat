@@ -251,6 +251,23 @@ streams, or an aborted stream hands back free questions. The question commits
 before the model runs, or a crashed turn loses what was asked. The reply cannot
 commit before the stream ends, because that is when it exists.
 
+**A retry costs nothing, and the question is why that is safe.** Every question
+carries an `X-Idempotency-Key` the client chose for it, and the spend and the key
+commit together. Sending the key again skips the spend, which is what makes a
+dropped connection recoverable: the hirer has paid, and got nothing. Three things
+stop that being a way to ask for free. The server hashes the message itself and
+refuses the key with any other question, so a key buys one question and never a
+new one. A question runs at most `MAX_QUESTION_ATTEMPTS` times, so hanging up
+repeatedly only buys the same answer a limited number of times. And the header is
+required, because a request without one could not be retried.
+
+A retry runs the model again rather than replaying a stored reply. A client that
+hung up never saw a finished answer, so there is usually nothing to replay, and
+keeping replies for this would be more text to retain and scrub. It also skips
+storing the question when the first attempt already did, which is why the key
+remembers the conversation: a first turn that failed left the client no id to
+send back, and it would otherwise open a second one.
+
 **`refresh` reads `refresh_tokens` twice.** The caller loads the session to check
 its hash, and `rotate` loads it again to check it exists. That is
 `RefreshSessionRepository.rotate` declining to trust that its caller checked —
