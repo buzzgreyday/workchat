@@ -243,7 +243,6 @@
     border-radius: var(--radius-control);
     outline-style: none;
     background-color: var(--chat-send-bg);
-    background-image: var(--button-surface);
     background-clip: padding-box;
     color: var(--chat-send-icon);
     font-size: 0.875rem;
@@ -277,7 +276,6 @@
   }
 
   .chat-button:active {
-    background-image: none;
     box-shadow: var(--button-shadow-pressed);
   }
 

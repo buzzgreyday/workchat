@@ -120,21 +120,20 @@
     0 4px 14px rgb(0 0 0 / 0.08);
   /* A field set into the surface rather than raised from it. */
   --shadow-sunk: inset 0 1px 3px rgb(0 0 0 / 0.16);
-  /* Every button is the same three layers, kept faint on purpose. White and
-     black at low alpha, so they suit any colour; change one here and every
-     button follows.
+  /* Every button is the same three layers, kept faint on purpose, as if lit from
+     above. White and black at low alpha, so they suit any colour; change one here
+     and every button follows.
 
-       Bottom   a slightly darker foot, and a soft shadow under the button.
-       Middle   the button's own colour, set where the button is.
-       Top      a crescent of light: a 1px inset highlight, which the rounded
-                corners taper at each end. */
-  --button-foot: linear-gradient(rgb(0 0 0 / 0) 60%, rgb(0 0 0 / 0.05));
-  --button-crescent: inset 0 1px 0 rgb(255 255 255 / 0.12);
+       Top      a 1px line of light along the top edge, tapered by the corners.
+       Middle   the button's own flat colour, set where the button is.
+       Bottom   a 2px darker line along the bottom edge, and a small soft shadow
+                under the button. */
+  --button-light: inset 0 1px 0 rgb(255 255 255 / 0.18);
+  --button-dark: inset 0 -2px 0 rgb(0 0 0 / 0.1);
   --button-blur: 0 1px 1px rgb(0 0 0 / 0.2);
 
   /* The layers put together: what a button's rules actually name. */
-  --button-surface: var(--button-foot);
-  --button-shadow: var(--button-crescent), var(--button-blur);
+  --button-shadow: var(--button-light), var(--button-dark), var(--button-blur);
   /* Pressed, the light goes out and the shade moves inside. */
   --button-shadow-pressed: inset 0 1px 2px rgb(0 0 0 / 0.18);
   /* Hover only brightens, and barely. Nothing moves or grows. */
