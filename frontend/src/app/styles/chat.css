@@ -246,7 +246,9 @@
     background-clip: padding-box;
     color: var(--chat-send-icon);
     font-size: 0.875rem;
-    font-weight: 500;
+    /* 600, as a weight every host is likely to load: the website has no 500, and
+       a browser falls back to the lighter 400, too thin on the send colour. */
+    font-weight: 600;
     line-height: 1.25rem;
     white-space: nowrap;
     user-select: none;
