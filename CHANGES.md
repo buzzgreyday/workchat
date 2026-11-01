@@ -7,6 +7,39 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.12.0] - 2026-11-01
+
+### Added
+
+- **A question that never arrived can be retried for free.** A failed reply
+  offers "Try again", which reruns the question without spending another, even
+  at zero questions left. A dropped connection used to cost the question and
+  give nothing back. `POST /chat/stream` now requires an `X-Idempotency-Key`,
+  and the server hashes the message itself, so a key buys one question and never
+  a new one; it runs at most three times. Keys and hashes go after a day, by
+  `scripts/purge-question-keys.sh`, which needs a line in the host's crontab
+  (`docs/deployment.md`). A tab left open on the old bundle is refused until it
+  reloads: the chat has few enough visitors to accept that.
+
+### Changed
+
+- **No avatars.** The bubbles' sides say who is speaking, so the bubbles take up
+  to 90% of the width. `--chat-avatar-*` leave the embed's contract, and a host
+  still setting them is ignored.
+- Bubbles round at 14px on every corner, like the controls.
+- The text is easier to read: on chat.mringdal.com messages are 18px at weight
+  400, where 300 was too thin on the navy, and small labels are 14px.
+- Every button is the same three faint layers: a slightly darker foot, its
+  colour, and a crescent of light. Hover barely brightens and nothing moves.
+- The chat's styling is plain CSS, with no Tailwind behind it.
+- The endless animations hold still under reduced motion.
+
+### Fixed
+
+- Two sends in the same instant ask the question once.
+- A stream that ends with no result counts as a failure, rather than leaving the
+  composer shut until a reload.
+
 ## [0.11.2] - 2026-10-11
 
 ### Changed
