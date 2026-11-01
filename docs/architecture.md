@@ -66,7 +66,10 @@ each model call, and `{"type": "thought", "code": "knowledge_lookup"}` before ea
 tool. Codes rather than sentences, so the wording stays with the rest of the
 frontend's, and a fixed list, so what the model chose to search for never reaches
 the browser. Auth, the spend and the idempotency check finish before the stream
-opens, because they answer with real statuses; there is no frame for them.
+opens, because they answer with real statuses; there is no frame for them. The
+frontend shows "Sending…" until the first frame, holds each line long enough to
+read, and drops a code it does not know. Only the line is held: the first word
+replaces it at once.
 
 Everything a turn accumulates lives in generator locals, so a second call cannot
 inherit the first one's reply or tool counts. The previous class kept them on
