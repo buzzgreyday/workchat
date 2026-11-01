@@ -109,14 +109,14 @@
   --chat-column: 56rem;
   /* Shadows in layers, the way light falls: a tight one where a thing touches
      the surface, and a wide soft one around it. */
-  --shadow-small: 0 1px 2px rgb(0 0 0 / 0.16), 0 4px 12px rgb(0 0 0 / 0.1);
+  --shadow-small: 0 1px 2px rgb(0 0 0 / 0.16), 0 3px 8px rgb(0 0 0 / 0.1);
   /* A message: three faint layers, and quieter than a button, because there are
      many on screen and they hold reading text. A tight dark shadow at the contact,
      a soft glow inside the top edge, and a wide blur around it. */
   --shadow-bubble:
     inset 0 1px 2px rgb(255 255 255 / 0.04),
     0 1px 2px rgb(0 0 0 / 0.14),
-    0 6px 20px rgb(0 0 0 / 0.08);
+    0 4px 14px rgb(0 0 0 / 0.08);
   /* A field set into the surface rather than raised from it. */
   --shadow-sunk: inset 0 1px 3px rgb(0 0 0 / 0.16);
   /* Every button is the same three layers, kept faint on purpose. White and
@@ -129,7 +129,7 @@
                 corners taper at each end. */
   --button-foot: linear-gradient(rgb(0 0 0 / 0) 60%, rgb(0 0 0 / 0.05));
   --button-crescent: inset 0 1px 0 rgb(255 255 255 / 0.12);
-  --button-blur: 0 1px 2px rgb(0 0 0 / 0.2);
+  --button-blur: 0 1px 1px rgb(0 0 0 / 0.2);
 
   /* The layers put together: what a button's rules actually name. */
   --button-surface: var(--button-foot);
