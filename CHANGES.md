@@ -7,6 +7,14 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.13.2] - 2026-11-01
+
+### Fixed
+
+- The chat's buttons are semi-bold. They asked for weight 500, which the website
+  does not load, so a browser drew them at 400: too thin on the send colour, and
+  lighter than the site's own buttons.
+
 ## [0.13.1] - 2026-11-01
 
 ### Changed
