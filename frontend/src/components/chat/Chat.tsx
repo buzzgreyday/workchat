@@ -46,18 +46,6 @@ export default function Chat({
   // Nothing is threaded through here any more. The three children read what
   // they each need from the provider, so adding something to the composer no
   // longer means touching a component that only ever passed it along.
-  //
-  // `h-full` rather than repeating the viewport arithmetic: the shell is one
-  // viewport tall and owns the padding, so the card just fills what it is
-  // given. Two places subtracting the same 2rem is how the two drift apart.
-  //
-  // The 700px cap applies from a 40rem-wide *container*, not a 40rem window.
-  // It sits below a modern phone's viewport, so applying it everywhere left a
-  // band of dead background above and below the card on exactly the screens
-  // with least to spare. And measured on the window it was wrong once
-  // embedded: a chat in a narrow dialog on a wide screen was capped as though
-  // it had the whole desktop. Responsive rules inside the chat use container
-  // variants (`@min-[…]:`), never viewport ones (`sm:`), for the same reason.
   return (
     <ChatProvider
       token={token}
@@ -67,12 +55,10 @@ export default function Chat({
       onUsageChange={onUsageChange}
       ownsViewport={ownsViewport}
     >
-      <div className="@container flex h-full w-full items-center justify-center">
+      <div className="chat-root">
         <div
           className={
-            frame === "card"
-              ? "bg-panel flex h-full w-full max-w-chat flex-col overflow-hidden rounded-card border shadow-2xl @min-[40rem]:max-h-[var(--card-max-height)]"
-              : "flex h-full w-full max-w-chat flex-col"
+            frame === "card" ? "chat-frame chat-frame-card" : "chat-frame"
           }
         >
           {showHeader && <ChatHeader />}

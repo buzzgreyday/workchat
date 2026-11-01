@@ -23,12 +23,7 @@ export default function MessageList() {
       // instead, which is the part a screen reader actually needs.
       role="log"
       aria-label="Conversation"
-      // `min-h-0` because a flex item's automatic minimum size is its content:
-      // without it this box refuses to shrink below the whole transcript and
-      // the card's `overflow-hidden` is the only thing hiding the difference.
-      // `overscroll-contain` keeps a flick at either end of the transcript from
-      // chaining out into the document behind it.
-      className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-gutter-lg space-y-4"
+      className="chat-log"
     >
       {messages.map((message) => (
         <MessageBubble
@@ -39,7 +34,7 @@ export default function MessageList() {
         )
       }
 
-      <p role="status" className="sr-only">
+      <p role="status" className="visually-hidden">
         {awaitingReply
           ? "Generating a reply"
           : "Reply ready"}

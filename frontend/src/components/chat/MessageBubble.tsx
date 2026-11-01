@@ -17,37 +17,29 @@ export default function MessageBubble({
 
   return (
     <div
-      className={`flex items-end gap-2 ${
-        isUser ? "justify-end" : "justify-start"
-      }`}
+      className={`message ${isUser ? "message-user" : "message-bot"}`}
     >
       {!isUser && (
         <div
-          className={`size-[var(--chat-avatar-size)] shrink-0 rounded-full ${
-            isStreaming ? "chat-avatar-glow" : ""
-          }`}
+          className={`message-avatar ${isStreaming ? "chat-avatar-glow" : ""}`}
         >
-          <div className="bg-avatar text-avatar-ink flex size-full items-center justify-center rounded-full">
+          <div className="message-avatar-face">
             <Bot size={16} className="chat-avatar-icon" />
           </div>
         </div>
       )}
 
       <div
-        className={`chat-message min-w-0 max-w-[var(--bubble-max-width)] wrap-anywhere rounded-bubble px-4 py-3 shadow-sm ${
-          isUser
-            ? "bg-bubble-user text-bubble-user-ink rounded-br-sm"
-            : "bg-bubble-bot border-bubble-bot-line text-bubble-bot-ink rounded-bl-sm border"
-        }`}
+        className="message-bubble chat-message"
       >
         {isTyping ? (
           <div
-            className="flex items-center gap-1 py-1"
+            className="typing-dots"
             aria-label="Generating a reply"
           >
-            <span className="chat-typing-dot bg-typing h-1.5 w-1.5 rounded-full" />
-            <span className="chat-typing-dot bg-typing h-1.5 w-1.5 rounded-full" />
-            <span className="chat-typing-dot bg-typing h-1.5 w-1.5 rounded-full" />
+            <span className="chat-typing-dot" />
+            <span className="chat-typing-dot" />
+            <span className="chat-typing-dot" />
           </div>
         ) : (
           <ReactMarkdown

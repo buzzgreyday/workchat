@@ -19,7 +19,7 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 * OpenAI integration
 * Dockerized development environment
 * TypeScript frontend
-* Tailwind CSS UI
+* Plain CSS, no framework
 * TanStack Query for API communication
 
 ---
@@ -43,9 +43,8 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 * Next.js 16
 * React 19
 * TypeScript
-* Tailwind CSS 4
+* Plain CSS
 * TanStack Query
-* shadcn/ui
 * React Markdown
 * JWT Decode
 
@@ -89,13 +88,11 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 │   ├── purge-expired-sessions.sh
 │   └── setup-deploy-secrets.sh   # CI deploy key + GitHub secrets; also key rotation
 ├── frontend
-│   ├── components.json
 │   ├── Dockerfile
 │   ├── eslint.config.mjs
 │   ├── next.config.ts
 │   ├── package.json
 │   ├── package-lock.json
-│   ├── postcss.config.mjs
 │   ├── public
 │   ├── README.md
 │   ├── src
