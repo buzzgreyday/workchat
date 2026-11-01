@@ -48,11 +48,6 @@
   /* Links in a reply. */
   --chat-link: var(--chat-accent);
 
-  --chat-avatar-bg: var(--chat-accent);
-  --chat-avatar-icon: var(--chat-on-accent);
-  /* The circle beside each reply. Shrink it and set the icon to `none` for
-     a plain dot. */
-  --chat-avatar-size: 2rem;
   /* The dots while a reply is being written. */
   --chat-typing: var(--chat-text-muted);
 
@@ -76,7 +71,8 @@
      once the chat itself is 40rem wide — measured on the chat's container,
      not the window, see Chat.tsx. */
   --card-max-height: 43.75rem;
-  --bubble-max-width: 80%;
+  /* Short of the full width, so which side a message is on still shows. */
+  --bubble-max-width: 90%;
   /* The floor under the safe-area insets in the `.shell-*` rules. */
   --edge: 1rem;
 
@@ -96,9 +92,9 @@
   --motion-all: all var(--motion-fast) var(--motion-ease);
 
   /* ---- Shape and space -------------------------------------------------- */
-  --radius-sm: calc(var(--radius) * 0.6);
   --radius-control: calc(var(--radius) * 1.4);
-  --radius-bubble: calc(var(--radius) * 1.8);
+  /* The same as the controls, so a bubble and a button share one corner. */
+  --radius-bubble: var(--radius-control);
   --radius-card: calc(var(--radius) * 2.2);
   --gutter-sm: 1rem;
   --gutter: 1.25rem;
@@ -111,7 +107,37 @@
   );
   --composer-max: 8rem;
   --chat-column: 56rem;
-  --shadow-small: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  /* Shadows in layers, the way light falls: a tight one where a thing touches
+     the surface, and a wide soft one around it. */
+  --shadow-small: 0 1px 2px rgb(0 0 0 / 0.16), 0 3px 8px rgb(0 0 0 / 0.1);
+  /* A message: three faint layers, and quieter than a button, because there are
+     many on screen and they hold reading text. A tight dark shadow at the contact,
+     a soft glow inside the top edge, and a wide blur around it. */
+  --shadow-bubble:
+    inset 0 1px 2px rgb(255 255 255 / 0.04),
+    0 1px 2px rgb(0 0 0 / 0.14),
+    0 4px 14px rgb(0 0 0 / 0.08);
+  /* A field set into the surface rather than raised from it. */
+  --shadow-sunk: inset 0 1px 3px rgb(0 0 0 / 0.16);
+  /* Every button is the same three layers, kept faint on purpose. White and
+     black at low alpha, so they suit any colour; change one here and every
+     button follows.
+
+       Bottom   a slightly darker foot, and a soft shadow under the button.
+       Middle   the button's own colour, set where the button is.
+       Top      a crescent of light: a 1px inset highlight, which the rounded
+                corners taper at each end. */
+  --button-foot: linear-gradient(rgb(0 0 0 / 0) 60%, rgb(0 0 0 / 0.05));
+  --button-crescent: inset 0 1px 0 rgb(255 255 255 / 0.12);
+  --button-blur: 0 1px 1px rgb(0 0 0 / 0.2);
+
+  /* The layers put together: what a button's rules actually name. */
+  --button-surface: var(--button-foot);
+  --button-shadow: var(--button-crescent), var(--button-blur);
+  /* Pressed, the light goes out and the shade moves inside. */
+  --button-shadow-pressed: inset 0 1px 2px rgb(0 0 0 / 0.18);
+  /* Hover only brightens, and barely. Nothing moves or grows. */
+  --button-hover: brightness(1.03);
   --shadow-card: 0 25px 50px -12px rgb(0 0 0 / 0.25);
 }
 
@@ -299,40 +325,6 @@ html {
   font-family: var(--chat-font-ui);
 }
 
-/* The robot in the reply avatar. `--chat-avatar-icon-display: none` leaves
-   the circle alone — a dot. Unset, the declaration is invalid and `display`
-   falls back to its initial value, which shows the icon. */
-.chat-avatar-icon {
-  display: var(--chat-avatar-icon-display);
-}
-
-/* Subtle rotating accent sheen, shown around the bot avatar while it's replying */
-@keyframes chat-ring-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.chat-avatar-glow {
-  position: relative;
-}
-
-.chat-avatar-glow::before {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: 9999px;
-  background: conic-gradient(
-    from 0deg,
-    var(--chat-avatar-bg),
-    transparent 35%,
-    transparent 65%,
-    var(--chat-avatar-bg)
-  );
-  animation: chat-ring-spin var(--motion-spin) linear infinite;
-  z-index: -1;
-}
-
 /* Typing indicator dots */
 @keyframes chat-typing-bounce {
   0%,
@@ -359,10 +351,9 @@ html {
   animation-delay: calc(var(--motion-stagger) * 2);
 }
 
-/* With reduced motion asked for, both hold still. The dots stay, so a reply
+/* With reduced motion asked for, they hold still. The dots stay, so a reply
    being written still shows. */
 @media (prefers-reduced-motion: reduce) {
-  .chat-avatar-glow::before,
   .chat-typing-dot {
     animation: none;
   }

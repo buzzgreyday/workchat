@@ -20,7 +20,7 @@ the page readable at a glance.
 | **Text** — cream | `#eae0cf` | All body text. |
 | **Muted text** | `#86898f` | Placeholders, footer links, secondary labels. |
 | **Accent** — blue-grey | `#94b4c1` | Links in text. Tints the visitor's own messages (`#4e6778`, 45% accent into navy). |
-| **Identity** — pale gold | `#e0cea1` | The WORKCHAT title, the avatar dot, status text such as "questions left". Who this is and where you are. |
+| **Identity** — pale gold | `#e0cea1` | The WORKCHAT title, status text such as "questions left". Who this is and where you are. |
 | **Action** — coral | `#e0876a` | The one thing to press: the send button. Nothing else. |
 | Icon on action | `#1b2e42` | The navy, on coral. |
 | Borders | `#ffffff` at 10% | Hairlines between parts and around raised surfaces. |
@@ -30,7 +30,7 @@ Rules that keep it coherent:
 
 - **Coral means "press this".** One coral thing per view. Using it for
   decoration or headings takes the meaning away from the button.
-- **Pale gold means "this is Michael's".** Titles, the avatar, status. It is
+- **Pale gold means "this is Michael's".** Titles, status. It is
   never a button.
 - **Text is cream, not white.** Pure white is harsher than the rest of the
   palette.
@@ -63,8 +63,8 @@ for small print, not for anything someone has to read to use the page.
 | Role | Face | Weight | Size |
 | --- | --- | --- | --- |
 | Title | **Bebas Neue** | 400 (its only weight; capitals only) | 2.5rem, down to 1.5rem on a phone |
-| Body, messages | **Nunito** | 300 (light) | 1rem, line height 1.5 |
-| Small labels | Nunito | 300 | 0.875rem (links), 0.75rem (pills) |
+| Messages | **Nunito** | 400 | 1.125rem, line height 1.5. 300 was too thin to read on the navy. |
+| Small labels | Nunito | 400 | 0.875rem (links, pills) |
 
 - Bebas has one weight. Asking for more makes the browser fake a bold; use
   size for emphasis instead.
@@ -93,12 +93,14 @@ public repository.
 | --- | --- |
 | Base radius | 10px |
 | Buttons, inputs | 14px |
-| Message bubbles | 18px, with the corner nearest the speaker at 6px |
+| Message bubbles | 14px on every corner, like the controls |
 | Pills | fully round |
 | Gutters | 16px (phone, tight), 20px, 24px (roomy) |
-| Controls | 50px tall — a one-line input and its button match. Never under 44px: a tap target. |
+| Controls | 50px tall or a little over, with the text — a one-line input and its button match. Never under 44px: a tap target. |
 | Reading width | 56rem (896px) at most |
-| Shadows | Small only: `0 1px 3px rgb(0 0 0 / 0.1)` on bubbles, pills and the button |
+| Buttons | Three faint layers, every one. **Bottom:** a slightly darker foot and a small soft shadow. **Middle:** its colour. **Top:** a crescent of light, a 1px inset highlight the corners taper. White and black at low alpha, so they suit any colour. Hover barely brightens and nothing moves; pressed, the shade moves inside. |
+| Shadows | A tight one at the contact and a wide soft one around it, on pills. Bubbles add a faint inner glow along the top, and stay quieter than buttons. Inputs are sunk, with an inset. |
+| Avatars | None. The bubbles' sides say who is speaking. |
 | Motion | Named `--motion-*` durations, each project its own. Anything that moves holds still under `prefers-reduced-motion: reduce` |
 
 Layout on chat.mringdal.com: a full-width top bar, the content edge to edge
@@ -122,8 +124,7 @@ Three things it does differently from chat.mringdal.com, on purpose:
 
 - **Body text is Nunito at 600**, not 300, and bold needs 800 to read as bold.
 - **Its titles ask Bebas for 800**, a weight the browser fakes.
-- **The site's boxes round at 14px**: the story box and the chat window, with
-  the buttons. The chat's own bubbles stay 18px.
+- **Its body text is 1.125rem**, and the chat's messages are told the same.
 
 The faces are loaded in the page, so their variables inherit into the chat's
 shadow root and its `@font-face` rules are the document's, where the shadow root

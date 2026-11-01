@@ -90,8 +90,6 @@ one of these moves that part alone:
 | `--chat-user-bubble-bg`, `--chat-user-bubble-text` | The visitor's questions | `--chat-accent`, `--chat-on-accent` |
 | `--chat-bot-bubble-bg`, `--chat-bot-bubble-text`, `--chat-bot-bubble-border` | The replies | `--chat-panel-alt`, `--chat-text`, `--chat-border` |
 | `--chat-link` | Links in a reply | `--chat-accent` |
-| `--chat-avatar-bg`, `--chat-avatar-icon` | The bot's avatar | `--chat-accent`, `--chat-on-accent` |
-| `--chat-avatar-size`, `--chat-avatar-icon-display` | The avatar's size, and `none` to drop its icon for a plain dot | `2rem`, shown |
 | `--chat-typing` | The dots while a reply is written | `--chat-text-muted` |
 | `--chat-input-bg`, `--chat-input-text`, `--chat-input-placeholder`, `--chat-input-border` | The input | `--chat-panel-alt`, `--chat-text`, `--chat-text-muted`, `--chat-border` |
 | `--chat-input-focus` | The input's border and glow on focus | `--chat-accent` |
