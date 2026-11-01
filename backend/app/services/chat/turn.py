@@ -27,9 +27,11 @@ from app.common.config import MAX_TOOL_ROUNDS, get_settings
 from app.common.logging.logging import logger
 from app.common.models import Usage
 from app.services.chat.events import (
+    ModelCalled,
     RoundFinished,
     TokenProduced,
     ToolInvoked,
+    ToolStarted,
     TurnEvent,
     TurnFinished,
 )
@@ -58,6 +60,7 @@ async def run_turn(
         content = ""
         pending: dict[int, dict[str, Any]] = {}
 
+        yield ModelCalled()
         response = await client.chat.completions.create(
             model=get_settings().openai_model,
             messages=messages,
@@ -93,6 +96,7 @@ async def run_turn(
         # into a thinner answer built from what was already fetched.
         logger.warning("Tool-call rounds exhausted without a final reply", extra={"max_rounds": max_rounds})
         content = ""
+        yield ModelCalled()
         response = await client.chat.completions.create(
             model=get_settings().openai_model,
             messages=messages,
@@ -176,6 +180,7 @@ async def _run_tools(
             logger.warning("Dropping an incomplete tool call", extra={"name": call.function.name})
             continue
         logger.info("Running a tool for the model", extra={"tool": call.function.name})
+        yield ToolStarted(name=call.function.name)
         result = await tooling.run(call.function.name, call.function.arguments)
         tool_message: ChatCompletionToolMessageParam = {
             "role": "tool",

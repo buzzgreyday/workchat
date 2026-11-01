@@ -38,6 +38,16 @@ def _stream_chunks(tokens=("hi ", "from ", "mock")):
     return _chunks()
 
 
+async def _first_token(events):
+    """Read past the progress a turn opens with, up to the first of the reply."""
+    from app.services.chat import TokenProduced
+
+    async for event in events:
+        if isinstance(event, TokenProduced):
+            return event
+    raise AssertionError("the turn produced no reply")
+
+
 async def test_chat_persists_user_and_assistant_rows(client, issued_token, db_session):
     resp = await ask(client, issued_token, message="what frameworks does he use?")
     assert resp.status_code == 200
@@ -102,9 +112,9 @@ async def test_chat_stream_persists_on_client_abort(
         endpoint="/chat/stream",
     )
 
-    first = await events.__anext__()   # receive one token
-    assert first.text == "partial ", "the first event must be content, not a preamble"
-    await events.aclose()              # ...then the client goes away
+    first = await _first_token(events)  # receive one token
+    assert first.text == "partial "
+    await events.aclose()               # ...then the client goes away
 
     user_rows = await _messages(db_session, role="user")
     assert len(user_rows) == 1, "the question must survive regardless"
@@ -287,7 +297,7 @@ async def test_a_hang_up_mid_reply_can_be_retried_for_nothing(
         transcripts=SQLTranscriptRepository(session_maker),
         question_key=key,
     )
-    await events.__anext__()
+    await _first_token(events)
     await events.aclose()
 
     conversation = (await _conversations(db_session))[0]
@@ -295,3 +305,38 @@ async def test_a_hang_up_mid_reply_can_be_retried_for_nothing(
 
     assert retried.grant.used_queries == 1
     assert retried.conversation_id == conversation.id
+
+
+async def test_a_hang_up_as_the_stream_opens_leaves_the_question_to_the_retry(
+    client, issued_token, db_session, session_maker, openai_mock
+):
+    """
+    The opening frame goes out before the question is stored, so a client gone
+    by then stores nothing and calls no model. The key has no conversation, so
+    the retry stores the question itself.
+    """
+    from app.common.models import ChatRequest, TokenContext
+    from app.services.chat import TurnStarted, answer
+    from app.services.chat.tooling import get_tooling
+
+    token_row = (await db_session.execute(select(DatabaseToken))).scalars().first()
+    token = TokenContext(
+        sub=token_row.subject, jti=str(token_row.id),
+        max_queries=token_row.max_queries, used_queries=1,
+        remaining_queries=token_row.max_queries - 1,
+        expires_at=token_row.expires_at,
+    )
+    calls = openai_mock.chat.completions.create.await_count
+
+    events = answer(
+        request=ChatRequest(message="gone already"),
+        token=token,
+        client=openai_mock,
+        tooling=get_tooling(),
+        transcripts=SQLTranscriptRepository(session_maker),
+    )
+    assert isinstance(await events.__anext__(), TurnStarted)
+    await events.aclose()
+
+    assert await _messages(db_session) == []
+    assert openai_mock.chat.completions.create.await_count == calls

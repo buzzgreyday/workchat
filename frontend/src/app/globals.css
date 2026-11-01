@@ -82,6 +82,7 @@
   --motion-fast: 150ms;
   --motion-spin: 2.4s;
   --motion-bounce: 1.2s;
+  --motion-pulse: 2s;
   --motion-stagger: 0.15s;
   --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --motion-colors:
@@ -339,6 +340,17 @@ html {
   }
 }
 
+/* A slow breath, so a long wait does not look like a frozen page. */
+@keyframes chat-progress-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
 .chat-typing-dot {
   animation: chat-typing-bounce var(--motion-bounce) ease-in-out infinite;
 }
@@ -351,10 +363,11 @@ html {
   animation-delay: calc(var(--motion-stagger) * 2);
 }
 
-/* With reduced motion asked for, they hold still. The dots stay, so a reply
+/* With reduced motion asked for, they hold still. The words and dots stay, so a reply
    being written still shows. */
 @media (prefers-reduced-motion: reduce) {
-  .chat-typing-dot {
+  .chat-typing-dot,
+  .chat-progress {
     animation: none;
   }
 }

@@ -21,7 +21,16 @@ from app.repositories import (
 from app.repositories.base import RefreshSessionRepository, TokenRepository, TranscriptRepository
 from app.services import chat as chat_service
 from app.services.auth import Auth, bearer_scheme, get_auth
-from app.services.chat import ChatTooling, TokenProduced, TurnEvent, TurnFailed, TurnFinished
+from app.services.chat import (
+    ChatTooling,
+    ModelCalled,
+    TokenProduced,
+    ToolStarted,
+    TurnEvent,
+    TurnFailed,
+    TurnFinished,
+    TurnStarted,
+)
 from app.services.chat.tooling import get_tooling
 
 router = APIRouter(tags=["Chat"])
@@ -34,7 +43,17 @@ def wire(event: TurnEvent) -> dict[str, Any] | None:
     The mapping lives at the HTTP boundary because that is what it is about.
     `ToolInvoked` and `RoundFinished` are how the recorder learns what a turn
     did; a client has no use for either, so they stop here.
+
+    Progress goes out as a code and never a sentence: the words are the
+    frontend's (`lib/copy.ts`). The code says what kind of work is happening and
+    no more, so a tool's name and arguments, which the model chose, stop here too.
     """
+    if isinstance(event, TurnStarted):
+        return {"type": "state", "code": "preprocessing"}
+    if isinstance(event, ModelCalled):
+        return {"type": "state", "code": "composing"}
+    if isinstance(event, ToolStarted):
+        return {"type": "thought", "code": "knowledge_lookup"}
     if isinstance(event, TokenProduced):
         return {"type": "token", "value": event.text}
     if isinstance(event, TurnFinished):

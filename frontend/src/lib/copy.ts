@@ -42,6 +42,19 @@ export const RETRIES_SPENT_MESSAGE =
   "I've tried that one as many times as I can, and it's still not working. " +
   "Give it a little while before asking again.";
 
+/**
+ * What a reply is waiting on, in place of the typing dots. The keys are the
+ * codes the server sends (`types/sse.ts`), and "sending", which is this page's
+ * own: auth and the spend finish before the stream opens, so nothing can say
+ * anything until they have.
+ */
+export const PROGRESS = {
+  sending: "Sending…",
+  preprocessing: "Reading your question…",
+  composing: "Thinking…",
+  knowledge_lookup: "Searching the CV…",
+} as const;
+
 export const NO_LINK_MESSAGE =
   "You'll need the chat link you were sent to start a session. " +
   "If you had one open, it may just have timed out — ask for a new link.";

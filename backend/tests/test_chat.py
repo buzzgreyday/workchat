@@ -2,7 +2,7 @@ import os
 import uuid
 
 from app.common.config import MAX_QUESTION_ATTEMPTS, get_settings
-from tests.conftest import ask, done_frame, key_header
+from tests.conftest import ask, done_frame, key_header, sse_frames, stream_of
 
 async def test_chat_requires_auth(client):
     resp = await client.post("/chat/stream", headers=key_header(), json={"message": "hi"})
@@ -255,3 +255,62 @@ async def test_the_key_is_allowed_across_origins(client):
     assert resp.status_code == 200
     assert "x-idempotency-key" in resp.headers["access-control-allow-headers"].lower()
     assert resp.headers["access-control-allow-origin"] == origin
+
+
+# --- progress, before the first word -------------------------------------
+
+
+def _progress(resp):
+    return [f for f in sse_frames(resp) if f["type"] in ("state", "thought")]
+
+
+async def test_a_plain_reply_says_it_is_reading_then_composing(client, issued_token):
+    resp = await ask(client, issued_token)
+
+    frames = sse_frames(resp)
+    assert frames[:2] == [
+        {"type": "state", "code": "preprocessing"},
+        {"type": "state", "code": "composing"},
+    ]
+    assert frames[-1]["type"] == "done"
+
+
+async def test_a_search_is_announced_without_saying_what_for(client, issued_token, openai_mock):
+    from unittest.mock import AsyncMock, MagicMock
+
+    def _wants_search():
+        async def _chunks():
+            call = MagicMock(index=0, id="call_1", type="function")
+            call.function = MagicMock(arguments='{"query": "a-secret-search-term"}')
+            call.function.name = "search_cv"
+            yield MagicMock(choices=[MagicMock(delta=MagicMock(content=None, tool_calls=[call]), finish_reason=None)])
+            yield MagicMock(
+                choices=[MagicMock(delta=MagicMock(content=None, tool_calls=None), finish_reason="tool_calls")]
+            )
+
+        return _chunks()
+
+    openai_mock.chat.completions.create = AsyncMock(side_effect=[_wants_search(), stream_of("found it")])
+
+    resp = await ask(client, issued_token)
+
+    assert _progress(resp) == [
+        {"type": "state", "code": "preprocessing"},
+        {"type": "state", "code": "composing"},
+        {"type": "thought", "code": "knowledge_lookup"},
+        {"type": "state", "code": "composing"},
+    ]
+    progress_text = str(_progress(resp))
+    assert "search_cv" not in progress_text
+    assert "a-secret-search-term" not in progress_text
+
+
+async def test_a_refusal_is_a_status_and_no_progress_is_streamed(client):
+    resp = await client.post(
+        "/chat/stream",
+        headers={"Authorization": "Bearer not-a-real-jwt", **key_header()},
+        json={"message": "hi"},
+    )
+
+    assert resp.status_code == 401
+    assert "preprocessing" not in resp.text

@@ -148,6 +148,11 @@
     padding-block: 0.25rem;
   }
 
+  /* The bubble's own text colour, not the muted one: this is to be read. */
+  .chat-progress {
+    animation: chat-progress-pulse var(--motion-pulse) ease-in-out infinite;
+  }
+
   .chat-typing-dot {
     width: 0.375rem;
     height: 0.375rem;

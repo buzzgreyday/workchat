@@ -1,7 +1,23 @@
 import type { ChatHistoryMessage, Usage } from "./chat";
 
+/**
+ * What the server may say a turn is doing. A list as well as a type, because
+ * this is checked at the trust boundary: a code not listed here is dropped, so
+ * the backend can add one before this frontend has words for it.
+ */
+export const PROGRESS_CODES = [
+  "preprocessing",
+  "composing",
+  "knowledge_lookup",
+] as const;
+
+export type ProgressCode = (typeof PROGRESS_CODES)[number];
 
 export type SSEEvent =
+  | {
+      type: "state" | "thought";
+      code: ProgressCode;
+    }
   | {
       type: "token";
       value: string;
