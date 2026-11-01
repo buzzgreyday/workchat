@@ -98,7 +98,7 @@ public repository.
 | Gutters | 16px (phone, tight), 20px, 24px (roomy) |
 | Controls | 50px tall or a little over, with the text — a one-line input and its button match. Never under 44px: a tap target. |
 | Reading width | 56rem (896px) at most |
-| Buttons | Three faint layers, every one. **Bottom:** a slightly darker foot and a small soft shadow. **Middle:** its colour. **Top:** a crescent of light, a 1px inset highlight the corners taper. White and black at low alpha, so they suit any colour. Hover barely brightens and nothing moves; pressed, the shade moves inside. |
+| Buttons | Three faint layers, lit from above, every one. **Top:** a 1px line of light. **Middle:** its flat colour. **Bottom:** a 2px darker line and a small soft shadow. All inset except the shadow, in white and black at low alpha, so they suit any colour. Hover barely brightens and nothing moves; pressed, the shade moves inside. |
 | Shadows | A tight one at the contact and a wide soft one around it, on pills. Bubbles add a faint inner glow along the top, and stay quieter than buttons. Inputs are sunk, with an inset. |
 | Avatars | None. The bubbles' sides say who is speaking. |
 | Motion | Named `--motion-*` durations, each project its own. Anything that moves holds still under `prefers-reduced-motion: reduce` |

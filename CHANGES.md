@@ -7,6 +7,14 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.13.1] - 2026-11-01
+
+### Changed
+
+- Buttons are flat colour, lit by a 1px line along the top and shaded by a 2px
+  line along the bottom, in place of the gradient foot. The edges stay the same
+  thickness on a button of any size, so a large one no longer looks heavier.
+
 ## [0.13.0] - 2026-11-01
 
 ### Changed
