@@ -98,7 +98,7 @@ public repository.
 | Gutters | 16px (phone, tight), 20px, 24px (roomy) |
 | Controls | 50px tall or a little over, with the text — a one-line input and its button match. Never under 44px: a tap target. |
 | Reading width | 56rem (896px) at most |
-| Buttons | Three faint layers, lit from above, every one. **Top:** a 1px line of light. **Middle:** its flat colour. **Bottom:** a 2px darker line and a small soft shadow. All inset except the shadow, in white and black at low alpha, so they suit any colour. Hover barely brightens and nothing moves; pressed, the shade moves inside. |
+| Buttons | One kind, `.button`, in each project. Its colour down to a slightly darker foot, under four shadows, as if lit from above: a 1px inset of light along the top, a 2px inset of dark along the bottom, a tight shadow where it meets the page, and a soft glow beneath in its own colour. The gradient, the dark edge and both shadows are darker versions of the colour, lightness only, so they suit any host and the darkest edge is never grey. Hover barely brightens and does not move; pressed, it goes flat, moves down 1px and takes a dark inset shadow in its own colour. Disabled is flat, with no shadow. |
 | Shadows | A tight one at the contact and a wide soft one around it, on pills. Bubbles add a faint inner glow along the top, and stay quieter than buttons. Inputs are sunk, with an inset. |
 | Avatars | None. The bubbles' sides say who is speaking. |
 | Motion | Named `--motion-*` durations, each project its own. Anything that moves holds still under `prefers-reduced-motion: reduce` |
@@ -117,7 +117,7 @@ reference, rather than a copy here that could drift from them:
 | `app/layout.tsx` | The two faces, through `next/font/google` |
 | `app/styles/tokens.css` | The colours, faces, radii and motion, on `:root` |
 | `app/styles/base.css` | `html` and `body`: the navy, the cream and the body type |
-| `app/styles/buttons.css` | `.action`, the one thing to press on a view |
+| `app/styles/buttons.css` | `.button`, the one kind of button |
 | `app/styles/chat.css` | The `--chat-*` variables, on the `workchat-chat` element |
 
 Three things it does differently from chat.mringdal.com, on purpose:

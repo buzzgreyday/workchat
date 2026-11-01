@@ -51,7 +51,7 @@ export default function ChatInput() {
           onClick={() => startTrial()}
           disabled={starting}
           aria-describedby={noticeId}
-          className="chat-button chat-button-wide"
+          className="button button-wide"
         >
           {starting ? "Starting…" : TRY_IT}
         </button>
@@ -138,7 +138,7 @@ export default function ChatInput() {
         onClick={() => sendMessage()}
         disabled={shut}
         aria-label="Send question"
-        className="chat-button chat-button-send"
+        className="button button-send"
       >
         <Send size={18} />
       </button>
