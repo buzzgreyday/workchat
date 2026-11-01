@@ -3,7 +3,11 @@ import {
   ChatRequest,
   Usage,
 } from "@/types/chat";
-import { SSEEvent } from "@/types/sse";
+import {
+  PROGRESS_CODES,
+  type ProgressCode,
+  type SSEEvent,
+} from "@/types/sse";
 import { apiUrl } from "@/lib/api";
 import type { AuthFetch } from "@/types/session";
 
@@ -102,6 +106,12 @@ function toSSEEvent(json: string): SSEEvent | null {
   const event = raw as Record<string, unknown>;
 
   switch (event.type) {
+    case "state":
+    case "thought":
+      return PROGRESS_CODES.includes(event.code as ProgressCode)
+        ? { type: event.type, code: event.code as ProgressCode }
+        : null;
+
     case "token":
       return typeof event.value === "string"
         ? { type: "token", value: event.value }
@@ -148,6 +158,7 @@ class ChatService {
     // does not cost a second question.
     questionKey: string,
     callbacks: {
+      onProgress: (code: ProgressCode) => void;
       onToken: (value: string) => void;
       onDone: (
         history: ChatHistoryMessage[],
@@ -219,6 +230,11 @@ class ChatService {
         }
 
         switch (event.type) {
+          case "state":
+          case "thought":
+            callbacks.onProgress(event.code);
+            break;
+
           case "token":
             callbacks.onToken(event.value);
             break;

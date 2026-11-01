@@ -3,6 +3,8 @@ import remarkGfm from "remark-gfm";
 
 import { Message } from "@/types/chat";
 
+import Progress from "./Progress";
+
 interface MessageBubbleProps {
   message: Message;
 }
@@ -21,7 +23,9 @@ export default function MessageBubble({
       <div
         className="message-bubble chat-message"
       >
-        {isTyping ? (
+        {isTyping && message.progress ? (
+          <Progress progress={message.progress} />
+        ) : isTyping ? (
           <div
             className="typing-dots"
             aria-label="Generating a reply"

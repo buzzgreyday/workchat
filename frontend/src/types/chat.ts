@@ -1,3 +1,5 @@
+import type { ProgressCode } from "./sse";
+
 export interface ChatHistoryMessage {
   role:
     | "user"
@@ -35,7 +37,15 @@ export interface Message {
     | "streaming"
     | "complete"
     | "error";
+
+  // What a reply is waiting on, until its first word. Only ever set on a reply
+  // to a question: a streaming bubble without it is the greeting's typing dots,
+  // waiting on a session rather than an answer.
+  progress?: MessageProgress;
 }
+
+/** The server's steps, and the one before it has answered at all. */
+export type MessageProgress = ProgressCode | "sending";
 
 export interface Usage {
     used: number,

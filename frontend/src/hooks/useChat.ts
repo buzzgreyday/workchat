@@ -148,6 +148,13 @@ export function useChat({
         },
         key,
         {
+          onProgress(code) {
+            dispatch({
+              type: "assistant/progress",
+              progress: code,
+            });
+          },
+
           onToken(value) {
             dispatch({
               type: "assistant/token",

@@ -1,4 +1,4 @@
-import type { Message } from "@/types/chat";
+import type { Message, MessageProgress } from "@/types/chat";
 
 /**
  * The seeded greeting's id.
@@ -32,6 +32,7 @@ export type TranscriptAction =
       at: Date;
     }
   | { type: "assistant/opened"; id: string; at: Date }
+  | { type: "assistant/progress"; progress: MessageProgress }
   | { type: "assistant/token"; value: string }
   | { type: "assistant/completed" }
   | { type: "assistant/failed"; content: string }
@@ -120,8 +121,15 @@ export function transcriptReducer(
           content: "",
           createdAt: action.at,
           status: "streaming",
+          progress: "sending",
         },
       ];
+
+    case "assistant/progress":
+      return mapLast(messages, (message) => ({
+        ...message,
+        progress: action.progress,
+      }));
 
     case "assistant/token":
       return mapLast(messages, (message) => ({
@@ -133,6 +141,7 @@ export function transcriptReducer(
       return mapLast(messages, (message) => ({
         ...message,
         status: "complete",
+        progress: undefined,
       }));
 
     /**
@@ -147,6 +156,7 @@ export function transcriptReducer(
         ...message,
         content: action.content,
         status: "error",
+        progress: undefined,
       }));
 
     case "assistant/reopened":
@@ -154,6 +164,7 @@ export function transcriptReducer(
         ...message,
         content: "",
         status: "streaming",
+        progress: "sending",
       }));
 
     // Wholesale, not merged: what is in storage is the whole transcript

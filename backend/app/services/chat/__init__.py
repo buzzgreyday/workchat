@@ -19,12 +19,15 @@ from app.common.logging.logging import logger
 from app.common.models import ChatRequest, TokenContext, Usage
 from app.repositories.base import TranscriptRepository
 from app.services.chat.events import (
+    ModelCalled,
     RoundFinished,
     TokenProduced,
     ToolInvoked,
+    ToolStarted,
     TurnEvent,
     TurnFailed,
     TurnFinished,
+    TurnStarted,
 )
 from app.services.chat import history as signed_history
 from app.services.chat.prompt import build_messages
@@ -34,12 +37,15 @@ from app.services.chat.turn import run_turn
 
 __all__ = [
     "ChatTooling",
+    "ModelCalled",
     "RoundFinished",
     "TokenProduced",
     "ToolInvoked",
+    "ToolStarted",
     "TurnEvent",
     "TurnFailed",
     "TurnFinished",
+    "TurnStarted",
     "answer",
 ]
 
@@ -64,6 +70,8 @@ async def answer(
     it survives whatever happens next. A retry finds it already there, in
     `earlier_conversation`, and stores it only if the earlier attempt could not.
     """
+    yield TurnStarted()
+
     token_sub_var.set(token.sub)
     request_id = current_request_id()
     key = get_settings().history_signing_secret
