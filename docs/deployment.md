@@ -259,7 +259,7 @@ none. The frontend keys off that, so a rate-limited visitor is asked to wait rat
 than told their questions are gone.
 
 **Content is scrubbed after 30 days.** Add the purge to the same crontab as the
-backup:
+backup, which is root's:
 
 ```
 30 3 * * * /usr/bin/flock -n /tmp/workchat-purge.lock /opt/ai-cv/scripts/purge-chat-content.sh >> /var/log/workchat/purge.log 2>&1
@@ -279,19 +279,23 @@ Override the tail it keeps with `SESSION_GRACE_DAYS`.
 
 **Guest-trial rows go when their day ends.** Only relevant with
 `TRIAL_ENABLED`, harmless otherwise. The backend already drops earlier days
-whenever a trial is requested; this makes it true on a day nobody asks. Just
-after midnight UTC — `CRON_TZ` pins that whatever the host's zone:
+whenever a trial is requested; this makes it true on a day nobody asks. It runs
+just after midnight UTC. The host's clock is on UTC, so the entry needs no
+`CRON_TZ`; set `CRON_TZ=UTC` above it if that ever changes.
+
+This one and the next belong in the `deploy` user's crontab, not root's. `deploy`
+can run Docker, so they don't need root. It can't write to `/var/log/workchat`, so
+they log to `~/logs`, which has to exist first:
 
 ```
-CRON_TZ=UTC
-5 0 * * * /usr/bin/flock -n /tmp/workchat-trials.lock /opt/ai-cv/scripts/purge-trial-requests.sh >> /var/log/workchat/purge.log 2>&1
+5 0 * * * /usr/bin/flock -n /tmp/workchat-trials.lock /opt/ai-cv/scripts/purge-trial-requests.sh >> $HOME/logs/purge-trials.log 2>&1
 ```
 
 **Question keys go after a day.** Each holds a hash of a question, kept only so a
-failed one can be retried for free:
+failed one can be retried for free. Also in `deploy`'s crontab:
 
 ```
-50 3 * * * /usr/bin/flock -n /tmp/workchat-question-keys.lock /opt/ai-cv/scripts/purge-question-keys.sh >> /var/log/workchat/purge.log 2>&1
+50 3 * * * /usr/bin/flock -n /tmp/workchat-question-keys.lock /opt/ai-cv/scripts/purge-question-keys.sh >> $HOME/logs/purge-question-keys.log 2>&1
 ```
 
 All four scripts take `--dry-run`, which counts instead of writing.
@@ -358,8 +362,8 @@ pins `name: ai-cv` — the compose project name, the container names and the
 that pin, moving the directory would rename the project and silently start
 against an empty database.
 
-Two things follow the move: `chown -R deploy:deploy` on the checkout, and root's
-crontab, whose backup and purge entries carry absolute paths.
+Two things follow the move: `chown -R deploy:deploy` on the checkout, and the
+crontabs of root and `deploy`, whose backup and purge entries carry absolute paths.
 
 `scripts/setup-deploy-secrets.sh` does all six in one go — mints the key,
 installs it, pins the host key, proves the key can actually run `docker compose`
