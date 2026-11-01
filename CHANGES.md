@@ -7,6 +7,16 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.13.0] - 2026-11-01
+
+### Changed
+
+- **The wait for a reply says what is happening**, in place of three dots:
+  "Sending…", "Reading your question…", "Thinking…" and "Searching the CV…",
+  until the first word replaces the line. The stream reports each step as a code
+  and the frontend words it, so what the model searched for never reaches the
+  browser. The dots stay for a session opening, where nothing has been sent.
+
 ## [0.12.0] - 2026-11-01
 
 ### Added
