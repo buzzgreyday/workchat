@@ -60,6 +60,14 @@ OpenAI. That split is the reason there is one loop: while the transport was
 baked into it there were two — one yielding frames, one building a JSON body —
 and six things were duplicated between them.
 
+While a hirer waits for the first word, the stream says what is happening:
+`{"type": "state", "code": "preprocessing"}` as it opens, `"composing"` before
+each model call, and `{"type": "thought", "code": "knowledge_lookup"}` before each
+tool. Codes rather than sentences, so the wording stays with the rest of the
+frontend's, and a fixed list, so what the model chose to search for never reaches
+the browser. Auth, the spend and the idempotency check finish before the stream
+opens, because they answer with real statuses; there is no frame for them.
+
 Everything a turn accumulates lives in generator locals, so a second call cannot
 inherit the first one's reply or tool counts. The previous class kept them on
 the instance and relied on the route building a fresh one per request.
