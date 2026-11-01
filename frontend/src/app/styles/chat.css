@@ -64,19 +64,6 @@
     gap: 0.75rem;
   }
 
-  .chat-header-avatar {
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 9999px;
-    background: var(--chat-avatar-bg);
-    color: var(--chat-avatar-icon);
-    box-shadow: var(--shadow-small);
-  }
-
   .chat-header .usage-badge {
     margin-top: 0.75rem;
   }
@@ -101,8 +88,8 @@
     border-radius: 9999px;
     background: var(--chat-badge-bg);
     color: var(--chat-badge-text);
-    font-size: 0.75rem;
-    line-height: 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
     box-shadow: var(--shadow-small);
   }
 
@@ -124,8 +111,6 @@
 
   .message {
     display: flex;
-    align-items: flex-end;
-    gap: 0.5rem;
   }
 
   .message-user {
@@ -136,43 +121,22 @@
     justify-content: flex-start;
   }
 
-  .message-avatar {
-    flex-shrink: 0;
-    width: var(--chat-avatar-size);
-    height: var(--chat-avatar-size);
-    border-radius: 9999px;
-  }
-
-  .message-avatar-face {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    border-radius: 9999px;
-    background: var(--chat-avatar-bg);
-    color: var(--chat-avatar-icon);
-  }
-
   .message-bubble {
     min-width: 0;
     max-width: var(--bubble-max-width);
     padding: 0.75rem 1rem;
     overflow-wrap: anywhere;
     border-radius: var(--radius-bubble);
-    box-shadow: var(--shadow-small);
+    box-shadow: var(--shadow-bubble);
   }
 
-  /* The corner nearest the speaker is the sharper one. */
   .message-user .message-bubble {
-    border-bottom-right-radius: var(--radius-sm);
     background: var(--chat-user-bubble-bg);
     color: var(--chat-user-bubble-text);
   }
 
   .message-bot .message-bubble {
     border: 1px solid var(--chat-bot-bubble-border);
-    border-bottom-left-radius: var(--radius-sm);
     background: var(--chat-bot-bubble-bg);
     color: var(--chat-bot-bubble-text);
   }
@@ -202,8 +166,8 @@
 
   .trial-notice {
     color: var(--chat-text-muted);
-    font-size: 0.75rem;
-    line-height: 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
     text-align: center;
   }
 
@@ -233,6 +197,7 @@
     background: var(--chat-input-bg);
     color: var(--chat-input-text);
     line-height: 1.5;
+    box-shadow: var(--shadow-sunk);
     transition: var(--motion-colors);
   }
 
@@ -250,7 +215,7 @@
     right: 0.75rem;
     bottom: 0.5rem;
     color: var(--chat-input-placeholder);
-    font-size: 0.75rem;
+    font-size: 0.875rem;
     font-variant-numeric: tabular-nums;
     line-height: 1rem;
     pointer-events: none;
@@ -260,7 +225,8 @@
     color: var(--chat-send-bg);
   }
 
-  /* The chat's buttons: the one thing to press, in the send colour. */
+  /* The chat's buttons: the one thing to press, in the send colour, under the
+     layers every button has (globals.css). */
   .chat-button {
     display: inline-flex;
     flex-shrink: 0;
@@ -271,7 +237,8 @@
     border: 1px solid transparent;
     border-radius: var(--radius-control);
     outline-style: none;
-    background: var(--chat-send-bg);
+    background-color: var(--chat-send-bg);
+    background-image: var(--button-surface);
     background-clip: padding-box;
     color: var(--chat-send-icon);
     font-size: 0.875rem;
@@ -279,7 +246,7 @@
     line-height: 1.25rem;
     white-space: nowrap;
     user-select: none;
-    box-shadow: var(--shadow-small);
+    box-shadow: var(--button-shadow);
     transition: var(--motion-all);
   }
 
@@ -290,9 +257,10 @@
     pointer-events: none;
   }
 
+  /* Only under a mouse: a touch screen keeps :hover on the last button tapped. */
   @media (hover: hover) {
     .chat-button:hover {
-      filter: brightness(1.1);
+      filter: var(--button-hover);
     }
   }
 
@@ -300,16 +268,18 @@
     border-color: var(--chat-accent);
     box-shadow:
       0 0 0 3px color-mix(in oklab, var(--chat-accent) 50%, transparent),
-      var(--shadow-small);
+      var(--button-shadow);
   }
 
   .chat-button:active {
-    translate: 0 1px;
+    background-image: none;
+    box-shadow: var(--button-shadow-pressed);
   }
 
   .chat-button:disabled {
     opacity: 0.5;
     pointer-events: none;
+    box-shadow: none;
   }
 
   .chat-button-send {

@@ -43,14 +43,13 @@
   /* Only tints your own questions (mixed into the navy) and colours links in
      replies; nothing on the page is painted with it. */
   --chat-accent: #94b4c1;
-  /* The send button's colour, on its own: the title and the avatar have a
-     colour of their own now, so this can change without moving them. The
+  /* The send button's colour, on its own: the title has a
+     colour of its own now, so this can change without moving them. The
      pill text and the input's focus follow the button. */
   --chat-action: #e0876a;
 
   /* ---- Parts: the chat -------------------------------------------------- */
-  /* The title's pale gold, and the avatar's too — they belong together, and
-     stay put whatever the button does. mringdal.com's identity gold. */
+  /* The title's pale gold, which stays put whatever the button does. mringdal.com's identity gold. */
   --chat-title-color: #e0cea1;
 
   /* Your questions */
@@ -66,13 +65,7 @@
   --chat-bot-bubble-border: var(--chat-border);
   --chat-link: var(--chat-accent);
 
-  /* The bot's avatar, and the dots while it writes. A plain circle at the
-     usual size, no icon, in the title's colour: the chat's identity in two
-     places, apart from the button, which is the action. */
-  --chat-avatar-bg: var(--chat-title-color);
-  --chat-avatar-icon: var(--chat-on-accent);
-  --chat-avatar-size: 2rem;
-  --chat-avatar-icon-display: none;
+  /* The dots while a reply is being written. */
   --chat-typing: var(--chat-text-muted);
 
   /* The input */
@@ -93,7 +86,7 @@
 
   /* The "questions left" pill */
   --chat-badge-bg: var(--chat-panel-alt);
-  /* With the title and the dot: status, not action. */
+  /* With the title: status, not action. */
   --chat-badge-text: var(--chat-title-color);
 
   /* ---- Parts: this page's frame ---------------------------------------- */
@@ -111,7 +104,8 @@
 
   /* ---- Fonts ------------------------------------------------------------ */
   --chat-font: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
-  --chat-font-weight: 300;
+  /* 300 was too thin to read comfortably on the navy. */
+  --chat-font-weight: 400;
 
   /* Bebas has one weight and capitals only. Anything but 400 is a weight the
      browser fakes. */
@@ -126,7 +120,7 @@
   /* The bubbles. The input follows the size too, but never below 1rem. */
   --chat-font-message: var(--chat-font);
   --chat-font-message-weight: var(--chat-font-weight);
-  --chat-font-message-size: 1rem;
+  --chat-font-message-size: 1.125rem;
 
   /* The text being typed. */
   --chat-font-input: var(--chat-font);

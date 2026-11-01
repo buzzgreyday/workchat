@@ -1,6 +1,5 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Bot } from "lucide-react";
 
 import { Message } from "@/types/chat";
 
@@ -19,16 +18,6 @@ export default function MessageBubble({
     <div
       className={`message ${isUser ? "message-user" : "message-bot"}`}
     >
-      {!isUser && (
-        <div
-          className={`message-avatar ${isStreaming ? "chat-avatar-glow" : ""}`}
-        >
-          <div className="message-avatar-face">
-            <Bot size={16} className="chat-avatar-icon" />
-          </div>
-        </div>
-      )}
-
       <div
         className="message-bubble chat-message"
       >

@@ -1,5 +1,3 @@
-import { Bot } from "lucide-react";
-
 import { useControls } from "./ChatProvider";
 import UsageBadge from "./UsageBadge";
 
@@ -16,10 +14,6 @@ export default function ChatHeader() {
   return (
     <div className="chat-header">
       <div className="chat-header-row">
-        <div className="chat-header-avatar">
-          <Bot size={20} />
-        </div>
-
         <h1 className="chat-title">
             Workchat
         </h1>
