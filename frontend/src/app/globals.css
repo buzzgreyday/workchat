@@ -132,14 +132,14 @@
   --button-contact: 0 1px 2px rgb(0 0 0 / 0.4); /* Where it meets the page. */
   /* A soft glow beneath. The negative spread keeps it under the button rather
      than around it. */
-  --button-glow: 0 8px 24px -6px rgb(0 0 0 / 0.3);
+  --button-glow: 0 4px 10px -4px rgb(0 0 0 / 0.2);
   --button-shadow:
     var(--button-light),
     var(--button-dark),
     var(--button-contact),
     var(--button-glow);
   /* Pressed, the light goes out and the shade moves inside. */
-  --button-shadow-pressed: inset 0 2px 4px rgb(0 0 0 / 0.3);
+  --button-shadow-pressed: inset 0 1px 3px rgb(0 0 0 / 0.2);
   /* Hover only brightens, and barely. Nothing moves or grows. */
   --button-hover: brightness(1.03);
   --shadow-card: 0 25px 50px -12px rgb(0 0 0 / 0.25);
@@ -156,10 +156,10 @@
     );
     --button-dark: inset 0 -2px 0 oklch(from var(--button-color) calc(l - 0.17) c h);
     --button-contact: 0 1px 2px oklch(from var(--button-color) calc(l - 0.34) c h);
-    --button-glow: 0 8px 24px -6px
-      oklch(from var(--button-color) calc(l - 0.14) c h);
-    --button-shadow-pressed: inset 0 2px 4px
-      oklch(from var(--button-color) calc(l - 0.34) c h);
+    --button-glow: 0 4px 10px -4px
+      oklch(from var(--button-color) calc(l - 0.14) c h / 0.6);
+    --button-shadow-pressed: inset 0 1px 3px
+      oklch(from var(--button-color) calc(l - 0.24) c h);
   }
 }
 
