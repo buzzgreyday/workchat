@@ -7,6 +7,14 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.13.4] - 2026-11-01
+
+### Changed
+
+- The button glow is tighter, so it stays a little warmth under the button rather
+  than a halo on a dark page. A press looks shallower: its inset shadow is
+  smaller and lighter, and the button still moves down a pixel.
+
 ## [0.13.3] - 2026-11-01
 
 ### Changed
