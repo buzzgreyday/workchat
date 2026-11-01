@@ -1,4 +1,4 @@
-from tests.conftest import done_frame
+from tests.conftest import key_header, done_frame
 
 """
 Both token versions, side by side.
@@ -61,7 +61,7 @@ async def refresh_with(client, raw_token):
 async def chat(client, access_token, message="hi"):
     return await client.post(
         "/chat/stream",
-        headers={"Authorization": f"Bearer {access_token}"},
+        headers={"Authorization": f"Bearer {access_token}", **key_header()},
         json={"message": message},
     )
 

@@ -6,6 +6,7 @@ asked, so these assert against the rows themselves rather than the response body
 """
 import asyncio
 import json
+import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -207,3 +208,90 @@ async def test_chat_stream_done_event_includes_conversation_id(client, issued_to
     resp = await ask(client, issued_token)
     done = done_frame(resp)
     assert done["conversation_id"]
+
+
+async def test_a_retry_keeps_one_question_and_one_conversation(
+    client, issued_token, db_session, openai_mock
+):
+    """A first turn that failed left the client no conversation id to send back."""
+    key = str(uuid.uuid4())
+    healthy = openai_mock.chat.completions.create
+    openai_mock.chat.completions.create = AsyncMock(side_effect=RuntimeError("boom"))
+    failed = await ask(client, issued_token, question_key=key, message="does this survive?")
+    assert any(f["type"] == "error" for f in sse_frames(failed))
+
+    openai_mock.chat.completions.create = healthy
+    retried = await ask(client, issued_token, question_key=key, message="does this survive?")
+
+    assert done_frame(retried)["conversation_id"]
+    assert len(await _messages(db_session, role="user")) == 1
+    assert [r.status for r in await _messages(db_session, role="assistant")] == [
+        "failed",
+        "completed",
+    ]
+    assert len(await _conversations(db_session)) == 1
+
+
+async def test_a_retry_stores_the_question_if_the_first_attempt_could_not(
+    client, issued_token, db_session, monkeypatch
+):
+    key = str(uuid.uuid4())
+    real = SQLTranscriptRepository.record_question
+
+    async def _boom(*args, **kwargs):
+        raise RuntimeError("database on fire")
+
+    monkeypatch.setattr(SQLTranscriptRepository, "record_question", _boom)
+    await ask(client, issued_token, question_key=key, message="kept the second time")
+    monkeypatch.setattr(SQLTranscriptRepository, "record_question", real)
+
+    await ask(client, issued_token, question_key=key, message="kept the second time")
+
+    rows = await _messages(db_session, role="user")
+    assert [r.content for r in rows] == ["kept the second time"]
+
+
+async def test_a_hang_up_mid_reply_can_be_retried_for_nothing(
+    client, issued_token, db_session, session_maker, openai_mock
+):
+    """
+    The reason retries exist. Driven against the generator, like the abort test
+    above: the test client cannot express a hang-up.
+    """
+    from app.common.models import ChatRequest, TokenContext
+    from app.repositories.sql import SQLTokenRepository
+    from app.services.chat import answer
+    from app.services.chat.tooling import get_tooling
+
+    token_row = (await db_session.execute(select(DatabaseToken))).scalars().first()
+    tokens = SQLTokenRepository(db_session)
+    key = uuid.uuid4()
+
+    spent = await tokens.spend_question(token_row.id, key, "a-hash")
+    assert spent.grant.used_queries == 1
+    assert spent.conversation_id is None
+
+    openai_mock.chat.completions.create = AsyncMock(
+        side_effect=lambda **kwargs: stream_of("partial ", "never arrives")
+    )
+    events = answer(
+        request=ChatRequest(message="tell me everything"),
+        token=TokenContext(
+            sub=token_row.subject, jti=str(token_row.id),
+            max_queries=token_row.max_queries, used_queries=1,
+            remaining_queries=token_row.max_queries - 1,
+            expires_at=token_row.expires_at,
+        ),
+        client=openai_mock,
+        tooling=get_tooling(),
+        transcripts=SQLTranscriptRepository(session_maker),
+        question_key=key,
+    )
+    await events.__anext__()
+    await events.aclose()
+
+    conversation = (await _conversations(db_session))[0]
+    retried = await tokens.spend_question(token_row.id, key, "a-hash")
+
+    assert retried.grant.used_queries == 1
+    assert retried.conversation_id == conversation.id

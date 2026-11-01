@@ -1,0 +1,302 @@
+/* The chat itself (components/chat), the same on its own page and in the embed.
+   Responsive rules here ask the chat's container, never the window: a chat in
+   a narrow dialog on a wide screen has a narrow chat's room. */
+@layer components {
+  /* There for a screen reader, and nothing else. */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .chat-root {
+    container-type: inline-size;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* `height` rather than repeating the viewport arithmetic: the chat fills what
+     it is given. */
+  .chat-frame {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: var(--chat-column);
+    height: 100%;
+  }
+
+  /* For a chat set into somebody else's page. The cap applies from a 40rem-wide
+     container: it sits below a modern phone's viewport, so applying it
+     everywhere left dead background around the card on the smallest screens. */
+  .chat-frame-card {
+    overflow: hidden;
+    border: 1px solid var(--chat-border);
+    border-radius: var(--radius-card);
+    background: var(--chat-panel);
+    box-shadow: var(--shadow-card);
+  }
+
+  @container (width >= 40rem) {
+    .chat-frame-card {
+      max-height: var(--card-max-height);
+    }
+  }
+
+  /* The chat's own header, for a host that has none. */
+  .chat-header {
+    padding: var(--gutter) var(--gutter-lg);
+    border-bottom: 1px solid var(--chat-border);
+    background: var(--chat-panel);
+  }
+
+  .chat-header-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .chat-header .usage-badge {
+    margin-top: 0.75rem;
+  }
+
+  /* No fallback on the family, on purpose: unset, it is invalid at computed-value
+     time, `font-family` inherits, and the title is in the body face. */
+  .chat-title {
+    color: var(--chat-title-color);
+    font-family: var(--chat-font-title);
+    font-size: var(--chat-font-title-size, 1.25rem);
+    font-weight: var(--chat-font-title-weight, 600);
+    line-height: 1.4;
+  }
+
+  .chat-owner {
+    font-family: var(--chat-font, ui-sans-serif, system-ui, sans-serif);
+  }
+
+  .usage-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    background: var(--chat-badge-bg);
+    color: var(--chat-badge-text);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    box-shadow: var(--shadow-small);
+  }
+
+  /* `min-height`, because a flex item's automatic minimum size is its content:
+     without it this box refuses to shrink below the whole transcript.
+     `overscroll-behavior` keeps a flick at either end from chaining out into
+     the document behind it. */
+  .chat-log {
+    flex: 1;
+    min-height: 0;
+    padding: var(--gutter-lg);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .chat-log > :not(:last-child) {
+    margin-block-end: 1rem;
+  }
+
+  .message {
+    display: flex;
+  }
+
+  .message-user {
+    justify-content: flex-end;
+  }
+
+  .message-bot {
+    justify-content: flex-start;
+  }
+
+  .message-bubble {
+    min-width: 0;
+    max-width: var(--bubble-max-width);
+    padding: 0.75rem 1rem;
+    overflow-wrap: anywhere;
+    border-radius: var(--radius-bubble);
+    box-shadow: var(--shadow-bubble);
+  }
+
+  .message-user .message-bubble {
+    background: var(--chat-user-bubble-bg);
+    color: var(--chat-user-bubble-text);
+  }
+
+  .message-bot .message-bubble {
+    border: 1px solid var(--chat-bot-bubble-border);
+    background: var(--chat-bot-bubble-bg);
+    color: var(--chat-bot-bubble-text);
+  }
+
+  .typing-dots {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding-block: 0.25rem;
+  }
+
+  .chat-typing-dot {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: var(--chat-typing);
+  }
+
+  /* No link, and a trial on offer: the way in goes where the composer was. */
+  .trial-offer {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: var(--gutter-sm);
+  }
+
+  .trial-notice {
+    color: var(--chat-text-muted);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    text-align: center;
+  }
+
+  .composer {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+    padding: var(--gutter-sm);
+  }
+
+  .composer-box {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* The size and focus are `.chat-field`, in globals.css. */
+  .composer-field {
+    flex: 1;
+    min-height: var(--control-height);
+    max-height: var(--composer-max);
+    padding: 0.75rem 1rem;
+    resize: none;
+    border: 1px solid var(--chat-input-border);
+    border-radius: var(--radius-control);
+    background: var(--chat-input-bg);
+    color: var(--chat-input-text);
+    line-height: 1.5;
+    box-shadow: var(--shadow-sunk);
+    transition: var(--motion-colors);
+  }
+
+  .composer-field::placeholder {
+    color: var(--chat-input-placeholder);
+  }
+
+  /* Room for the count, once there is one. */
+  .composer-field[data-counting] {
+    padding-right: 4rem;
+  }
+
+  .composer-count {
+    position: absolute;
+    right: 0.75rem;
+    bottom: 0.5rem;
+    color: var(--chat-input-placeholder);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1rem;
+    pointer-events: none;
+  }
+
+  .composer-count[data-full] {
+    color: var(--chat-send-bg);
+  }
+
+  /* The chat's buttons: the one thing to press, in the send colour, under the
+     layers every button has (globals.css). */
+  .chat-button {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding-inline: 0.625rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    outline-style: none;
+    background-color: var(--chat-send-bg);
+    background-image: var(--button-surface);
+    background-clip: padding-box;
+    color: var(--chat-send-icon);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    user-select: none;
+    box-shadow: var(--button-shadow);
+    transition: var(--motion-all);
+  }
+
+  .chat-button svg {
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    pointer-events: none;
+  }
+
+  /* Only under a mouse: a touch screen keeps :hover on the last button tapped. */
+  @media (hover: hover) {
+    .chat-button:hover {
+      filter: var(--button-hover);
+    }
+  }
+
+  .chat-button:focus-visible {
+    border-color: var(--chat-accent);
+    box-shadow:
+      0 0 0 3px color-mix(in oklab, var(--chat-accent) 50%, transparent),
+      var(--button-shadow);
+  }
+
+  .chat-button:active {
+    background-image: none;
+    box-shadow: var(--button-shadow-pressed);
+  }
+
+  .chat-button:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    box-shadow: none;
+  }
+
+  .chat-button-send {
+    width: var(--control-height);
+    height: var(--control-height);
+  }
+
+  .chat-button-wide {
+    min-height: var(--control-height);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  /* Stays in the log's flow, under the reply it belongs to. */
+  .chat-retry {
+    align-self: flex-start;
+    max-width: 100%;
+    white-space: normal;
+  }
+}

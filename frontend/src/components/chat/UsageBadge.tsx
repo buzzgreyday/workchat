@@ -9,15 +9,11 @@ import type { Usage } from "@/types/chat";
  */
 export default function UsageBadge({
   usage,
-  className = "",
 }: {
   usage: Usage;
-  className?: string;
 }) {
   return (
-    <span
-      className={`chat-ui bg-badge text-badge-ink inline-block rounded-full px-3 py-1 text-micro shadow-sm ${className}`}
-    >
+    <span className="usage-badge chat-ui">
       {usage.remaining} / {usage.max} questions left
     </span>
   );

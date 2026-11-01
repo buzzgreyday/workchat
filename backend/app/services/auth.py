@@ -18,7 +18,7 @@ that is the only signal an already-issued token can offer. The chat endpoints
 stay unversioned and accept either kind; only the auth endpoints are under /v2.
 
 Per-grant usage is enforced by an atomic write in the store
-(see TokenRepository.consume_query), not in-memory, so it survives restarts
+(see TokenRepository.spend_question), not in-memory, so it survives restarts
 and works across replicas.
 
 Why this is a dependency and not middleware, since it comes up: middleware would
@@ -518,14 +518,22 @@ class Auth:
             credentials: HTTPAuthorizationCredentials | None,
             tokens: TokenRepository,
             sessions: RefreshSessionRepository,
-    ) -> TokenContext:
+            question_key: uuid.UUID,
+            message_hash: str,
+    ) -> tuple[TokenContext, uuid.UUID | None]:
         """
         What the chat endpoints are built on. Accepts a v1 or a v2 access token
-        and spends one query from the grant either way.
+        and spends one query from the grant either way, unless this key has
+        already paid for this question.
+
+        Also returns the conversation an earlier attempt recorded the question in,
+        if there was one.
         """
         grant_id, version, session_id = await self._authenticate(credentials, sessions)
-        grant = await tokens.consume_query(grant_id, expected_version=version)
-        return self._context(grant, version, session_id)
+        spent = await tokens.spend_question(
+            grant_id, question_key, message_hash, expected_version=version
+        )
+        return self._context(spent.grant, version, session_id), spent.conversation_id
 
     async def verify(
             self,
@@ -596,19 +604,9 @@ def get_auth() -> Auth:
 # --- FastAPI adapter ---------------------------------------------------------
 #
 # The methods above take plain arguments and know nothing about `Depends`. These
-# three are where the framework's wiring lives, so that `Auth` stays a service
+# are where the framework's wiring lives, so that `Auth` stays a service
 # that can be built and called with no request in flight — the same split the
 # rest of this codebase keeps between a service and its adapter.
-
-async def verify_and_consume(
-        credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-        tokens: TokenRepository = Depends(get_token_repository),
-        sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
-        auth: Auth = Depends(get_auth),
-) -> TokenContext:
-    """The chat endpoints' dependency: authenticate, and spend one query."""
-    return await auth.verify_and_consume(credentials, tokens, sessions)
-
 
 async def verify(
         credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),

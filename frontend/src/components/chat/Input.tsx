@@ -1,7 +1,6 @@
 import { useId } from "react";
 import { Send } from "lucide-react";
 
-import { Button } from "../ui/button";
 import { useControls } from "./ChatProvider";
 import { useAutoResize } from "@/hooks/useAutoResize";
 import {
@@ -46,19 +45,17 @@ export default function ChatInput() {
     const starting = trial === "starting";
 
     return (
-      <div className="flex flex-col items-stretch gap-2 p-gutter-sm">
-        <Button
+      <div className="trial-offer">
+        <button
+          type="button"
           onClick={() => startTrial()}
           disabled={starting}
           aria-describedby={noticeId}
-          className="min-h-control rounded-control text-body shadow-sm"
+          className="chat-button chat-button-wide"
         >
           {starting ? "Starting…" : TRY_IT}
-        </Button>
-        <p
-          id={noticeId}
-          className="text-center text-xs text-ink-muted"
-        >
+        </button>
+        <p id={noticeId} className="trial-notice">
           {TRIAL_NOTICE}
         </p>
       </div>
@@ -70,21 +67,18 @@ export default function ChatInput() {
   const atLimit = input.length >= MAX_MESSAGE_CHARS;
 
   return (
-    <div className="flex items-end gap-3 p-gutter-sm">
-      <div className="relative flex min-w-0 flex-1">
+    <div className="composer">
+      <div className="composer-box">
         <textarea
           // A textarea rather than an input: a question worth asking a CV often
           // runs to two sentences, and there was no way to break a line — Enter
           // sent, and nothing else did anything.
           ref={boxRef}
           rows={1}
-          // `text-body`, 16px, at every width. Not only a style choice: under
-          // 16px iOS zooms the page the moment the field takes focus and does
-          // not zoom back out, which leaves the layout offset behind the
-          // keyboard and looks exactly like the chat having broken. Desktop used
-          // to drop to 14px, which made the question look smaller than the same
-          // words once they landed in a bubble; now what is typed matches.
-          className={`chat-field bg-field border-field-line text-field-ink placeholder:text-field-placeholder max-h-composer-max min-h-control flex-1 resize-none rounded-control border px-4 py-3 text-body transition ${counting ? "pr-16" : ""}`}
+          // 16px at every width (`.chat-field`): under it iOS zooms the page the
+          // moment the field takes focus, and does not zoom back out.
+          className="composer-field chat-field"
+          data-counting={counting || undefined}
           // Short on purpose, all three of them. A textarea soft-wraps, so a
           // placeholder wider than the box wraps to a second line inside a
           // one-row field and the composer scrolls before anything is typed.
@@ -124,14 +118,16 @@ export default function ChatInput() {
             // Polite, and only at the limit: a count announced on every key
             // would drown out what is being typed.
             aria-live={atLimit ? "polite" : "off"}
-            className={`pointer-events-none absolute right-3 bottom-2 text-xs tabular-nums ${atLimit ? "text-primary" : "text-field-placeholder"}`}
+            className="composer-count"
+            data-full={atLimit || undefined}
           >
             {input.length} / {MAX_MESSAGE_CHARS}
           </span>
         )}
       </div>
 
-      <Button
+      <button
+        type="button"
         // Pressing the button must not take focus from the field. On a phone
         // that blur lowers the keyboard and brings the footer back, the
         // composer moves up under the finger, and the tap lands beside the
@@ -142,10 +138,10 @@ export default function ChatInput() {
         onClick={() => sendMessage()}
         disabled={shut}
         aria-label="Send question"
-        className="size-control shrink-0 rounded-control shadow-sm"
-        >
+        className="chat-button chat-button-send"
+      >
         <Send size={18} />
-      </Button>
+      </button>
     </div>
   );
 }

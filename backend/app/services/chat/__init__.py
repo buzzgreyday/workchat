@@ -7,13 +7,14 @@ module only wires them together and decides what a failure looks like from the
 outside.
 """
 
+import uuid
 from collections.abc import AsyncIterator
 from dataclasses import replace
 
 from openai import AsyncOpenAI
 
 from app.common.config import get_settings
-from app.common.context import current_request_id, token_sub_var
+from app.common.context import conversation_id_var, current_request_id, token_sub_var
 from app.common.logging.logging import logger
 from app.common.models import ChatRequest, TokenContext, Usage
 from app.repositories.base import TranscriptRepository
@@ -53,12 +54,15 @@ async def answer(
     tooling: ChatTooling,
     transcripts: TranscriptRepository | None = None,
     endpoint: str = "/chat/stream",
+    question_key: uuid.UUID | None = None,
+    earlier_conversation: uuid.UUID | None = None,
 ) -> AsyncIterator[TurnEvent]:
     """
     Everything one question needs, start to finish.
 
     The question is stored before the model is called, which is what guarantees
-    it survives whatever happens next.
+    it survives whatever happens next. A retry finds it already there, in
+    `earlier_conversation`, and stores it only if the earlier attempt could not.
     """
     token_sub_var.set(token.sub)
     request_id = current_request_id()
@@ -76,14 +80,19 @@ async def answer(
         )
         history, continuing = [], None
 
-    conversation_id = await record_question(
-        transcripts,
-        token=token,
-        message=request.message,
-        conversation_id=continuing,
-        endpoint=endpoint,
-        request_id=request_id,
-    )
+    if earlier_conversation is not None:
+        conversation_id: uuid.UUID | None = earlier_conversation
+        conversation_id_var.set(str(earlier_conversation))
+    else:
+        conversation_id = await record_question(
+            transcripts,
+            token=token,
+            message=request.message,
+            conversation_id=continuing,
+            endpoint=endpoint,
+            request_id=request_id,
+            question_key=question_key,
+        )
 
     events = recorded(
         run_turn(

@@ -6,6 +6,7 @@ import {
   OUT_OF_QUESTIONS_MESSAGE,
   outOfQuestionsTrialMessage,
   rateLimitedMessage,
+  RETRIES_SPENT_MESSAGE,
   SESSION_ENDED_MESSAGE,
   tooLongMessage,
 } from "@/lib/copy";
@@ -32,6 +33,19 @@ export function isQuotaExhausted(
     error instanceof ChatError &&
     error.status === 429 &&
     error.detail === "Query limit reached"
+  );
+}
+
+/**
+ * Could asking again with the same key go any differently?
+ *
+ * Yes for a connection that broke or a server that failed: the fault was on the
+ * way, not in the question. No for a refusal, which would only be repeated.
+ */
+export function isRetryable(error: unknown): boolean {
+  return (
+    !(error instanceof ChatError) ||
+    error.status >= 500
   );
 }
 
@@ -66,6 +80,11 @@ export function failureMessage(
   // a seeded one, a paste in an older tab. Refused before it was paid for.
   if (error.status === 422) {
     return tooLongMessage(MAX_MESSAGE_CHARS);
+  }
+
+  // Only a retry can get this: the question has run as often as it may.
+  if (error.status === 409) {
+    return RETRIES_SPENT_MESSAGE;
   }
 
   if (error.status === 401) {

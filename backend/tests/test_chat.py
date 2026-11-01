@@ -1,7 +1,11 @@
-from tests.conftest import ask, done_frame
+import os
+import uuid
+
+from app.common.config import MAX_QUESTION_ATTEMPTS, get_settings
+from tests.conftest import ask, done_frame, key_header
 
 async def test_chat_requires_auth(client):
-    resp = await client.post("/chat/stream", json={"message": "hi"})
+    resp = await client.post("/chat/stream", headers=key_header(), json={"message": "hi"})
     assert resp.status_code == 401
 
 
@@ -38,7 +42,7 @@ async def test_chat_stream_history_has_one_assistant_reply(client, issued_token,
 
     resp = await client.post(
         "/chat/stream",
-        headers={"Authorization": f"Bearer {issued_token}"},
+        headers={"Authorization": f"Bearer {issued_token}", **key_header()},
         json={"message": "hi"},
     )
     assert resp.status_code == 200
@@ -86,7 +90,7 @@ async def test_tool_call_loop_is_bounded(client, issued_token, openai_mock):
 
     resp = await client.post(
         "/chat/stream",
-        headers={"Authorization": f"Bearer {issued_token}"},
+        headers={"Authorization": f"Bearer {issued_token}", **key_header()},
         json={"message": "hi"},
     )
     assert resp.status_code == 200
@@ -107,18 +111,16 @@ async def test_chat_quota_exhausted(client):
         json={"subject": "s", "company": "quota", "max_queries": 2},
     )
     token = r.json()["token"]
-    auth = {"Authorization": f"Bearer {token}"}
 
-    assert (await client.post("/chat/stream", headers=auth, json={"message": "1"})).status_code == 200
-    assert (await client.post("/chat/stream", headers=auth, json={"message": "2"})).status_code == 200
-    third = await client.post("/chat/stream", headers=auth, json={"message": "3"})
-    assert third.status_code == 429
+    assert (await ask(client, token, message="1")).status_code == 200
+    assert (await ask(client, token, message="2")).status_code == 200
+    assert (await ask(client, token, message="3")).status_code == 429
 
 
 async def test_chat_bad_token(client):
     resp = await client.post(
         "/chat/stream",
-        headers={"Authorization": "Bearer not-a-real-jwt"},
+        headers={"Authorization": "Bearer not-a-real-jwt", **key_header()},
         json={"message": "hi"},
     )
     assert resp.status_code == 401
@@ -164,3 +166,92 @@ async def test_injected_system_text_is_gender_neutral(client, issued_token, open
 
     gendered = re.findall(r"\b(he|him|his|she|her|hers|himself|herself)\b", appended, re.I)
     assert not gendered, f"gendered pronouns hardcoded in appended system text: {gendered}"
+
+
+# --- a question, named by its key ----------------------------------------
+
+
+async def test_chat_refuses_a_question_with_no_key_without_spending(client, issued_token):
+    resp = await client.post(
+        "/chat/stream",
+        headers={"Authorization": f"Bearer {issued_token}"},
+        json={"message": "hi"},
+    )
+    assert resp.status_code == 422
+
+    assert done_frame(await ask(client, issued_token))["usage"]["used"] == 1
+
+
+async def test_chat_refuses_a_malformed_key_without_spending(client, issued_token):
+    malformed = "not-a-uuid"
+    resp = await ask(client, issued_token, question_key=malformed)
+    assert resp.status_code == 422
+
+    assert done_frame(await ask(client, issued_token))["usage"]["used"] == 1
+
+
+async def test_a_retry_runs_the_model_again_and_spends_nothing(client, issued_token, openai_mock):
+    key = str(uuid.uuid4())
+
+    first = await ask(client, issued_token, question_key=key)
+    calls = openai_mock.chat.completions.create.await_count
+    second = await ask(client, issued_token, question_key=key)
+
+    assert done_frame(first)["usage"]["used"] == 1
+    assert done_frame(second)["usage"]["used"] == 1
+    assert openai_mock.chat.completions.create.await_count > calls
+
+
+async def test_a_retry_with_a_different_question_is_refused(client, issued_token, openai_mock):
+    """The hash is the server's own, so no client can vouch for a new question."""
+    key = str(uuid.uuid4())
+    await ask(client, issued_token, question_key=key, message="the one paid for")
+    calls = openai_mock.chat.completions.create.await_count
+
+    resp = await ask(client, issued_token, question_key=key, message="a free one")
+
+    assert resp.status_code == 422
+    assert openai_mock.chat.completions.create.await_count == calls
+
+
+async def test_a_question_past_its_attempts_is_refused(client, issued_token):
+    key = str(uuid.uuid4())
+    for _ in range(MAX_QUESTION_ATTEMPTS):
+        assert (await ask(client, issued_token, question_key=key)).status_code == 200
+
+    resp = await ask(client, issued_token, question_key=key)
+
+    assert resp.status_code == 409
+    assert done_frame(await ask(client, issued_token))["usage"]["used"] == 2
+
+
+async def test_the_last_question_can_be_retried(client):
+    r = await client.post(
+        "/admin/issue-token",
+        headers={"X-Admin-Key": os.environ["ADMIN_KEY"]},
+        json={"subject": "s", "company": "quota", "max_queries": 1},
+    )
+    token = r.json()["token"]
+    key = str(uuid.uuid4())
+    assert (await ask(client, token, question_key=key)).status_code == 200
+
+    assert (await ask(client, token, question_key=key)).status_code == 200
+    assert (await ask(client, token)).status_code == 429
+
+
+async def test_the_key_is_allowed_across_origins(client):
+    """The chat calls the API from another origin, so a browser asks first."""
+    origin = get_settings().cors_origins[0]
+
+    resp = await client.options(
+        "/chat/stream",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type,x-idempotency-key",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert "x-idempotency-key" in resp.headers["access-control-allow-headers"].lower()
+    assert resp.headers["access-control-allow-origin"] == origin

@@ -31,6 +31,17 @@ export const LINK_EXPIRED_MESSAGE =
 export const GENERIC_FAILURE_MESSAGE =
   "Something went wrong answering that — it's not you. Try again in a moment.";
 
+/**
+ * The button under a reply that failed. Says what it costs because someone with
+ * few questions left would otherwise think twice: the question is paid for
+ * already, and asking it again by retyping would pay for it a second time.
+ */
+export const RETRY = "Try again — it won't cost a second question";
+
+export const RETRIES_SPENT_MESSAGE =
+  "I've tried that one as many times as I can, and it's still not working. " +
+  "Give it a little while before asking again.";
+
 export const NO_LINK_MESSAGE =
   "You'll need the chat link you were sent to start a session. " +
   "If you had one open, it may just have timed out — ask for a new link.";

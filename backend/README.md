@@ -4,8 +4,8 @@ FastAPI backend using SQLAlchemy, Alembic, and PostgreSQL.
 
 ## Types
 
-`app/` is type-checked with mypy, configured in `pyproject.toml`. There is no CI
-yet, so nothing runs this but you:
+`app/` is type-checked with mypy, configured in `pyproject.toml`. CI runs it on
+every push; the test run does not, so locally it is a deliberate act:
 
 ```bash
 uv run mypy

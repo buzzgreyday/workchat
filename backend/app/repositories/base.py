@@ -60,6 +60,20 @@ class ReplyOutcome:
     error: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class SpentQuestion:
+    """
+    A question paid for, on this attempt or an earlier one.
+
+    `conversation_id` is set when an earlier attempt already recorded the
+    question. It is None on a first attempt, and on a retry of one that never
+    managed to record it.
+    """
+
+    grant: Grant
+    conversation_id: uuid.UUID | None = None
+
+
 class RepositoryBase(ABC):
     """Shared plumbing. A repository is what it can do, not what it inherits."""
 
@@ -101,7 +115,7 @@ class TokenRepository(RepositoryBase):
     a spent quota as zero rather than raising — so the validity rules live in
     the auth service, not here.
 
-    `consume_query` is the exception, and has to be: what makes a spend safe is
+    `spend_question` is the exception, and has to be: what makes a spend safe is
     that the store arbitrates the race, so only the store can say whether a
     failed spend was a revoked grant, an expired one or an exhausted one. The
     diagnosis is inseparable from the statement, and so are the errors.
@@ -116,19 +130,29 @@ class TokenRepository(RepositoryBase):
         """The grant with this id, or None. No validity judgement."""
 
     @abstractmethod
-    async def consume_query(
-        self, token_id: uuid.UUID, expected_version: int | None = None
-    ) -> Grant:
+    async def spend_question(
+        self,
+        token_id: uuid.UUID,
+        key: uuid.UUID,
+        message_hash: str,
+        expected_version: int | None = None,
+    ) -> SpentQuestion:
         """
-        Spend one question against this grant, atomically, and return it as it
-        now stands. Durable on return: a spend a later failure could undo is a
-        free question, and a client that aborts its stream would take them all.
+        Pay for the question this key names, once, and return the grant as it now
+        stands. Durable on return: a spend a later failure could undo is a free
+        question, and a client that aborts its stream would take them all.
+
+        A key seen before spends nothing, because that question is already paid
+        for. It only has to be the same question, on a grant still live, within
+        MAX_QUESTION_ATTEMPTS. An allowance at zero does not refuse it: the
+        question that failed may have been the last one.
 
         The version is checked as part of the same condition rather than after
         it, so presenting a v1-shaped token against a v2 grant costs nothing.
 
         Raises InvalidToken, TokenRevoked, TokenExpired or QuotaExhausted —
-        whichever of them explains why the spend did not happen.
+        whichever explains why the spend did not happen — and, for a key seen
+        before, IdempotencyKeyReused or RetriesExhausted.
         """
 
     @abstractmethod
@@ -282,12 +306,16 @@ class TranscriptRepository(RepositoryBase):
         message: str,
         endpoint: str,
         request_id: str,
+        question_key: uuid.UUID | None = None,
     ) -> uuid.UUID:
         """
         Store the question and return the conversation it belongs to, reusing
         the one named if it is genuinely this grant's and starting a new one
         otherwise. Durable on return: this is what guarantees the question
         survives whatever then happens to the stream, the model or the process.
+
+        With a `question_key`, the conversation is noted against that key in the
+        same transaction, so a retry finds the question it does not need to store.
         """
 
     @abstractmethod

@@ -37,26 +37,16 @@ export default function StandaloneChat({
 
   return (
     <>
-      {/* Wraps rather than squeezing: on a phone the count drops to a line of
-          its own instead of breaking the title in two. */}
-      <header className="shell-top shell-sides flex w-full shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--site-bar-border)] bg-[var(--site-bar-bg)] pb-3">
-        {/* Held at its designed size when a browser enlarges text by
-            itself. DuckDuckGo's Text Size follows the phone's own text size
-            and, on iOS, applies it as `-webkit-text-size-adjust` on the page:
-            this title then outgrew the bar it was drawn for. It is display
-            type — already 1.5–2.5rem, sized to the bar — so it opts out; the
-            chat's messages, the badge and the links keep following the
-            reader's text size, which is where it matters. Browser zoom still
-            scales everything, this included. */}
-        <h1 className="text-heading text-title font-display [-webkit-text-size-adjust:100%] [text-size-adjust:100%]">
+      <header className="site-bar shell-top shell-sides">
+        <h1 className="chat-title site-title">
           <RollingTitle text="Workchat" />
         </h1>
         {usage && (
-          <UsageBadge usage={usage} className="ms-auto shrink-0" />
+          <UsageBadge usage={usage} />
         )}
       </header>
 
-      <div className="shell-sides-bleed flex bg-[var(--site-chat-bg)] min-h-0 w-full flex-1 justify-center">
+      <div className="site-chat shell-sides-bleed">
         <Chat
           token={token}
           claim={claim}
@@ -73,11 +63,11 @@ export default function StandaloneChat({
           No links configured, no footer — rather than an empty strip. The
           chat's band then reaches the bottom, which is padded instead. */}
       {hasOwnerLinks(owner) ? (
-        <footer className="site-footer shell-bottom shell-sides flex w-full shrink-0 justify-center border-t border-[var(--site-footer-border)] bg-[var(--site-footer-bg)] pt-2">
+        <footer className="site-footer site-footer-links shell-bottom shell-sides">
           <OwnerLinks owner={owner} />
         </footer>
       ) : (
-        <div className="site-footer shell-bottom w-full shrink-0 bg-[var(--site-chat-bg)]" />
+        <div className="site-footer site-footer-empty shell-bottom" />
       )}
     </>
   );

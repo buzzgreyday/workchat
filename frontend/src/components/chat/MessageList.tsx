@@ -1,6 +1,7 @@
 import MessageBubble from "./MessageBubble";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
-import { useTranscriptContext } from "./ChatProvider";
+import { RETRY } from "@/lib/copy";
+import { useControls, useTranscriptContext } from "./ChatProvider";
 
 
 // Rendering each message, no fetch, jwt, etc. Reads the transcript context
@@ -8,6 +9,7 @@ import { useTranscriptContext } from "./ChatProvider";
 // stops at this subtree instead of reaching the header and the composer too.
 export default function MessageList() {
   const { messages } = useTranscriptContext();
+  const { canRetry, retry } = useControls();
 
   const { containerRef } = useAutoScroll(messages);
 
@@ -23,12 +25,7 @@ export default function MessageList() {
       // instead, which is the part a screen reader actually needs.
       role="log"
       aria-label="Conversation"
-      // `min-h-0` because a flex item's automatic minimum size is its content:
-      // without it this box refuses to shrink below the whole transcript and
-      // the card's `overflow-hidden` is the only thing hiding the difference.
-      // `overscroll-contain` keeps a flick at either end of the transcript from
-      // chaining out into the document behind it.
-      className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-gutter-lg space-y-4"
+      className="chat-log"
     >
       {messages.map((message) => (
         <MessageBubble
@@ -39,7 +36,17 @@ export default function MessageList() {
         )
       }
 
-      <p role="status" className="sr-only">
+      {canRetry && (
+        <button
+          type="button"
+          onClick={() => retry()}
+          className="chat-button chat-button-wide chat-retry"
+        >
+          {RETRY}
+        </button>
+      )}
+
+      <p role="status" className="visually-hidden">
         {awaitingReply
           ? "Generating a reply"
           : "Reply ready"}

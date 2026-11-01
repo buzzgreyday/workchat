@@ -19,7 +19,7 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 * OpenAI integration
 * Dockerized development environment
 * TypeScript frontend
-* Tailwind CSS UI
+* Plain CSS, no framework
 * TanStack Query for API communication
 
 ---
@@ -43,9 +43,8 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 * Next.js 16
 * React 19
 * TypeScript
-* Tailwind CSS 4
+* Plain CSS
 * TanStack Query
-* shadcn/ui
 * React Markdown
 * JWT Decode
 
@@ -89,13 +88,11 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 │   ├── purge-expired-sessions.sh
 │   └── setup-deploy-secrets.sh   # CI deploy key + GitHub secrets; also key rotation
 ├── frontend
-│   ├── components.json
 │   ├── Dockerfile
 │   ├── eslint.config.mjs
 │   ├── next.config.ts
 │   ├── package.json
 │   ├── package-lock.json
-│   ├── postcss.config.mjs
 │   ├── public
 │   ├── README.md
 │   ├── src
@@ -463,6 +460,12 @@ Properties worth knowing:
   or moving device needs a new link.
 * **Quota is per grant, not per token.** Claiming and refreshing cost nothing;
   only a question spends a query.
+* **A question is paid for once.** `POST /chat/stream` requires an
+  `X-Idempotency-Key`, a UUID the client makes for each question. Sending it again
+  retries without spending: the model runs again, up to three times in all, and
+  only for the same question, which the server checks against its own hash. Any
+  other message under that key is a 422, and a fourth attempt a 409. Without this
+  a dropped connection cost a question and gave nothing back.
 * **Nothing derived outlives its grant.** Access and refresh expiries are both
   clamped to `tokens.expires_at`.
 * **Rotation has a grace window.** A refresh token re-presented within
@@ -591,7 +594,7 @@ Typical development workflow:
    after `pyproject.toml`/`uv.lock`, or `frontend` after `package.json`.
 6. Commit code and migration files together, so a checkout never has models and
    schema out of step.
-7. Work on an `experimental/*` branch and open a pull request into
+7. Work on a `feat/*`, `fix/*` or `chore/*` branch and open a pull request into
    `development`. `main` is production and takes merges from `development`
    only — see [Branches](docs/development.md#branches).
 
@@ -708,12 +711,12 @@ Possible future enhancements include:
 * Move the hardcoded conditional prompts from the code to separate files
 * Resource search scoring
 * ~~CI/CD pipeline~~ — done: GitHub Actions runs types, tests, migration drift,
-  Caddyfile, secret scanning and image builds. Work happens on `experimental/*`,
-  integrates on `development` and reaches production through `main`, where a
+  Caddyfile, secret scanning and image builds. Work happens on `feat/*`, `fix/*`
+  and `chore/*`, integrates on `development` and reaches production through `main`, where a
   green run queues a deploy for approval. See
   [branches](docs/development.md#branches) and
   [`docs/deployment.md`](docs/deployment.md#cicd)
-* ~~Automated testing~~ — done: 100 backend tests, run in CI
+* ~~Automated testing~~ — done: the backend suite, run in CI
 * Background workers
 * Monitoring and metrics
 * Centralized logging

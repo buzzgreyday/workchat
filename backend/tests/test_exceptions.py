@@ -72,7 +72,9 @@ def test_all_are_app_errors_so_one_handler_catches_them(exc):
 async def test_handler_renders_the_same_shape_as_httpexception(client):
     """A domain exception raised deep in a service, and FastAPI's own error for a
     missing header, must be indistinguishable to the caller."""
-    from_service = await client.post("/chat/stream", json={"message": "hi"})
+    from_service = await client.post(
+        "/chat/stream", headers={"X-Idempotency-Key": str(uuid.uuid4())}, json={"message": "hi"}
+    )
     assert from_service.status_code == 401
     assert from_service.json() == {"detail": "Missing or malformed Authorization header"}
 

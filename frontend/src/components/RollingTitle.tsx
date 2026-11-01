@@ -49,23 +49,20 @@ export default function RollingTitle({ text }: { text: string }) {
     return () => clearTimeout(timer);
   }, [half]);
 
-  const layer = (visible: boolean) =>
-    `[grid-area:1/1] transition-opacity ease-in-out ${
-      visible ? "opacity-100" : "opacity-0"
-    }`;
-
   return (
     <>
-      <span className="sr-only">{text}</span>
-      <span aria-hidden="true" className="inline-grid">
+      <span className="visually-hidden">{text}</span>
+      <span aria-hidden="true" className="rolling-title">
         <span
-          className={layer(!swapped)}
+          className="rolling-title-layer"
+          data-shown={!swapped || undefined}
           style={{ transitionDuration: `${FADE_MS}ms` }}
         >
           {text}
         </span>
         <span
-          className={layer(swapped)}
+          className="rolling-title-layer"
+          data-shown={swapped || undefined}
           style={{ transitionDuration: `${FADE_MS}ms` }}
         >
           {swappedText}

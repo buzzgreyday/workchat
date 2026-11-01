@@ -63,12 +63,12 @@ export default function OwnerLinks({
   return (
     <nav
       aria-label={`${owner.name} elsewhere`}
-      className="flex items-center gap-4"
+      className="owner-links"
     >
       {owner.websiteUrl && (
         <a
           href={owner.websiteUrl}
-          className="chat-ui flex items-center gap-1.5 text-meta text-[var(--site-link)] transition hover:text-[var(--site-link-hover)]"
+          className="owner-link chat-ui"
         >
           <WebsiteIcon />
           {siteName(owner.websiteUrl)}
@@ -79,7 +79,7 @@ export default function OwnerLinks({
           href={owner.githubUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="chat-ui flex items-center gap-1.5 text-meta text-[var(--site-link)] transition hover:text-[var(--site-link-hover)]"
+          className="owner-link chat-ui"
         >
           <GithubIcon />
           GitHub
@@ -90,7 +90,7 @@ export default function OwnerLinks({
           href={owner.linkedinUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="chat-ui flex items-center gap-1.5 text-meta text-[var(--site-link)] transition hover:text-[var(--site-link-hover)]"
+          className="owner-link chat-ui"
         >
           <LinkedinIcon />
           LinkedIn

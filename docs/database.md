@@ -24,6 +24,7 @@ docker compose exec backend alembic upgrade head
 | `refresh_tokens` | One row per session within a grant — a hirer on a laptop and the same hirer on a phone are two rows. Rotation keeps the old row and chains it to its successor through `rotated_to`, which is what makes a replayed token recognisable rather than merely unknown. |
 | `conversations` | One chat session, with `subject`/`company`/`job_title` snapshotted from the token. |
 | `chat_messages` | Two rows per turn — the question as received, and the reply as it finished. |
+| `question_keys` | One row per question paid for: the client's key, a SHA-256 of the message made by the server, how many times it has run, and where it was recorded. It is what makes a retry free. Deleted after a day. |
 | `trial_requests` | One row per guest trial opened today: the day, the challenge that paid for it, and a keyed, day-scoped hash of the visitor's address — never the address. Earlier days are deleted as each new trial is requested. See [privacy.md](privacy.md#guest-trials). |
 | `trial_budget` | Trials opened per UTC day, against `TRIAL_DAILY_LIMIT`. A date and a number. |
 
@@ -85,6 +86,9 @@ removed while any surviving row still pointed at it — which is exactly what th
 session purge does when it clears an expired predecessor out from under a live
 successor. Taking a whole chain out in one statement works under either setting;
 this is about partial and single-row deletes.
+
+Question keys are deleted after a day by `scripts/purge-question-keys.sh`: nobody
+retries yesterday's question, and each one holds a hash of it.
 
 Guest trials clean up after themselves: `trial_requests` rows only ever hold
 today, because each trial request deletes the earlier days first, and
