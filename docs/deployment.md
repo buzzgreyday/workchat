@@ -287,7 +287,14 @@ CRON_TZ=UTC
 5 0 * * * /usr/bin/flock -n /tmp/workchat-trials.lock /opt/ai-cv/scripts/purge-trial-requests.sh >> /var/log/workchat/purge.log 2>&1
 ```
 
-All three scripts take `--dry-run`, which counts instead of writing.
+**Question keys go after a day.** Each holds a hash of a question, kept only so a
+failed one can be retried for free:
+
+```
+50 3 * * * /usr/bin/flock -n /tmp/workchat-question-keys.lock /opt/ai-cv/scripts/purge-question-keys.sh >> /var/log/workchat/purge.log 2>&1
+```
+
+All four scripts take `--dry-run`, which counts instead of writing.
 
 **Revoking access.** `POST /api/admin/tokens/{token_id}/revoke` with your admin
 key kills a grant and every session under it, v1 links included. Revoking the

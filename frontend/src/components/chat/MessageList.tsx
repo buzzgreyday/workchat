@@ -1,6 +1,7 @@
 import MessageBubble from "./MessageBubble";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
-import { useTranscriptContext } from "./ChatProvider";
+import { RETRY } from "@/lib/copy";
+import { useControls, useTranscriptContext } from "./ChatProvider";
 
 
 // Rendering each message, no fetch, jwt, etc. Reads the transcript context
@@ -8,6 +9,7 @@ import { useTranscriptContext } from "./ChatProvider";
 // stops at this subtree instead of reaching the header and the composer too.
 export default function MessageList() {
   const { messages } = useTranscriptContext();
+  const { canRetry, retry } = useControls();
 
   const { containerRef } = useAutoScroll(messages);
 
@@ -33,6 +35,16 @@ export default function MessageList() {
         )
         )
       }
+
+      {canRetry && (
+        <button
+          type="button"
+          onClick={() => retry()}
+          className="chat-button chat-button-wide chat-retry"
+        >
+          {RETRY}
+        </button>
+      )}
 
       <p role="status" className="visually-hidden">
         {awaitingReply

@@ -322,4 +322,11 @@
     font-size: 1rem;
     line-height: 1.5;
   }
+
+  /* Stays in the log's flow, under the reply it belongs to. */
+  .chat-retry {
+    align-self: flex-start;
+    max-width: 100%;
+    white-space: normal;
+  }
 }

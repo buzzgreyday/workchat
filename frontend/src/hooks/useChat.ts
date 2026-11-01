@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { getGrantId, isTrial } from "@/lib/auth";
 import { MAX_MESSAGE_CHARS } from "@/lib/limits";
@@ -13,6 +13,7 @@ import {
 import {
   failureMessage,
   isQuotaExhausted,
+  isRetryable,
 } from "@/lib/failure";
 import { useConversationMemory } from "@/hooks/useConversationMemory";
 import { useTranscript } from "@/hooks/useTranscript";
@@ -115,34 +116,27 @@ export function useChat({
       ? NO_QUESTIONS_LEFT
       : NO_SESSION;
 
-  const sendMessage = async (
-    question?: string,
+  // `loading` only changes once React has rendered, so two sends in the same
+  // tick would both read it as false. A ref is true the moment it is set.
+  const inFlight = useRef(false);
+
+  // The question that failed, and the key it was paid for under. In memory on
+  // purpose: a reload returns to the last settled transcript, where it is gone.
+  const [failed, setFailed] = useState<{
+    text: string;
+    key: string;
+  } | null>(null);
+
+  // One attempt at a question. The same key goes out every time for the same
+  // question, which is what stops the server charging for it again.
+  const runTurn = async (
+    text: string,
+    key: string,
   ) => {
-    const text =
-      typeof question === "string"
-        ? question.trim()
-        : input.trim();
-
-    if (!text || loading || disabled) {
-      return;
-    }
-
-    dispatch({
-      type: "user/asked",
-      id: newId(),
-      content: text,
-      at: new Date(),
-    });
-
-    setInput("");
+    inFlight.current = true;
+    setFailed(null);
 
     try {
-      dispatch({
-        type: "assistant/opened",
-        id: newId(),
-        at: new Date(),
-      });
-
       await chatService.stream(
         authFetch,
         {
@@ -152,6 +146,7 @@ export function useChat({
             memory.historySignature,
           conversation_id: memory.conversationId,
         },
+        key,
         {
           onToken(value) {
             dispatch({
@@ -198,6 +193,8 @@ export function useChat({
                 GENERIC_FAILURE_MESSAGE,
             });
 
+            setFailed({ text, key });
+
             // The question was already paid for — quota is spent before the
             // model is called — but usage only rides a `done` frame, so the
             // header is a turn behind until this puts it right.
@@ -222,7 +219,72 @@ export function useChat({
           owner,
         ),
       });
+
+      if (isRetryable(error)) {
+        setFailed({ text, key });
+
+        // Paid for or not depends on how far it got, and only the server knows.
+        void refreshUsage();
+      }
+    } finally {
+      inFlight.current = false;
     }
+  };
+
+  const sendMessage = async (
+    question?: string,
+  ) => {
+    const text =
+      typeof question === "string"
+        ? question.trim()
+        : input.trim();
+
+    if (
+      !text ||
+      inFlight.current ||
+      loading ||
+      disabled
+    ) {
+      return;
+    }
+
+    // Before the first await, so a second send in this tick is already refused.
+    inFlight.current = true;
+
+    dispatch({
+      type: "user/asked",
+      id: newId(),
+      content: text,
+      at: new Date(),
+    });
+
+    setInput("");
+
+    dispatch({
+      type: "assistant/opened",
+      id: newId(),
+      at: new Date(),
+    });
+
+    await runTurn(text, newId());
+  };
+
+  // Not behind `disabled`: at zero questions the composer is shut, and the
+  // question that failed may have been the last one.
+  const canRetry =
+    failed !== null &&
+    !loading &&
+    status === "ready";
+
+  const retry = async () => {
+    if (!canRetry || inFlight.current) {
+      return;
+    }
+
+    inFlight.current = true;
+    dispatch({ type: "assistant/reopened" });
+
+    await runTurn(failed.text, failed.key);
   };
 
   return {
@@ -232,8 +294,10 @@ export function useChat({
     disabled,
     disabledReason,
     usage,
+    canRetry,
 
     setInput,
     sendMessage,
+    retry,
   };
 }

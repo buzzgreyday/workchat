@@ -1,14 +1,16 @@
+import hashlib
+import uuid
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from fastapi.security import HTTPAuthorizationCredentials
 from openai import AsyncOpenAI
 from starlette.responses import StreamingResponse
 
 from app.common.config import get_settings
 from app.common.logging.logging import logger
-from app.common.models import ChatRequest, TokenContext
+from app.common.models import ChatRequest
 from app.common import sse
 from app.openai.client import get_openai_client
 from app.repositories import (
@@ -18,7 +20,7 @@ from app.repositories import (
 )
 from app.repositories.base import RefreshSessionRepository, TokenRepository, TranscriptRepository
 from app.services import chat as chat_service
-from app.services.auth import Auth, bearer_scheme, get_auth, verify_and_consume
+from app.services.auth import Auth, bearer_scheme, get_auth
 from app.services.chat import ChatTooling, TokenProduced, TurnEvent, TurnFailed, TurnFinished
 from app.services.chat.tooling import get_tooling
 
@@ -71,6 +73,7 @@ async def frames(events: AsyncIterator[TurnEvent]) -> AsyncIterator[bytes]:
 )
 async def chat_stream(
     req: ChatRequest,
+    question_key: Annotated[uuid.UUID, Header(alias="X-Idempotency-Key")],
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     tokens: TokenRepository = Depends(get_token_repository),
     sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
@@ -90,8 +93,15 @@ async def chat_stream(
     validation, so a spending dependency charged a question for a request that
     was then refused — one over the length limit, say. The body only runs once
     the request is valid, so only a question that is asked is paid for.
+
+    The client names each question with a key and repeats it to retry, which
+    costs nothing further. The hash is made here, from the body: taken from the
+    client, it would vouch for whatever the client chose to send with it.
     """
-    token: TokenContext = await verify_and_consume(credentials, tokens, sessions, auth)
+    message_hash = hashlib.sha256(req.message.encode()).hexdigest()
+    token, earlier_conversation = await auth.verify_and_consume(
+        credentials, tokens, sessions, question_key, message_hash
+    )
     logger.info(
         "Chat message received from user",
         extra={
@@ -116,5 +126,7 @@ async def chat_stream(
         tooling=tooling,
         transcripts=transcripts,
         endpoint="/chat/stream",
+        question_key=question_key,
+        earlier_conversation=earlier_conversation,
     )
     return StreamingResponse(frames(events), media_type="text/event-stream")
