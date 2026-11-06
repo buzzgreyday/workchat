@@ -3,7 +3,6 @@ import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { RETRY } from "@/lib/copy";
 import { useControls, useTranscriptContext } from "./ChatProvider";
 
-
 // Rendering each message, no fetch, jwt, etc. Reads the transcript context
 // rather than taking a prop, so the token-by-token re-render it cannot avoid
 // stops at this subtree instead of reaching the header and the composer too.
@@ -32,9 +31,7 @@ export default function MessageList() {
           key={message.id}
           message={message}
         />
-        )
-        )
-      }
+      ))}
 
       {canRetry && (
         <button
@@ -51,6 +48,6 @@ export default function MessageList() {
           ? "Generating a reply"
           : "Reply ready"}
       </p>
-  </div>
-);
+    </div>
+  );
 }

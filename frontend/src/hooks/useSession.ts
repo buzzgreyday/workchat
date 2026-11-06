@@ -75,7 +75,7 @@ const TRIAL_REFUSALS: Record<string, TrialState> = {
 /**
  * Owns the access token and how it gets renewed.
  *
- * Two shapes, decided by which parameter the link carried:
+ * Three cases, decided by which parameter the link carried:
  *
  *  - `token` (v1) — the link *is* the access token. Long-lived, nothing to
  *    renew, and a 401 is final.
@@ -135,28 +135,26 @@ export function useSession({
         return inFlight.current;
       }
 
+      const refreshOnce = async (): Promise<string> => {
+        const session = await authService.refresh();
+        apply(session);
+        return session.access_token;
+      };
+
       const attempt = (async () => {
         try {
-          try {
-            const session =
-              await authService.refresh();
-            apply(session);
-            return session.access_token;
-          } catch (error) {
-            // 409 means another tab rotated first. That tab has already written
-            // the successor to the shared cookie jar, so one retry picks it up.
-            if (
-              error instanceof AuthError &&
-              error.status === 409
-            ) {
-              const session =
-                await authService.refresh();
-              apply(session);
-              return session.access_token;
-            }
-
-            throw error;
+          return await refreshOnce();
+        } catch (error) {
+          // 409 means another tab rotated first. That tab has already written
+          // the successor to the shared cookie jar, so one retry picks it up.
+          if (
+            error instanceof AuthError &&
+            error.status === 409
+          ) {
+            return await refreshOnce();
           }
+
+          throw error;
         } finally {
           inFlight.current = null;
         }
@@ -238,13 +236,13 @@ export function useSession({
           error instanceof AuthError &&
           error.status === 409;
 
-        setStatus(
-          spent
-            ? "spent"
-            : claim
-              ? "error"
-              : "none",
-        );
+        if (spent) {
+          setStatus("spent");
+        } else if (claim) {
+          setStatus("error");
+        } else {
+          setStatus("none");
+        }
       } finally {
         // Whenever a claim came in at all — an empty one too. `?claim=` with
         // nothing after it (a link cut short, an address bar autocompleting

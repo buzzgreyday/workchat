@@ -80,7 +80,6 @@
      How long things take. Named, so a new effect picks a pace rather than a
      number. Not part of EMBED.md's contract: these are the chat's own. */
   --motion-fast: 150ms;
-  --motion-spin: 2.4s;
   --motion-bounce: 1.2s;
   --motion-pulse: 2s;
   --motion-stagger: 0.15s;
@@ -218,7 +217,7 @@ html {
   overscroll-behavior: none;
 
   /* The one place the viewport arithmetic happens, and the reason `body` and
-     `main` only say `h-full`.
+     `main` only say `height: 100%`.
      `--app-height` is written by `useViewportHeight` from the *visual*
      viewport, the only measurement iOS updates for the keyboard. `100dvh` is
      the fallback and covers three cases that should all behave exactly as they
