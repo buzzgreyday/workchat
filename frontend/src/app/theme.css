@@ -43,9 +43,9 @@
   /* Only tints your own questions (mixed into the navy) and colours links in
      replies; nothing on the page is painted with it. */
   --chat-accent: #94b4c1;
-  /* The send button's colour, on its own: the title has a
-     colour of its own now, so this can change without moving them. The
-     pill text and the input's focus follow the button. */
+  /* The send button's colour, on its own: the title and the pill text have
+     a gold of their own, so this can change without moving them. The input's
+     focus follows the button. */
   --chat-action: #e0876a;
 
   /* ---- Parts: the chat -------------------------------------------------- */
@@ -53,9 +53,9 @@
   --chat-title-color: #e0cea1;
 
   /* Your questions */
-  /* Halfway between the accent and the panel, so the send button — full
-     accent — stays the one bright thing on screen. Darker than the accent,
-     so it takes the light text rather than the text made for the accent. */
+  /* The accent at 45% into the panel, so the send button stays the one
+     bright thing on screen. Darker than the accent, so it takes the light
+     text rather than the text made for the accent. */
   --chat-user-bubble-bg: color-mix(in oklab, var(--chat-accent) 45%, var(--chat-panel));
   --chat-user-bubble-text: var(--chat-text);
 
@@ -80,7 +80,7 @@
 
   /* The send button */
   /* The action colour from the palette, so the one thing to press reads
-     first. The title, the pill text and the input's focus follow this. */
+     first. The input's focus follows this. */
   --chat-send-bg: var(--chat-action);
   --chat-send-icon: #1b2e42;
 
