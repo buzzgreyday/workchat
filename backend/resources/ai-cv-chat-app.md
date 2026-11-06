@@ -8,13 +8,14 @@ summary: "This chat application itself — a full-stack AI-powered CV assistant 
 
 ## Technologies
 Backend: Python, FastAPI, SQLAlchemy (async), Alembic migrations, PostgreSQL, JWT-based access tokens, OpenAI tool-calling.
-Frontend: Next.js, React, TypeScript, Tailwind CSS.
+Frontend: Next.js, React, TypeScript, plain CSS (built with Tailwind CSS until October 2026).
 Infrastructure: Docker Compose, Caddy reverse proxy with automatic HTTPS.
 
 ## What it does
 - The chat interface a hiring manager is using right now: questions are answered by an LLM agent that calls retrieval tools (search_cv, get_full_entry) over these CV records, rather than a static PDF resume.
 - Backend: FastAPI serving a streaming chat endpoint, async PostgreSQL access via SQLAlchemy, Alembic-managed schema migrations, and per-hirer JWT access tokens scoped by expiry and query count.
-- Frontend: Next.js/TypeScript chat UI with streamed responses, built with Tailwind CSS.
+- Frontend: Next.js/TypeScript chat UI with streamed responses, styled in plain CSS. It began on Tailwind CSS and moved off it in October 2026, to keep button and effect work in readable stylesheets.
+- Guest trial: a visitor without a link can be offered a few questions, earned with an invisible proof-of-work in the browser and limited to one trial per IP address per day. Addresses are never stored, only a keyed hash that is deleted when its day ends.
 - Infrastructure: containerized with Docker Compose; Caddy handles TLS and reverse proxying in production.
 
 ## Engineering details

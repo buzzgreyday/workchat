@@ -30,8 +30,8 @@ Constellation Network").
 ## Full-Stack Developer
 Demonstrated, though backend is still where the depth is. This CV chat
 application (see "AI CV Chat Application") is a full-stack project built
-end to end: a FastAPI/PostgreSQL backend and a Next.js/TypeScript/Tailwind
-frontend, containerized with Docker. Day-to-day professional experience
+end to end: a FastAPI/PostgreSQL backend and a Next.js/TypeScript frontend, styled
+with Tailwind at first and in plain CSS since October 2026, containerized with Docker. Day-to-day professional experience
 remains backend-focused — treat the frontend side as demonstrated
 capability, not years of production frontend experience.
 
