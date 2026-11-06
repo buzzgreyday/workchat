@@ -7,6 +7,21 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.13.6] - 2026-11-06
+
+### Fixed
+
+- The chat no longer tells hirers its frontend uses shadcn/ui and TanStack
+  Query. Both were removed, unused, in 0.7.0, but the record it answers from
+  still named them.
+
+### Changed
+
+- Nothing else a visitor sees. An unused animation token is gone, four nested
+  choices in the frontend read as plain if/else, the session refresh is one
+  try, and comments and docs say what the code does now. `docs/design.md` gives
+  the title's weight per surface: 800 on chat.mringdal.com, 600 in the embed.
+
 ## [0.13.5] - 2026-11-06
 
 ### Changed
