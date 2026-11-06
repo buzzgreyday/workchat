@@ -56,6 +56,9 @@ cd frontend && npm run test:contract     # ../website's e2e suite against this b
 cd frontend && npm run test:e2e
 ```
 
+CI's browser is Chromium alone. For a change to how the chat looks, render it
+in Firefox and WebKit too (see the website's CLAUDE.md for running WebKit).
+
 After changing a SQLAlchemy model: generate the migration
 (`docker compose exec backend alembic revision --autogenerate -m "…"`), read
 it — autogenerate misses server defaults and renames — and commit it with the
@@ -72,6 +75,9 @@ there.
 After changing the tags on anything in `backend/resources/`: regenerate the
 skills list (`cd backend && uv run -m app.build_skills`) and commit it. The
 search index itself needs nothing; it is rebuilt at startup.
+
+`skills.md` is generated, so two branches that regenerate it conflict. Resolve
+by rerunning `build_skills` on the merged resources, never by editing the block.
 
 ### Evals
 
