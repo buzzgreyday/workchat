@@ -14,9 +14,7 @@ export default function ChatHeader() {
   return (
     <div className="chat-header">
       <div className="chat-header-row">
-        <h1 className="chat-title">
-            Workchat
-        </h1>
+        <h1 className="chat-title">Workchat</h1>
         <p className="chat-owner">with {owner.name.toUpperCase()}</p>
       </div>
 
