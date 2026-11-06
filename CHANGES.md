@@ -864,8 +864,8 @@ tracked independently._
 
 ### Fixed
 
-- No gender is hardcoded in application code (frontend has my name harcoded though). 
-  The frontend however needs some additional tweeks, so we're saving this for later.
+- No gender is hardcoded in application code (frontend has my name hardcoded though). 
+  The frontend however needs some additional tweaks, so we're saving this for later.
   This was more work than expected, but this is a good place to leave it for now and iterate.
 
 ## [0.1.10] - 2026-08-14

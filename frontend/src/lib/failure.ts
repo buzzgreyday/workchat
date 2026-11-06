@@ -69,11 +69,13 @@ export function failureMessage(
   }
 
   if (error.status === 429) {
-    return isQuotaExhausted(error)
-      ? trial
-        ? outOfQuestionsTrialMessage(owner)
-        : OUT_OF_QUESTIONS_MESSAGE
-      : rateLimitedMessage(error.retryAfter);
+    if (!isQuotaExhausted(error)) {
+      return rateLimitedMessage(error.retryAfter);
+    }
+
+    return trial
+      ? outOfQuestionsTrialMessage(owner)
+      : OUT_OF_QUESTIONS_MESSAGE;
   }
 
   // The composer stops at the limit, so this is a question that got past it —

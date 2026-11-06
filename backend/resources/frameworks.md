@@ -1,7 +1,7 @@
 ---
 title: Frameworks and Tools
 type: frameworks
-tags: [fastapi, pyramid, pydantic, pika, rabbitmq, amqp, lxml, xml, pandas, sqlalchemy, alembic, pytest, celery, redis, mongodb, sql, postgresql, nextjs, react, typescript, javascript, tailwind, shadcn, tanstack-query, opentelemetry, grafana, loki, tempo, docker, docker-compose, caddy, kubernetes, rancher, nomad, github-actions, ci-cd, code-review, dotnet, monolith, rest-api, frameworks, tooling, stack]
+tags: [fastapi, pyramid, pydantic, pika, rabbitmq, amqp, lxml, xml, pandas, sqlalchemy, alembic, pytest, celery, redis, mongodb, sql, postgresql, nextjs, react, typescript, javascript, tailwind, opentelemetry, grafana, loki, tempo, docker, docker-compose, caddy, kubernetes, rancher, nomad, github-actions, ci-cd, code-review, dotnet, monolith, rest-api, frameworks, tooling, stack]
 summary: "The frameworks, libraries and tooling Michael actually works in, grouped by area, with depth stated per entry. At iEDI his daily stack is Python with FastAPI and Pyramid, Pydantic, Pika/RabbitMQ in the services that use queues, lxml, Pandas, MongoDB and SQL, tested and shipped through GitHub Actions and peer-reviewed pull requests, deployed on Kubernetes via Rancher and currently being migrated to HashiCorp Nomad. Outside work he builds with PostgreSQL, SQLAlchemy, Redis, Celery, OpenTelemetry, Next.js, Tailwind CSS and .NET."
 ---
 
@@ -49,7 +49,6 @@ exposure.
   components plus client components for the streaming conversation.
 - **React** and **TypeScript** — built with, alongside Next.js.
 - **Tailwind CSS** — built with, outside work.
-- **shadcn/ui**, **TanStack Query** — used, in this application's frontend.
 - **JavaScript** — worked in, though only a small part of the work at iEDI;
   his professional focus there is backend Python.
 

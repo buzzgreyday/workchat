@@ -20,7 +20,6 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 * Dockerized development environment
 * TypeScript frontend
 * Plain CSS, no framework
-* TanStack Query for API communication
 
 ---
 
@@ -44,7 +43,6 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 * React 19
 * TypeScript
 * Plain CSS
-* TanStack Query
 * React Markdown
 * JWT Decode
 
@@ -74,21 +72,31 @@ The project consists of a Python backend exposing REST APIs and AI integrations,
 │   └── Dockerfile            # Caddy + rate-limit module, built via xcaddy
 ├── Caddyfile                 # prod only; site address comes from $SITE_DOMAIN
 ├── docker-compose.yaml       # dev
+├── docker-compose.embed.yaml # dev overlay: CORS for the website's dev:stack
+├── docker-compose.lan.yaml   # dev overlay: a phone on the same Wi-Fi
 ├── docker-compose.prod.yaml  # production (Caddy + services)
 ├── docs
 │   ├── architecture.md
 │   ├── database.md
 │   ├── deployment.md
-│   └── development.md
+│   ├── design.md
+│   ├── development.md
+│   └── privacy.md
 ├── scripts                   # run from cron on the production host
 │   ├── backup-db.sh
 │   ├── backup-private-resources.sh
+│   ├── dev-lan.sh            # dev only: see "Try it on a phone" below
 │   ├── pull-backups.sh
 │   ├── purge-chat-content.sh
 │   ├── purge-expired-sessions.sh
+│   ├── purge-question-keys.sh
+│   ├── purge-trial-requests.sh
 │   └── setup-deploy-secrets.sh   # CI deploy key + GitHub secrets; also key rotation
 ├── frontend
 │   ├── Dockerfile
+│   ├── e2e                   # Playwright, backend mocked
+│   ├── embed                 # the <workchat-chat> element; see EMBED.md
+│   ├── EMBED.md
 │   ├── eslint.config.mjs
 │   ├── next.config.ts
 │   ├── package.json
@@ -421,7 +429,7 @@ already handed out cannot grow a claim they were never minted with, so silence
 has to keep meaning v1 for as long as any of those links is still in an inbox.
 
 Only the auth endpoints are versioned. `/chat/stream` stays where it
-are and accept either kind of access token, because moving them under `/v2` would
+is and accepts either kind of access token, because moving them under `/v2` would
 have left every v1 hirer holding a link to a frozen API.
 
 **v1 — the links already sent out.** One long-lived JWT per grant, delivered as
