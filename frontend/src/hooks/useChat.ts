@@ -110,11 +110,11 @@ export function useChat({
   const disabled =
     status !== "ready" || outOfQuestions;
 
-  const disabledReason = !disabled
-    ? null
-    : outOfQuestions
-      ? NO_QUESTIONS_LEFT
-      : NO_SESSION;
+  let disabledReason: string | null = null;
+
+  if (disabled) {
+    disabledReason = outOfQuestions ? NO_QUESTIONS_LEFT : NO_SESSION;
+  }
 
   // `loading` only changes once React has rendered, so two sends in the same
   // tick would both read it as false. A ref is true the moment it is set.
