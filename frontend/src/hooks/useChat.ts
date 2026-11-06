@@ -112,10 +112,8 @@ export function useChat({
 
   let disabledReason: string | null = null;
 
-  if (outOfQuestions) {
-    disabledReason = NO_QUESTIONS_LEFT;
-  } else if (disabled) {
-    disabledReason = NO_SESSION;
+  if (disabled) {
+    disabledReason = outOfQuestions ? NO_QUESTIONS_LEFT : NO_SESSION;
   }
 
   // `loading` only changes once React has rendered, so two sends in the same

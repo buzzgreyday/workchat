@@ -62,12 +62,11 @@ for small print, not for anything someone has to read to use the page.
 
 | Role | Face | Weight | Size |
 | --- | --- | --- | --- |
-| Title | **Bebas Neue** | 800, which the browser fakes: 400 is its only weight, capitals only | 2.5rem, down to 1.5rem on a phone |
+| Title | **Bebas Neue** | 800 on chat.mringdal.com; 600 in the embed unless the host sets `--chat-font-title-weight`. Either is faked: 400 is its only weight, capitals only | 2.5rem, down to 1.5rem on a phone |
 | Messages | **Nunito** | 400 | 1.125rem, line height 1.5. 300 was too thin to read on the navy. |
 | Small labels | Nunito | 400 | 0.875rem (links, pills) |
 
-- Bebas has one weight. The 800 both sites ask for is a bold the browser
-  fakes; beyond that, use size for emphasis, not weight.
+- Bebas has one weight. Anything above 400 is a bold the browser fakes; beyond that, use size for emphasis, not weight.
 - Write the title in normal case. Bebas draws capitals anyway, and screen
   readers spell out text typed in capitals.
 - Any text field on a phone must be at least 16px, or iOS zooms the page when
@@ -120,10 +119,10 @@ reference, rather than a copy here that could drift from them:
 | `app/styles/buttons.css` | `.button`, the one kind of button |
 | `app/styles/chat.css` | The `--chat-*` variables, on the `workchat-chat` element |
 
-Two things it does differently from chat.mringdal.com, on purpose:
-
-- **Body text is Nunito at 600**, not 400, and bold needs 800 to read as bold.
-- **Its body text is 1.125rem**, and the chat's messages are told the same.
+One thing it does differently from chat.mringdal.com, on purpose: **body text
+is Nunito at 600**, not 400, and bold needs 800 to read as bold. Its body text
+is 1.125rem, the size of the chat's own messages, and it tells the embedded
+messages the same.
 
 The faces are loaded in the page, so their variables inherit into the chat's
 shadow root and its `@font-face` rules are the document's, where the shadow root

@@ -15,8 +15,8 @@
  *
  * Height is taken, not asserted — `100%` of whatever the host sized, so the
  * page decides how big its chat is and the chat still gets a definite height
- * for its own `height: 100%` to mean something. A host that sizes nothing gets nothing; that is
- * the one thing EMBED.md asks of them.
+ * for its own `height: 100%` to mean something. A host that sizes nothing
+ * gets nothing; that is the one thing EMBED.md asks of them.
  *
  * The font is inherited from the host page unless it names one. Unset,
  * `var(--chat-font)` is invalid at computed-value time and `font-family`

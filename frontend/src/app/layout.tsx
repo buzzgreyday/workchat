@@ -26,8 +26,8 @@ const nunito = localFont({
   ],
 });
 
-// A single weight, and capitals only — there is no bold to ask for, so any
-// `--chat-font-title-weight` above 400 is one the browser fakes. From Google rather than a file in
+// A single weight, and capitals only — there is no bold to ask for (see
+// `--chat-font-title-weight` in theme.css). From Google rather than a file in
 // `fonts/`: the Fontshare copy's licence forbids putting it in a public
 // repository, and Google's is the same Dharma Type design under the OFL.
 const bebas = Bebas_Neue({
