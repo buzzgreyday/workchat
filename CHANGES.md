@@ -7,6 +7,25 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.13.5] - 2026-11-06
+
+### Changed
+
+- **The chat can explain how it is built.** Asked about its engineering, it
+  can describe idempotent retries, the atomic spend, signed history, the
+  private proof-of-work trial, the layering of a chat turn, the embed's
+  contract and the eval suite, each checked against the code it describes.
+- **The chat knows mringdal.com**, the site it is embedded in, and the
+  decisions behind it: two repos joined only by a written contract, plain CSS,
+  same-site cookies and gated deploys.
+
+### Fixed
+
+- The chat no longer says its frontend is built with Tailwind. It has been
+  plain CSS since 0.12.0, and the record now says so and mentions the guest
+  trial. CLAUDE.md now asks for the record to change with the code it
+  describes.
+
 ## [0.13.4] - 2026-11-01
 
 ### Changed
