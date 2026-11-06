@@ -19,12 +19,14 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **docker** — AI CV Chat Application, Software Developer @ iEDI, Tracing and Distributed Logging
 - **rest-api** — .NET API, AI CV Chat Application, Software Developer @ iEDI
 - **blockchain** — Blockchain Wallet Modification, Freelance Software Developer @ Constellation Network
+- **ci-cd** — AI CV Chat Application, Software Developer @ iEDI
 - **fastapi** — AI CV Chat Application, Software Developer @ iEDI
+- **github-actions** — AI CV Chat Application, Software Developer @ iEDI
 - **javascript** — Blockchain Wallet Modification, Software Developer @ iEDI
   - Scope: A small part of the work at iEDI; his professional focus there is backend Python.
+- **testing** — AI CV Chat Application, Software Developer @ iEDI
 - **architecture** — Software Developer @ iEDI
 - **backend-engineer** — Software Developer @ iEDI
-- **ci-cd** — Software Developer @ iEDI
 - **code-review** — Software Developer @ iEDI
 - **cron** — Software Developer @ iEDI
 - **cryptography** — Freelance Software Developer @ Constellation Network
@@ -35,7 +37,6 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **encryption** — Freelance Software Developer @ Constellation Network
 - **erp** — Software Developer @ iEDI
 - **freelance** — Freelance Software Developer @ Constellation Network
-- **github-actions** — Software Developer @ iEDI
 - **integrations** — Software Developer @ iEDI
 - **kubernetes** — Software Developer @ iEDI
   - Scope: Created and managed services, ingress, and deployments through Rancher; did not author raw manifests/Helm charts or design cluster architecture from scratch.
@@ -63,12 +64,12 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **sql** — Software Developer @ iEDI
 - **system-design** — Software Developer @ iEDI
 - **technical-debt** — Software Developer @ iEDI
-- **testing** — Software Developer @ iEDI
 - **troubleshooting** — Software Developer @ iEDI
 - **xml** — Software Developer @ iEDI
 - **typescript** — AI CV Chat Application, Blockchain Wallet Modification
 - **.NET** — .NET API
 - **alembic** — AI CV Chat Application
+- **api-contracts** — AI CV Chat Application
 - **async** — AI CV Chat Application
 - **authentication** — AI CV Chat Application
 - **bash** — AI CV Chat Application
@@ -82,27 +83,32 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **crypto** — Blockchain Wallet Modification
 - **csharp** — .NET API
 - **dotnet** — .NET API
+- **evals** — AI CV Chat Application
 - **frontend** — AI CV Chat Application
 - **full-stack** — AI CV Chat Application
 - **full-stack-developer** — AI CV Chat Application
 - **grafana** — Tracing and Distributed Logging
 - **hardware-wallet** — Blockchain Wallet Modification
 - **hobby-programming** — Custom iPodLinux Bootloader
+- **idempotency** — AI CV Chat Application
 - **jwt** — AI CV Chat Application
 - **linux** — Custom iPodLinux Bootloader
 - **llm** — AI CV Chat Application
 - **loki** — Tracing and Distributed Logging
 - **monitoring** — Tracing and Distributed Logging
+- **mypy** — AI CV Chat Application
 - **nextjs** — AI CV Chat Application
 - **observability** — Tracing and Distributed Logging
 - **openai** — AI CV Chat Application
 - **opentelemetry** — Tracing and Distributed Logging
 - **postgresql** — AI CV Chat Application
+- **privacy** — AI CV Chat Application
 - **react** — AI CV Chat Application
 - **security** — AI CV Chat Application
 - **self-taught** — Custom iPodLinux Bootloader
 - **server-sent-events** — AI CV Chat Application
 - **shell-scripting** — AI CV Chat Application
+- **software-architecture** — AI CV Chat Application
 - **sqlalchemy** — AI CV Chat Application
 - **sse** — AI CV Chat Application
 - **streaming** — AI CV Chat Application
@@ -110,7 +116,9 @@ summary: Technical skills derived from experience and projects, plus spoken lang
 - **tailwind** — AI CV Chat Application
 - **tempo** — Tracing and Distributed Logging
 - **tool-calling** — AI CV Chat Application
+- **transactions** — AI CV Chat Application
 - **web-api** — .NET API
+- **web-components** — AI CV Chat Application
 - **web3** — Blockchain Wallet Modification
 
 <!-- AUTO-GENERATED-SKILLS-END -->
