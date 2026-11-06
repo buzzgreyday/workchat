@@ -61,6 +61,14 @@ After changing a SQLAlchemy model: generate the migration
 it — autogenerate misses server defaults and renames — and commit it with the
 model. CI fails on drift (`alembic check`).
 
+The chat describes itself in `backend/resources/ai-cv-chat-app.md`, and
+`roles.md` repeats its stack. A change to what the chat is built with, or what
+it offers a visitor, updates those files in the same piece of work —
+otherwise the chat tells hirers about a version of itself that no longer
+exists. The homepage at `../website` points at resource files by name from
+`lib/projects.ts`; renaming one, or changing its `type`, breaks its check
+there.
+
 After changing the tags on anything in `backend/resources/`: regenerate the
 skills list (`cd backend && uv run -m app.build_skills`) and commit it. The
 search index itself needs nothing; it is rebuilt at startup.
