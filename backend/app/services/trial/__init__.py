@@ -46,7 +46,7 @@ from app.repositories.base import (
     TrialReservation,
     UserRepository,
 )
-from app.services.auth import Auth
+from app.services.auth import SessionService
 from app.services.trial import cookie, keys, pow
 from app.services.trial.pow import Challenge
 
@@ -100,7 +100,7 @@ async def start_trial(
     tokens: TokenRepository,
     sessions: RefreshSessionRepository,
     trials: TrialRepository,
-    auth: Auth,
+    session_service: SessionService,
     now: datetime | None = None,
 ) -> TokenPair:
     """
@@ -163,4 +163,4 @@ async def start_trial(
         )
     )
     logger.info("Trial opened", extra={"token_id": grant.id})
-    return await auth.open_session(grant, sessions)
+    return await session_service.open_session(grant, sessions)

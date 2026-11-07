@@ -20,7 +20,7 @@ from app.repositories import (
 )
 from app.repositories.base import RefreshSessionRepository, TokenRepository, TranscriptRepository
 from app.services import chat as chat_service
-from app.services.auth import Auth, bearer_scheme, get_auth
+from app.services.auth import Authenticator, bearer_scheme, get_authenticator
 from app.services.chat import (
     ChatTooling,
     ModelCalled,
@@ -96,7 +96,7 @@ async def chat_stream(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     tokens: TokenRepository = Depends(get_token_repository),
     sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
-    auth: Auth = Depends(get_auth),
+    authenticator: Authenticator = Depends(get_authenticator),
     client: AsyncOpenAI = Depends(get_openai_client),
     tooling: ChatTooling = Depends(get_tooling),
     transcripts: TranscriptRepository = Depends(get_transcript_repository),
@@ -119,9 +119,10 @@ async def chat_stream(
     client, it would vouch for whatever the client chose to send with it.
     """
     message_hash = hashlib.sha256(req.message.encode()).hexdigest()
-    token, earlier_conversation = await auth.verify_and_consume(
+    paid = await authenticator.verify_and_consume(
         credentials, tokens, sessions, question_key, message_hash
     )
+    token = paid.token
     logger.info(
         "Chat message received from user",
         extra={
@@ -148,6 +149,6 @@ async def chat_stream(
         transcripts=transcripts,
         endpoint="/chat/stream",
         question_key=question_key,
-        earlier_conversation=earlier_conversation,
+        earlier_conversation=paid.earlier_conversation,
     )
     return StreamingResponse(frames(events), media_type="text/event-stream")

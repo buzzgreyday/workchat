@@ -24,7 +24,6 @@ from app.common.config import get_settings
 from app.common.db import Base, get_db, get_session_factory, transaction
 from app.factory import create_app
 from app.openai.client import get_openai_client
-from app.services.auth import get_auth
 from app.services.search import get_search
 
 _TEST_RESOURCES = Path(tempfile.mkdtemp(prefix="cv-test-"))
@@ -65,7 +64,7 @@ os.environ.setdefault("TRIAL_POW_MAX_NUMBER", "1000")
 # Everything the application caches for the life of a process. The suite is one
 # process, so a value built against an earlier test's environment would outlive
 # it; clearing here is what keeps the settings above authoritative.
-for _cache in (get_settings, get_auth, get_search, get_openai_client, get_session_factory):
+for _cache in (get_settings, get_search, get_openai_client, get_session_factory):
     _cache.cache_clear()
 
 

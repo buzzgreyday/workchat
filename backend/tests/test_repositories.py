@@ -585,7 +585,8 @@ async def test_issue_token_runs_without_a_database():
     """
     from app.common.models import IssueTokenRequest
     from app.services.admin import issue_token
-    from app.services.auth import Auth
+    from app.common.config import get_settings
+    from app.services.auth import TokenCodec
 
     users = FakeUserRepository()
     tokens = FakeTokenRepository()
@@ -594,7 +595,7 @@ async def test_issue_token_runs_without_a_database():
         IssueTokenRequest(subject="Ada", company="Acme", max_queries=3),
         users=users,
         tokens=tokens,
-        auth=Auth(),
+        codec=TokenCodec.from_settings(get_settings()),
     )
 
     assert raw.count(".") == 2  # a JWT
@@ -610,15 +611,16 @@ async def test_issue_token_reuses_an_existing_user():
     """
     from app.common.models import IssueTokenRequest
     from app.services.admin import issue_token
-    from app.services.auth import Auth
+    from app.common.config import get_settings
+    from app.services.auth import TokenCodec
 
     users = FakeUserRepository()
     tokens = FakeTokenRepository()
     req = IssueTokenRequest(subject="Ada", company="Acme", max_queries=3)
-    auth = Auth()
+    codec = TokenCodec.from_settings(get_settings())
 
-    await issue_token(req, users=users, tokens=tokens, auth=auth)
-    await issue_token(req, users=users, tokens=tokens, auth=auth)
+    await issue_token(req, users=users, tokens=tokens, codec=codec)
+    await issue_token(req, users=users, tokens=tokens, codec=codec)
 
     assert len(users.rows) == 1, "the second issue must not create a second user"
     assert len(tokens.rows) == 2

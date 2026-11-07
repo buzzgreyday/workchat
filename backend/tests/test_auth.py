@@ -14,11 +14,12 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 import pytest
+from fastapi import Depends
 from sqlalchemy import select, update
 
 from app.common.config import ALGORITHM, REFRESH_COOKIE_NAME, get_settings
 from app.common.schemas import DatabaseRefreshToken, DatabaseToken
-from app.services.auth import Auth, get_auth
+from app.services.auth import SessionService, TokenCodec, get_session_service, get_token_codec
 
 ADMIN_HEADERS = {"X-Admin-Key": os.environ["ADMIN_KEY"]}
 
@@ -74,10 +75,10 @@ def decode(token):
 def notifications(app, client):
     """Records what the operator would have been told.
 
-    An override rather than a patch: Auth is a dependency now, so the seam the
-    framework already provides reaches every endpoint — where setting an
-    attribute on a module-level instance only reached the modules that had not
-    already bound it by value.
+    An override rather than a patch: the session service is a dependency, so
+    the seam the framework already provides reaches every endpoint that uses
+    it — where setting an attribute on a module-level instance would only reach
+    the modules that had not already bound it by value.
     """
     sent = []
 
@@ -88,10 +89,12 @@ def notifications(app, client):
         async def sessions_cut(self, token_id, subject, company, reason):
             sent.append(("sessions_cut", str(token_id), subject))
 
-    recording_auth = Auth(notifier=Recorder())
-    app.dependency_overrides[get_auth] = lambda: recording_auth
+    def recording_sessions(codec: TokenCodec = Depends(get_token_codec)) -> SessionService:
+        return SessionService(codec, notifier=Recorder())
+
+    app.dependency_overrides[get_session_service] = recording_sessions
     yield sent
-    app.dependency_overrides.pop(get_auth, None)
+    app.dependency_overrides.pop(get_session_service, None)
 
 
 async def backdate_rotation(session_maker, minutes=10):
