@@ -7,6 +7,34 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.13.7] - 2026-11-07
+
+### Fixed
+
+- A grant's `created_at` is stored in UTC whatever timezone the host runs in.
+  It was built from a naive local time, which the domain model then read as
+  UTC — right on a UTC host, off by the host's offset anywhere else.
+
+### Changed
+
+- Nothing a visitor or a hirer sees: the same responses, the same tokens, the
+  same status codes. The backend was tidied against Clean Code.
+- **Auth is a package, one class per reason to change.** `TokenCodec` holds
+  the signing key, `SessionService` runs the v2 claim and refresh flow, and
+  `Authenticator` checks a request's bearer. The admin key is a plain
+  dependency, because it shares nothing with the rest. One `Auth` class did
+  all of it and changed for every one of those reasons. The v1 path is
+  untouched.
+- **Configuration is handed down, not fetched.** The chat turn is given its
+  model and system prompt, and the token and session stores their time
+  windows, instead of each reading `get_settings()` itself. A test now changes
+  them by overriding one dependency rather than patching a module.
+- **Rules stated once.** What makes a grant unusable lives on `Grant`, and a
+  model call is streamed by one piece of code; each had been written twice.
+- Token versions are a `TokenVersion` enum and a message's role and status are
+  typed, where they were bare numbers and strings documented in comments. The
+  wire format and the stored values are the same numbers and words as before.
+
 ## [0.13.6] - 2026-11-06
 
 ### Fixed
