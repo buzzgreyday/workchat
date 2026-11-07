@@ -18,7 +18,7 @@ the page readable at a glance.
 | **Surface** — navy | `#1b2e42` | The page and everything on it: the top bar, the chat band, the footer, cards. One colour, no frame of another around it. |
 | **Raised surface** | `#2b3d4f` | Things on the surface: reply bubbles, the input, pills. The navy lifted with 8% white. |
 | **Text** — cream | `#eae0cf` | All body text. |
-| **Muted text** | `#86898f` | Placeholders, footer links, secondary labels. |
+| **Muted text** — sage | `#809e85` | Placeholders, footer links, secondary labels. A grey tinted green. |
 | **Accent** — blue-grey | `#94b4c1` | Links in text. Tints the visitor's own messages (`#4e6778`, 45% accent into navy). |
 | **Identity** — pale gold | `#e0cea1` | The WORKCHAT title, status text such as "questions left". Who this is and where you are. |
 | **Action** — coral | `#e0876a` | The one thing to press: the send button. Nothing else. |
@@ -54,9 +54,16 @@ Measured contrast. 4.5:1 is the guideline for body text, 3:1 for large text
 | Coral button against navy | 5.2:1 |
 | Navy icon on coral | 5.2:1 |
 | Pale gold title on navy | 8.9:1 |
+| Sage muted text on navy | 4.7:1 |
+| Sage muted text on raised surface | 3.8:1 |
 
-Muted text on navy (the footer links, the trial notice) is 4.0:1: fine
-for small print, not for anything someone has to read to use the page.
+The muted text was a neutral grey (`#86898f`), at 3.95:1 on navy and 3.2:1
+on the raised surface: excused as small print, and below the guideline for
+anything read. Sage is the same lightness tinted green, and the tint alone
+moves it far enough from the navy to pass 4.5:1 there. A dark green was
+tried first and rejected: at 1.8:1 it cannot be read.
+On the raised surface it is still below 4.5:1, so placeholders and the pill's
+count stay short labels, not sentences.
 
 ## Type
 
