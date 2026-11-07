@@ -155,3 +155,30 @@ async def test_a_round_reports_why_it_stopped():
     events = await collect(run_turn(client, FakeTooling(), [], USAGE))
 
     assert [e.finish_reason for e in events if isinstance(e, RoundFinished)] == ["stop"]
+
+
+async def test_text_written_alongside_a_tool_call_is_kept():
+    """
+    A model may say something before it asks for a tool. That text is part of
+    the reply the hirer saw stream past, and it travels with the tool call in
+    the history the next round sends.
+    """
+    def preamble_then_tools():
+        async def chunks():
+            yield MagicMock(
+                choices=[MagicMock(delta=MagicMock(content="Let me check. ", tool_calls=None), finish_reason=None)]
+            )
+            async for chunk in wants_tools():
+                yield chunk
+
+        return chunks()
+
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock(side_effect=[preamble_then_tools(), stream_of("Found it.")])
+
+    finished = (await collect(run_turn(client, FakeTooling(), [], USAGE)))[-1]
+
+    assert finished.reply == "Let me check. Found it."
+    asked = next(m for m in finished.history if m.get("tool_calls"))
+    assert asked["content"] == "Let me check. "
+    assert finished.history[-1] == {"role": "assistant", "content": "Found it."}

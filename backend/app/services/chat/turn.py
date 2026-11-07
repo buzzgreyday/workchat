@@ -11,8 +11,8 @@ Everything a turn accumulates lives in locals. There is no instance, so a second
 call cannot inherit the first one's tool counts, reply or messages.
 """
 
-import uuid
 from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
 from typing import Any, cast
 
 from openai import AsyncOpenAI
@@ -54,74 +54,81 @@ async def run_turn(
     terminal event with the system prompt stripped.
     """
     reply = ""
-    finish_reason: str | None = None
 
     for _ in range(max_rounds):
-        content = ""
-        pending: dict[int, dict[str, Any]] = {}
+        round_ = _Round()
+        async for event in round_.run(client, tooling, messages):
+            yield event
+        reply += round_.content
 
-        yield ModelCalled()
-        response = await client.chat.completions.create(
-            model=get_settings().openai_model,
-            messages=messages,
-            **_reasoning(),
-            tools=await tooling.schemas(),
-            stream=True,
-        )
-        async for chunk in response:
-            choice = chunk.choices[0]
-            if choice.finish_reason:
-                finish_reason = choice.finish_reason
-            if choice.delta.content:
-                content += choice.delta.content
-                reply += choice.delta.content
-                yield TokenProduced(text=choice.delta.content)
-            _accumulate_tool_calls(choice.delta.tool_calls, pending)
-
-        yield RoundFinished(finish_reason=finish_reason)
-
-        if finish_reason != "tool_calls":
-            _append_assistant(messages, content)
+        if round_.finish_reason != "tool_calls":
+            _append_assistant(messages, round_.content)
             break
 
-        calls = _assemble(pending)
-        messages.append(_assistant_tool_call_message(content, calls))
+        calls = _assemble(round_.pending)
+        messages.append(_assistant_tool_call_message(round_.content, calls))
         async for event in _run_tools(tooling, calls, messages):
             yield event
     else:
-        # The budget ran out with the model still asking for tools. It used to
-        # end on whatever had been streamed — usually nothing, since a model
-        # still calling tools has not written prose yet, so the hirer got an
-        # empty bubble. One more round with tools switched off turns the cap
-        # into a thinner answer built from what was already fetched.
+        # The budget ran out with the model still asking for tools. Ending
+        # here would end on whatever had streamed — usually nothing, since a
+        # model still calling tools has not written prose yet. One more round
+        # with tools switched off turns the cap into a thinner answer built
+        # from what was already fetched.
         logger.warning("Tool-call rounds exhausted without a final reply", extra={"max_rounds": max_rounds})
-        content = ""
-        yield ModelCalled()
-        response = await client.chat.completions.create(
-            model=get_settings().openai_model,
-            messages=messages,
-            **_reasoning(),
-            tools=await tooling.schemas(),
-            tool_choice="none",
-            stream=True,
-        )
-        async for chunk in response:
-            choice = chunk.choices[0]
-            if choice.finish_reason:
-                finish_reason = choice.finish_reason
-            if choice.delta.content:
-                content += choice.delta.content
-                reply += choice.delta.content
-                yield TokenProduced(text=choice.delta.content)
-        yield RoundFinished(finish_reason=finish_reason)
-        _append_assistant(messages, content)
+        round_ = _Round()
+        async for event in round_.run(client, tooling, messages, tool_choice="none"):
+            yield event
+        reply += round_.content
+        _append_assistant(messages, round_.content)
 
     yield TurnFinished(
         reply=reply,
         history=cast(list[dict[str, Any]], strip_system(messages)),
         usage=usage,
-        finish_reason=finish_reason,
+        finish_reason=round_.finish_reason,
     )
+
+
+@dataclass(slots=True)
+class _Round:
+    """
+    One model call, and what it said.
+
+    Its events go out as they happen; what the turn needs afterwards — the
+    text, why the model stopped, the tool calls it assembled — stays here to
+    be read once the stream is done, which an async generator cannot return.
+    """
+
+    content: str = ""
+    finish_reason: str | None = None
+    pending: dict[int, dict[str, Any]] = field(default_factory=dict)
+
+    async def run(
+        self,
+        client: AsyncOpenAI,
+        tooling: ChatTooling,
+        messages: list[ChatCompletionMessageParam],
+        **options: Any,
+    ) -> AsyncIterator[TurnEvent]:
+        yield ModelCalled()
+        response = await client.chat.completions.create(
+            model=get_settings().openai_model,
+            messages=messages,
+            **_reasoning(),
+            tools=await tooling.schemas(),
+            stream=True,
+            **options,
+        )
+        async for chunk in response:
+            choice = chunk.choices[0]
+            if choice.finish_reason:
+                self.finish_reason = choice.finish_reason
+            if choice.delta.content:
+                self.content += choice.delta.content
+                yield TokenProduced(text=choice.delta.content)
+            _accumulate_tool_calls(choice.delta.tool_calls, self.pending)
+        yield RoundFinished(finish_reason=self.finish_reason)
 
 
 def _reasoning() -> dict[str, Any]:
