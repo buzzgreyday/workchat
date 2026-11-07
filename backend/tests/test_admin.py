@@ -154,7 +154,8 @@ async def test_issued_grant_is_stamped_in_utc_whatever_the_host_timezone():
 
     from app.common.models import Grant, IssueTokenRequest, User
     from app.services import admin
-    from app.services.auth import Auth
+    from app.common.config import get_settings
+    from app.services.auth import TokenCodec
 
     class Users:
         async def get_by_name(self, name):
@@ -175,7 +176,7 @@ async def test_issued_grant_is_stamped_in_utc_whatever_the_host_timezone():
     try:
         await admin.issue_token(
             IssueTokenRequest(subject="test-hire", company="Acme"),
-            users=Users(), tokens=tokens, auth=Auth(),
+            users=Users(), tokens=tokens, codec=TokenCodec.from_settings(get_settings()),
         )
     finally:
         if previous_tz is None:
