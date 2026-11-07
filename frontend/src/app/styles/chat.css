@@ -183,11 +183,15 @@
     padding: var(--gutter-sm);
   }
 
+  /* The `composer` part (EMBED.md): positioned and rounded like the field
+     in it, so what a host draws on the box with ::before or ::after, at
+     `inset: 0` and `border-radius: inherit`, lies exactly on the field. */
   .composer-box {
     position: relative;
     display: flex;
     flex: 1;
     min-width: 0;
+    border-radius: var(--radius-control);
   }
 
   /* The size and focus are `.chat-field`, in globals.css. */

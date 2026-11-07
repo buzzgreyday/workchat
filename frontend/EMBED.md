@@ -16,8 +16,8 @@ pin, so a release here reaches every embedding page on its next load.
 ## The API
 
 Versioned like an API, because it is one — and unlike a package, nobody can
-stay behind on an old version. Adding an attribute, an event, a state or a
-variable is safe. Renaming or removing one breaks every page that embeds this.
+stay behind on an old version. Adding an attribute, an event, a state, a
+part or a variable is safe. Renaming or removing one breaks every page that embeds this.
 
 **Attributes**
 
@@ -81,6 +81,37 @@ nothing to miss by listening too late. `:has()` reaches it from anywhere on the
 page, so a host can light up something outside the chat while it works —
 `body:has(workchat-chat:state(working)) .glow`. A browser without custom states
 (before 2024) shows no state, and the chat works as it always has.
+
+**Parts** (shadow parts, so style them with `::part()`)
+
+| Part | What it is |
+| --- | --- |
+| `composer` | The box the question is typed in: exactly the size of the field, its corners the field's, positioned, so anything drawn in it with `::before` or `::after` sits on the field. |
+
+```css
+workchat-chat::part(composer)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* a ring, a glow — whatever the host draws round the field */
+}
+```
+
+For what a colour cannot do. The `--chat-*` variables each carry one value,
+and the field's border is one colour; a host that wants something drawn round
+the field — two colours moving across each other, a light running round it —
+needs to reach the field itself, and a shadow root lets nothing in but its
+parts. The box rather than the field: a textarea takes no `::before` or
+`::after`, and the box is the same size, so whatever is drawn on it is drawn
+on the field. One part, not one per piece of the chat: each one is a promise
+about the markup under it, and this is the one a host has asked for.
+
+The part is the box, not its insides: its size, place and corners are the
+promise, and what it holds may change. Style the box, and leave the field and
+the count in it to the `--chat-*` variables. A host that styles the part
+together with a state — `workchat-chat:state(working)::part(composer)` — draws
+what the chat is doing round the place the visitor is looking.
 
 **CSS variables** — the palette is the `--chat-*` set declared at the top of
 `src/app/globals.css`: `--chat-bg`, `--chat-panel`, `--chat-border`, and the
@@ -192,7 +223,7 @@ WEBSITE_DIR=/path/to/site npm run test:contract
 ```
 
 Builds the element and runs the site's Playwright tests against that exact
-file. Rename an attribute, an event, a state or a `--chat-*` variable and it
+file. Rename an attribute, an event, a state, a part or a `--chat-*` variable and it
 goes red here, in this repo, before the change is deployed to a site that
 cannot pin a version of it. It needs a checkout of the site with its dependencies
 installed, and nothing else — no database, no key, no stack. The backend stays
