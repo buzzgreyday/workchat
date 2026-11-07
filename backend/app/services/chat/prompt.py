@@ -15,10 +15,8 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 
-from app.common.config import get_settings
 
-
-def system_content(now: datetime | None = None) -> str:
+def system_content(system_prompt: str, now: datetime | None = None) -> str:
     """
     The system prompt plus today's date.
 
@@ -29,7 +27,7 @@ def system_content(now: datetime | None = None) -> str:
     """
     today = now or datetime.now(timezone.utc)
     return (
-        f"{get_settings().system_prompt}\n\n"
+        f"{system_prompt}\n\n"
         f"Today's date is {today.strftime('%A, %d %B %Y')}. Use it whenever a "
         f"question depends on the current date — the length of a role, how "
         f"recent something is, or whether a date is past or future. Never "
@@ -37,12 +35,14 @@ def system_content(now: datetime | None = None) -> str:
     )
 
 
-def build_messages(message: str, history: Sequence[dict[str, Any]] | None) -> list[ChatCompletionMessageParam]:
+def build_messages(
+    message: str, history: Sequence[dict[str, Any]] | None, system_prompt: str
+) -> list[ChatCompletionMessageParam]:
     """The system prompt, the client's history, then what was just asked."""
     # Annotated rather than cast: a literal that has to satisfy the TypedDict is
     # checked against it, where `| dict` merely widened the type until the
     # checker stopped looking.
-    system_message: ChatCompletionSystemMessageParam = {"role": "system", "content": system_content()}
+    system_message: ChatCompletionSystemMessageParam = {"role": "system", "content": system_content(system_prompt)}
     user_message: ChatCompletionUserMessageParam = {"role": "user", "content": message}
     return [system_message, *strip_system(history), user_message]
 

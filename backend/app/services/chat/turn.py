@@ -23,7 +23,7 @@ from openai.types.chat import (
 )
 from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 
-from app.common.config import MAX_TOOL_ROUNDS, get_settings
+from app.common.config import MAX_TOOL_ROUNDS
 from app.common.logging.logging import logger
 from app.common.models import Usage
 from app.services.chat.events import (
@@ -39,11 +39,34 @@ from app.services.chat.prompt import strip_system
 from app.services.chat.tooling import ChatTooling, ToolCall, ToolCallFunction
 
 
+@dataclass(frozen=True, slots=True)
+class ChatModel:
+    """Which model a turn calls, and how hard it is asked to think. Every call
+    in a turn uses the same one."""
+
+    name: str
+    reasoning_effort: str | None = None
+
+    def call_options(self) -> dict[str, Any]:
+        """
+        What every chat call sends about the model.
+
+        `reasoning_effort` only when one is set: a model that does not reason
+        rejects the parameter, so it is left out rather than sent empty.
+        """
+        options: dict[str, Any] = {"model": self.name}
+        if self.reasoning_effort:
+            options["reasoning_effort"] = self.reasoning_effort
+        return options
+
+
 async def run_turn(
     client: AsyncOpenAI,
     tooling: ChatTooling,
     messages: list[ChatCompletionMessageParam],
     usage: Usage,
+    *,
+    model: ChatModel,
     max_rounds: int = MAX_TOOL_ROUNDS,
 ) -> AsyncIterator[TurnEvent]:
     """
@@ -57,7 +80,7 @@ async def run_turn(
 
     for _ in range(max_rounds):
         round_ = _Round()
-        async for event in round_.run(client, tooling, messages):
+        async for event in round_.run(client, tooling, model, messages):
             yield event
         reply += round_.content
 
@@ -77,7 +100,7 @@ async def run_turn(
         # from what was already fetched.
         logger.warning("Tool-call rounds exhausted without a final reply", extra={"max_rounds": max_rounds})
         round_ = _Round()
-        async for event in round_.run(client, tooling, messages, tool_choice="none"):
+        async for event in round_.run(client, tooling, model, messages, tool_choice="none"):
             yield event
         reply += round_.content
         _append_assistant(messages, round_.content)
@@ -108,14 +131,14 @@ class _Round:
         self,
         client: AsyncOpenAI,
         tooling: ChatTooling,
+        model: ChatModel,
         messages: list[ChatCompletionMessageParam],
         **options: Any,
     ) -> AsyncIterator[TurnEvent]:
         yield ModelCalled()
         response = await client.chat.completions.create(
-            model=get_settings().openai_model,
+            **model.call_options(),
             messages=messages,
-            **_reasoning(),
             tools=await tooling.schemas(),
             stream=True,
             **options,
@@ -129,17 +152,6 @@ class _Round:
                 yield TokenProduced(text=choice.delta.content)
             _accumulate_tool_calls(choice.delta.tool_calls, self.pending)
         yield RoundFinished(finish_reason=self.finish_reason)
-
-
-def _reasoning() -> dict[str, Any]:
-    """
-    `reasoning_effort` for the chat call, when one is configured, and nothing
-    otherwise — a model that does not reason rejects the parameter, so it is
-    left out rather than sent empty. Set centrally (OPENAI_REASONING_EFFORT,
-    Settings.openai_reasoning_effort); every call in a turn uses the same.
-    """
-    effort = get_settings().openai_reasoning_effort
-    return {"reasoning_effort": effort} if effort else {}
 
 
 def _accumulate_tool_calls(

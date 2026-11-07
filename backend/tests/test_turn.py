@@ -12,10 +12,11 @@ import pytest
 from app.common.config import MAX_TOOL_ROUNDS
 from app.common.models import Usage
 from app.services.chat.events import RoundFinished, TokenProduced, ToolInvoked, TurnFinished
-from app.services.chat.turn import run_turn
+from app.services.chat.turn import ChatModel, run_turn
 from tests.conftest import stream_of
 
 USAGE = Usage(used=1, remaining=4, max=5)
+MODEL = ChatModel("test-model")
 
 
 class FakeTooling:
@@ -56,7 +57,7 @@ async def test_a_plain_reply_streams_then_finishes():
     client = MagicMock()
     client.chat.completions.create = AsyncMock(side_effect=lambda **kw: stream_of("hi ", "there"))
 
-    events = await collect(run_turn(client, FakeTooling(), [], USAGE))
+    events = await collect(run_turn(client, FakeTooling(), [], USAGE, model=MODEL))
 
     assert [e.text for e in events if isinstance(e, TokenProduced)] == ["hi ", "there"]
     finished = events[-1]
@@ -70,7 +71,7 @@ async def test_the_turn_carries_no_transport():
     client = MagicMock()
     client.chat.completions.create = AsyncMock(side_effect=lambda **kw: stream_of("hi"))
 
-    events = await collect(run_turn(client, FakeTooling(), [], USAGE))
+    events = await collect(run_turn(client, FakeTooling(), [], USAGE, model=MODEL))
 
     assert not any(isinstance(e, (bytes, str)) for e in events)
 
@@ -80,7 +81,7 @@ async def test_a_tool_call_runs_and_is_reported():
     client = MagicMock()
     client.chat.completions.create = AsyncMock(side_effect=[wants_tools(), stream_of("answered")])
 
-    events = await collect(run_turn(client, tooling, [], USAGE))
+    events = await collect(run_turn(client, tooling, [], USAGE, model=MODEL))
 
     assert tooling.calls == [("search_cv", '{"query": "x"}')]
     assert [e.name for e in events if isinstance(e, ToolInvoked)] == ["search_cv"]
@@ -92,7 +93,7 @@ async def test_history_keeps_the_tool_call_pairing():
     client = MagicMock()
     client.chat.completions.create = AsyncMock(side_effect=[wants_tools(), stream_of("answered")])
 
-    finished = (await collect(run_turn(client, FakeTooling(), [], USAGE)))[-1]
+    finished = (await collect(run_turn(client, FakeTooling(), [], USAGE, model=MODEL)))[-1]
 
     assistant = next(m for m in finished.history if m.get("tool_calls"))
     tool = next(m for m in finished.history if m.get("role") == "tool")
@@ -112,7 +113,7 @@ async def test_the_tool_budget_is_bounded_and_still_answers():
     )
     client.chat.completions.create = create
 
-    finished = (await collect(run_turn(client, FakeTooling(), [], USAGE)))[-1]
+    finished = (await collect(run_turn(client, FakeTooling(), [], USAGE, model=MODEL)))[-1]
 
     assert create.await_count == MAX_TOOL_ROUNDS + 1
     assert create.await_args.kwargs["tool_choice"] == "none"
@@ -127,7 +128,7 @@ async def test_an_empty_reply_is_not_appended_to_history():
     client = MagicMock()
     client.chat.completions.create = AsyncMock(side_effect=lambda **kw: stream_of())
 
-    finished = (await collect(run_turn(client, FakeTooling(), [], USAGE)))[-1]
+    finished = (await collect(run_turn(client, FakeTooling(), [], USAGE, model=MODEL)))[-1]
 
     assert finished.history == []
 
@@ -139,10 +140,10 @@ async def test_a_second_turn_starts_clean():
     """
     client = MagicMock()
     client.chat.completions.create = AsyncMock(side_effect=lambda **kw: stream_of("first"))
-    first = (await collect(run_turn(client, FakeTooling(), [], USAGE)))[-1]
+    first = (await collect(run_turn(client, FakeTooling(), [], USAGE, model=MODEL)))[-1]
 
     client.chat.completions.create = AsyncMock(side_effect=lambda **kw: stream_of("second"))
-    second = (await collect(run_turn(client, FakeTooling(), [], USAGE)))[-1]
+    second = (await collect(run_turn(client, FakeTooling(), [], USAGE, model=MODEL)))[-1]
 
     assert first.reply == "first"
     assert second.reply == "second", "a turn must not inherit the last one's reply"
@@ -152,7 +153,7 @@ async def test_a_round_reports_why_it_stopped():
     client = MagicMock()
     client.chat.completions.create = AsyncMock(side_effect=lambda **kw: stream_of("hi"))
 
-    events = await collect(run_turn(client, FakeTooling(), [], USAGE))
+    events = await collect(run_turn(client, FakeTooling(), [], USAGE, model=MODEL))
 
     assert [e.finish_reason for e in events if isinstance(e, RoundFinished)] == ["stop"]
 
@@ -176,9 +177,26 @@ async def test_text_written_alongside_a_tool_call_is_kept():
     client = MagicMock()
     client.chat.completions.create = AsyncMock(side_effect=[preamble_then_tools(), stream_of("Found it.")])
 
-    finished = (await collect(run_turn(client, FakeTooling(), [], USAGE)))[-1]
+    finished = (await collect(run_turn(client, FakeTooling(), [], USAGE, model=MODEL)))[-1]
 
     assert finished.reply == "Let me check. Found it."
     asked = next(m for m in finished.history if m.get("tool_calls"))
     assert asked["content"] == "Let me check. "
     assert finished.history[-1] == {"role": "assistant", "content": "Found it."}
+
+
+async def test_every_call_goes_to_the_model_the_turn_was_given():
+    client = MagicMock()
+    create = AsyncMock(side_effect=[wants_tools(), stream_of("answered")])
+    client.chat.completions.create = create
+
+    await collect(run_turn(client, FakeTooling(), [], USAGE, model=ChatModel("gpt-x", "high")))
+
+    for call in create.await_args_list:
+        assert call.kwargs["model"] == "gpt-x"
+        assert call.kwargs["reasoning_effort"] == "high"
+
+
+def test_a_model_without_an_effort_sends_none():
+    """Left out, not sent empty: a model that does not reason rejects it."""
+    assert ChatModel("gpt-4.1-mini").call_options() == {"model": "gpt-4.1-mini"}

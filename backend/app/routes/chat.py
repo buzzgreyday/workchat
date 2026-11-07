@@ -8,7 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from openai import AsyncOpenAI
 from starlette.responses import StreamingResponse
 
-from app.common.config import get_settings
+from app.common.config import Settings, get_settings
 from app.common.logging.logging import logger
 from app.common.models import ChatRequest
 from app.common import sse
@@ -100,6 +100,7 @@ async def chat_stream(
     client: AsyncOpenAI = Depends(get_openai_client),
     tooling: ChatTooling = Depends(get_tooling),
     transcripts: TranscriptRepository = Depends(get_transcript_repository),
+    settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
     """
     The only chat endpoint.
@@ -132,7 +133,7 @@ async def chat_stream(
             }
         },
     )
-    if get_settings().log_chat_content:
+    if settings.log_chat_content:
         logger.debug(
             "Chat message content",
             extra={"user_message": req.message, "history": req.history},
@@ -143,6 +144,7 @@ async def chat_stream(
         token=token,
         client=client,
         tooling=tooling,
+        settings=settings,
         transcripts=transcripts,
         endpoint="/chat/stream",
         question_key=question_key,
