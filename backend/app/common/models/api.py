@@ -14,7 +14,7 @@ class Usage(BaseModel):
 
 class Record(BaseModel):
     file: str          # relative path, e.g. "experience/company-a.md"
-    type: str          # "experience" | "project" | "skill"
+    type: str          # free-form: "experience", "project", "case", "bio", ...
     title: str         # e.g. "Senior Engineer @ Acme Corp"
     tags: List[str] = []
     dates: Optional[str] = None

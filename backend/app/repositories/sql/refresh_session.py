@@ -165,7 +165,3 @@ class SQLRefreshSessionRepository(RefreshSessionRepository):
             "Revoked refresh sessions", extra={"token_id": token_id, "count": revoked}
         )
         return revoked
-
-
-# Column bounds. Guards against these and the ChatRequest bound drifting apart
-# and raising into a user's chat.

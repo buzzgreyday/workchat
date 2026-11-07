@@ -104,9 +104,9 @@ class RefreshTokenReplayed(AuthError):
     """
     A refresh token presented well after it was rotated away.
 
-    Carries the grant so the layer that answers can tell the operator who is now
-    locked out — the sessions are already cut by the time this is raised, and
-    with a single-use claim the hirer has no way back on their own.
+    Carries the grant's id so the layer that answers can tell the operator who
+    is now locked out — the sessions are already cut by the time this is
+    raised, and with a single-use claim the hirer has no way back on their own.
     """
 
     detail = "Refresh token already used"
