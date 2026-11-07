@@ -17,13 +17,15 @@ import chatCss from "./embed.css";
  *
  *   Attributes   api-url, about, claim, owner-name, header, frame
  *   Events       workchat-usage (detail: { used, remaining, max })
+ *   States       working, while a reply is being written: the host styles
+ *                it as `workchat-chat:state(working)`
  *   CSS          the --chat-* palette and fonts, set on the element by the
  *                host page
  *
  * No close event: in the host's own document Escape reaches their <dialog>
  * by itself. Forwarding it was an iframe problem.
  *
- * Adding to any of the three is safe. Renaming or removing is a breaking
+ * Adding to any of the four is safe. Renaming or removing is a breaking
  * change for every page that embeds this, and there is no version pin to
  * protect them — that is the trade for decoupled deploys.
  */
@@ -64,6 +66,15 @@ class WorkchatChat extends HTMLElement {
   #shadow: ShadowRoot | null = null;
   #mount: HTMLDivElement | null = null;
   #root: Root | null = null;
+
+  /**
+   * For the element's states, which the host page can select without
+   * listening for anything: `workchat-chat:state(working)` in its own CSS.
+   * A state rather than an event, because what a host does with "the chat is
+   * at work" is a look, and a look belongs in CSS. Taken once, in the
+   * constructor, where the platform requires it.
+   */
+  #internals: ElementInternals = this.attachInternals();
 
   connectedCallback() {
     // Built once and kept for the life of the element. `attachShadow` throws
@@ -169,6 +180,9 @@ class WorkchatChat extends HTMLElement {
           onUsageChange={(usage) =>
             this.#emit("workchat-usage", usage)
           }
+          onWorkingChange={(working) =>
+            this.#state("working", working)
+          }
         />
       </ErrorBoundary>,
     );
@@ -189,6 +203,24 @@ class WorkchatChat extends HTMLElement {
         this.getAttribute("owner-name") ??
         DEFAULT_OWNER.name,
     };
+  }
+
+  /**
+   * Turns a state on or off. Guarded: a browser without custom states has
+   * no `states`, and there the chat simply shows no state, as it always has.
+   */
+  #state(name: string, on: boolean) {
+    const states = this.#internals.states;
+
+    if (!states) {
+      return;
+    }
+
+    if (on) {
+      states.add(name);
+    } else {
+      states.delete(name);
+    }
   }
 
   #emit(type: string, detail?: unknown) {

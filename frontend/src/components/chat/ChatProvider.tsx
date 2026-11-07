@@ -105,6 +105,7 @@ export function ChatProvider({
   owner,
   seedQuestion,
   onUsageChange,
+  onWorkingChange,
   ownsViewport,
   children,
 }: {
@@ -119,6 +120,12 @@ export function ChatProvider({
    * site's top bar (`StandaloneChat`).
    */
   onUsageChange?: (usage: Usage) => void;
+  /**
+   * Told when a reply starts being written and when it is done, for a host
+   * that shows the chat at work in a look of its own: the embed's page,
+   * through its `working` state.
+   */
+  onWorkingChange?: (working: boolean) => void;
   /**
    * False when the chat is a component of somebody else's page rather than the
    * page itself. Only the embed passes it.
@@ -169,6 +176,19 @@ export function ChatProvider({
       notify.current?.(usage);
     }
   }, [usage]);
+
+  // The same, for whether a reply is being written: a change, not a render.
+  // `loading` is derived from the last message, so this is true from the
+  // moment a question is sent until its reply has finished or broken.
+  const notifyWorking = useRef(onWorkingChange);
+
+  useEffect(() => {
+    notifyWorking.current = onWorkingChange;
+  }, [onWorkingChange]);
+
+  useEffect(() => {
+    notifyWorking.current?.(loading);
+  }, [loading]);
 
   // React 19: the context *is* the provider — no `.Provider`.
   return (
