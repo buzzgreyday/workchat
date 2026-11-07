@@ -152,7 +152,8 @@ the element's `--chat-*` variables, its parts and its `working` state
 | A question | Raised: the raised surface at 80%, a hairline round it and a faint light along its top, with half a line more room above and below than between messages. |
 | A reply | Plain text, no bubble — the page's reading, not a message in a box. Its paragraphs a gap apart. |
 | The margins | One line down the left, 1rem in: the questions left, the replies, the box to type in. |
-| The scrollbar | None. The conversation still scrolls, by wheel, touch and keys. |
+| The scrollbar | None, through the element's `scrollbar="none"`. The conversation still scrolls, by wheel, touch and keys. |
+| Scrolling | A question goes to the top, and its reply arrives under it with the view held still. Once the reply runs past the foot, a round button there goes to the end: flat, the raised surface with a sage arrow, like the way out. |
 | Questions left | Plain sage text at the start of the bar, opposite the way out. |
 | Send | Round, coral, the 3D press: the one thing in the window to press. |
 | Close | Round, flat, the raised surface with a sage ×: the quietest way out. |
