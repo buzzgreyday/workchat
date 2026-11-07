@@ -275,7 +275,7 @@ test("the composer shrinks back after a multi-line question is sent", async ({
  * one API here that cannot promise that; writing `scrollTop` can only ever
  * move the element it is written to.
  *
- * The transcript no longer follows a reply at all (useAutoScroll): it scrolls
+ * The transcript no longer follows a reply at all (useScrollToQuestion): it scrolls
  * once, to put a new question at the top, and holds still while the reply
  * arrives. That one scroll, and the reply's arrival, are what is watched here
  * — anything the chat moves, it moves by writing the transcript's own

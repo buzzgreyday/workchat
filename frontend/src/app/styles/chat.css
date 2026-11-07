@@ -93,40 +93,10 @@
     box-shadow: var(--shadow-small);
   }
 
-  /* `min-height`, because a flex item's automatic minimum size is its content:
-     without it this box refuses to shrink below the whole transcript.
-     `overscroll-behavior` keeps a flick at either end from chaining out into
-     the document behind it.
-
-     The scrollbar is a thin thumb on nothing — no track, no arrows — which
-     is all a transcript needs, in `--chat-scrollbar`. Two ways, because no
-     one way reaches every browser: Firefox takes the standard properties,
-     and draws no arrows on a thin bar; Chrome draws arrows even on a thin
-     one, and drops them only through its own ::-webkit-scrollbar, which it
-     ignores wherever the standard properties are set — so where it has it,
-     they are put back to auto. Not left to the host's `scrollbar-color`,
-     which does cross the shadow root by inheritance: in Chrome that alone
-     brings back the arrows. */
-  /* `scrollbar="none"` (EMBED.md): no scrollbar at all. Both ways, for the
-     same reason as above: the standard property, and ::-webkit-scrollbar for
-     the WebKit and Chromium builds that predate it — Safari before 18.2, and
-     the web views apps such as DuckDuckGo are built on, which a host's
-     `scrollbar-width: none` on the transcript part did not reach. Only the
-     element can name its own scrollbar's pseudo-element; `::part()` stops
-     short of it. In the document of the standalone site there is no host,
-     and these match nothing. */
-  :host([scrollbar="none"]) .chat-log {
-    scrollbar-width: none;
-  }
-
-  :host([scrollbar="none"]) .chat-log::-webkit-scrollbar {
-    display: none;
-  }
-
   /* The transcript's place in the column, and what the button to its end
      sits in, over its foot, so it does not scroll with the messages. The
-     transcript's scroll position is named for the frame, so the button
-     beside it can follow it (below). */
+     transcript's scroll position is named here, so the button can follow it
+     (below). */
   .chat-log-frame {
     timeline-scope: --transcript;
     position: relative;
@@ -136,10 +106,20 @@
     min-height: 0;
   }
 
-  /* Positioned so a message's `offsetTop` is measured from it: where
-     useAutoScroll scrolls to put a new question at the top. A size
-     container, so the newest reply can be sized from its height (below).
-     And its scroll position a timeline, for the button to its end. */
+  /* `min-height`, because a flex item's automatic minimum size is its content:
+     without it this box refuses to shrink below the whole transcript.
+     `overscroll-behavior` keeps a flick at either end from chaining out into
+     the document behind it. Positioned, so a message's `offsetTop` is
+     measured from it (useScrollToQuestion); a size container, so the newest
+     reply can be sized from its height; and its scroll a timeline, for the
+     button to its end (below).
+
+     The scrollbar is a thin thumb on nothing — no track, no arrows — in
+     `--chat-scrollbar`. Two ways, because no one way reaches every browser:
+     Firefox takes the standard properties and draws no arrows on a thin bar;
+     Chrome draws arrows even on a thin one, and drops them only through its
+     own ::-webkit-scrollbar, which it ignores wherever the standard
+     properties are set — so where it has that, they are put back to auto. */
   .chat-log {
     position: relative;
     container-type: size;
@@ -181,16 +161,29 @@
     }
   }
 
+  /* `scrollbar="none"` (EMBED.md): no scrollbar at all, both ways, for the
+     WebKit builds and app web views (the DuckDuckGo browser) that predate
+     the standard property. Only the element can name its own
+     ::-webkit-scrollbar; a host's `::part()` stops short of it. The
+     standalone site has no host, and these match nothing there. */
+  :host([scrollbar="none"]) .chat-log {
+    scrollbar-width: none;
+  }
+
+  :host([scrollbar="none"]) .chat-log::-webkit-scrollbar {
+    display: none;
+  }
+
   .chat-log > :not(:last-child) {
     margin-block-end: 1rem;
   }
 
   /* The room under the newest question, so it can be scrolled to the top
      however short its reply: the reply after it is at least a view tall,
-     less about a question's height. Not exact — a question that runs to
-     three lines stops a little short of the top — and needing no script to
-     measure it, on every token, was worth that. The greeting, with no
-     question before it, is left its own height. */
+     less about a question's height. Approximate — a question of three lines
+     stops a little short of the top — where exact meant measuring in script
+     on every token. The greeting, with no question before it, keeps its
+     own height. */
   .message-user ~ .message-bot:nth-last-child(1 of .message-bot) {
     min-height: calc(100cqh - 5rem);
   }
@@ -207,18 +200,14 @@
      round, raised, centred over its foot. Quiet, in the raised surface and
      the text colour, because it is a way to move, not the thing to press.
 
-     Hidden, and shown by the transcript's scroll position alone — a
-     scroll-driven animation, with no script watching the scroll. Shown until
-     the last 5rem, fading over the next two, and gone for the last three:
-     those are the transcript's own padding and the reply's margin, blank
-     space, and treating them as the end means the few pixels the room under
-     a question can be off by (above) never call the button up, nor a
-     scroll that stops a fraction of a pixel short of the end, as a phone's
-     does. A transcript
-     with nothing to scroll has no timeline, the animation does not run, and
-     it stays hidden. A browser without scroll-driven animations (Firefox,
-     for now) leaves it hidden too: the transcript scrolls by hand there, and
-     it appears once the browser can tell when. */
+     Hidden, and shown by the scroll position alone, a scroll-driven
+     animation: shown until the last 5rem, fading over the next two, gone for
+     the last three. Those three are blank — the padding and the reply's
+     margin — so the room's few pixels of slack (above), and a phone's scroll
+     that stops a fraction short of the end, never call it up. With nothing
+     to scroll there is no timeline, and it stays hidden; so it does in a
+     browser without scroll-driven animations (Firefox, for now), where the
+     transcript scrolls by hand. */
   .chat-jump {
     position: absolute;
     bottom: var(--gutter-sm);

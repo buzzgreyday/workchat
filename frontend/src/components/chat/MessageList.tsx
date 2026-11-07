@@ -1,7 +1,7 @@
 import { ArrowDown } from "lucide-react";
 
 import MessageBubble from "./MessageBubble";
-import { useAutoScroll } from "@/hooks/useAutoScroll";
+import { useScrollToQuestion } from "@/hooks/useScrollToQuestion";
 import { RETRY } from "@/lib/copy";
 import { useControls, useTranscriptContext } from "./ChatProvider";
 
@@ -12,7 +12,7 @@ export default function MessageList() {
   const { messages } = useTranscriptContext();
   const { canRetry, retry } = useControls();
 
-  const { containerRef, toEnd } = useAutoScroll(messages);
+  const { containerRef, toEnd } = useScrollToQuestion(messages);
 
   const awaitingReply = messages.at(-1)?.status === "streaming";
 
