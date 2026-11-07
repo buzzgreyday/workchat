@@ -101,7 +101,7 @@ number. Usage, and how to pin the model being measured, is in the
 
 `<workchat-chat>` is loaded at runtime by `../website` (mringdal.com), which has
 no build step in common with this repo and cannot pin a version. Its
-attributes, its one event, its one state and its `--chat-*` variables, as written in
+attributes, its one event, its one state, its parts and its `--chat-*` variables, as written in
 `frontend/EMBED.md`, are a public API:
 
 - Change `EMBED.md` in the same change as the element. `npm run test:contract`

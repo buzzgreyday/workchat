@@ -16,8 +16,8 @@ pin, so a release here reaches every embedding page on its next load.
 ## The API
 
 Versioned like an API, because it is one — and unlike a package, nobody can
-stay behind on an old version. Adding an attribute, an event, a state or a
-variable is safe. Renaming or removing one breaks every page that embeds this.
+stay behind on an old version. Adding an attribute, an event, a state, a
+part or a variable is safe. Renaming or removing one breaks every page that embeds this.
 
 **Attributes**
 
@@ -82,6 +82,50 @@ page, so a host can light up something outside the chat while it works —
 `body:has(workchat-chat:state(working)) .glow`. A browser without custom states
 (before 2024) shows no state, and the chat works as it always has.
 
+**Parts** (shadow parts, so style them with `::part()`)
+
+| Part | What it is |
+| --- | --- |
+| `composer` | The box the question is typed in: exactly the size of the field, its corners the field's, positioned, so anything drawn in it with `::before` or `::after` sits on the field. |
+| `transcript` | The conversation: the box that scrolls, its padding the margin round the messages. |
+| `bubble` | Every message, a question or a reply. |
+| `user-bubble`, `bot-bubble` | A question and a reply, each also a `bubble`. |
+| `send` | The send button: square, as tall as a one-line field. Its colours are `--chat-send-bg` and `--chat-send-icon`; the part is for its shape. |
+
+```css
+workchat-chat::part(composer)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* a ring, a glow — whatever the host draws round the field */
+}
+```
+
+For what a colour cannot do. The `--chat-*` variables each carry one value,
+and the field's border is one colour; a host that wants something drawn round
+the field — two colours moving across each other, a light running round it —
+needs to reach the field itself, and a shadow root lets nothing in but its
+parts. The box rather than the field: a textarea takes no `::before` or
+`::after`, and the box is the same size, so whatever is drawn on it is drawn
+on the field.
+
+The others are for what a colour cannot change: a reply set as plain text,
+with no bubble at all — no padding, no border, no shadow; a question raised
+like a card, with a hairline and a light along its top; the margin round the
+conversation, and its scrollbar; a round send button. Each part is a promise about the markup
+under it, so there are only the ones a host has asked for, not one per piece
+of the chat.
+
+A part is the box, not its insides: its size, place and corners are the
+promise, and what it holds may change. Style the box, and leave what is in it
+— the field and the count, a reply's text and its links — to the `--chat-*`
+variables. `::part()` reaches the box itself and its `::before` and
+`::after`, and no further: not a scrollbar's own pseudo-elements, so a host
+hides one with `scrollbar-width: none` rather than styling it. A host that styles the part
+together with a state — `workchat-chat:state(working)::part(composer)` — draws
+what the chat is doing round the place the visitor is looking.
+
 **CSS variables** — the palette is the `--chat-*` set declared at the top of
 `src/app/globals.css`: `--chat-bg`, `--chat-panel`, `--chat-border`, and the
 rest. Its values are plain defaults, not the standalone site's look, which
@@ -113,6 +157,7 @@ one of these moves that part alone:
 | `--chat-bot-bubble-bg`, `--chat-bot-bubble-text`, `--chat-bot-bubble-border` | The replies | `--chat-panel-alt`, `--chat-text`, `--chat-border` |
 | `--chat-link` | Links in a reply | `--chat-accent` |
 | `--chat-typing` | The dots while a reply is written | `--chat-text-muted` |
+| `--chat-scrollbar` | The transcript's scrollbar: a thin thumb, with no track and no arrows | `--chat-text-muted` |
 | `--chat-input-bg`, `--chat-input-text`, `--chat-input-placeholder`, `--chat-input-border` | The input | `--chat-panel-alt`, `--chat-text`, `--chat-text-muted`, `--chat-border` |
 | `--chat-input-focus` | The input's border and glow on focus | `--chat-accent` |
 | `--chat-send-bg`, `--chat-send-icon` | The send button | `--chat-accent`, `--chat-on-accent` |
@@ -192,7 +237,7 @@ WEBSITE_DIR=/path/to/site npm run test:contract
 ```
 
 Builds the element and runs the site's Playwright tests against that exact
-file. Rename an attribute, an event, a state or a `--chat-*` variable and it
+file. Rename an attribute, an event, a state, a part or a `--chat-*` variable and it
 goes red here, in this repo, before the change is deployed to a site that
 cannot pin a version of it. It needs a checkout of the site with its dependencies
 installed, and nothing else — no database, no key, no stack. The backend stays

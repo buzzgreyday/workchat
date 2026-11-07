@@ -18,7 +18,14 @@ export default function MessageBubble({
     <div
       className={`message ${isUser ? "message-user" : "message-bot"}`}
     >
-      <div className="message-bubble chat-message">
+      {/* Parts (EMBED.md): every message is a `bubble`, and a
+          `user-bubble` or a `bot-bubble` too, so a host can style them
+          together or apart — raise the questions, set the replies as plain
+          text — with CSS of its own. */}
+      <div
+        className="message-bubble chat-message"
+        part={`bubble ${isUser ? "user-bubble" : "bot-bubble"}`}
+      >
         <BubbleContent message={message} />
       </div>
     </div>
