@@ -7,6 +7,45 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.14.0] - 2026-11-07
+
+### Added
+
+- **The element says when it is at work.** `<workchat-chat>` is in a custom
+  state, `working`, whenever its typing dots show: while it opens its session,
+  and from the moment a question is sent until its reply has finished or
+  broken off. A host selects it in CSS — `workchat-chat:state(working)` — and
+  mringdal.com rings its message box in violet and magenta while it is set. A
+  state rather than an event, because what a host does with "the chat is at
+  work" is a look: CSS can select it without a line of script, and it is there
+  whenever the stylesheet is, with nothing to miss by listening too late. A
+  browser without custom states shows none, and the chat works as before.
+- **Parts, for what a colour cannot do.** The box the question is typed in
+  (`composer`), the conversation (`transcript`), every message (`bubble`, and
+  `user-bubble` or `bot-bubble`) and the send button (`send`) are shadow
+  parts. A host styles them with `::part()`: mringdal.com draws a ring of two
+  drifting colours round the box, sets replies as plain text with the
+  questions raised, takes the scrollbar away and makes the send button round.
+  A `--chat-*` variable carries one value, so the ring could only ever have
+  had one colour. Only the parts a host has asked for, because each one is a
+  promise about the markup under it.
+- `--chat-scrollbar`, the colour of the transcript's scrollbar.
+
+### Changed
+
+- **The scrollbar is a thin thumb on nothing** — no track, no arrows. Firefox
+  draws that from the standard properties; Chrome draws arrows even on a thin
+  bar, and drops them only through its own `::-webkit-scrollbar`, which it
+  ignores wherever the standard properties are set, so it gets those instead.
+- **Muted text is sage** (`#809e85`), a grey tinted green, where it was a
+  neutral grey. The grey was 3.95:1 on the navy; sage, at the same lightness,
+  is 4.7:1. A dark green was tried first, and at 1.8:1 could not be read.
+
+### Fixed
+
+- A reply's paragraphs, lists and code have a gap between them. The reset
+  took every margin away, and a two-paragraph answer ran together as one.
+
 ## [0.13.7] - 2026-11-07
 
 ### Fixed
