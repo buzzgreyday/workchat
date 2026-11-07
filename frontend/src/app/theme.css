@@ -67,6 +67,7 @@
 
   /* The dots while a reply is being written. */
   --chat-typing: var(--chat-text-muted);
+  --chat-scrollbar: var(--chat-text-muted);
 
   /* The input */
   --chat-input-bg: var(--chat-panel-alt);

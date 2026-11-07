@@ -50,6 +50,8 @@
 
   /* The dots while a reply is being written. */
   --chat-typing: var(--chat-text-muted);
+  /* The transcript's scrollbar: its thumb, on no track. */
+  --chat-scrollbar: var(--chat-text-muted);
 
   --chat-input-bg: var(--chat-panel-alt);
   --chat-input-text: var(--chat-text);

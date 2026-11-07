@@ -96,13 +96,53 @@
   /* `min-height`, because a flex item's automatic minimum size is its content:
      without it this box refuses to shrink below the whole transcript.
      `overscroll-behavior` keeps a flick at either end from chaining out into
-     the document behind it. */
+     the document behind it.
+
+     The scrollbar is a thin thumb on nothing — no track, no arrows — which
+     is all a transcript needs, in `--chat-scrollbar`. Two ways, because no
+     one way reaches every browser: Firefox takes the standard properties,
+     and draws no arrows on a thin bar; Chrome draws arrows even on a thin
+     one, and drops them only through its own ::-webkit-scrollbar, which it
+     ignores wherever the standard properties are set — so where it has it,
+     they are put back to auto. Not left to the host's `scrollbar-color`,
+     which does cross the shadow root by inheritance: in Chrome that alone
+     brings back the arrows. */
   .chat-log {
     flex: 1;
     min-height: 0;
     padding: var(--gutter-lg);
     overflow-y: auto;
     overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--chat-scrollbar) transparent;
+  }
+
+  @supports selector(::-webkit-scrollbar) {
+    .chat-log {
+      scrollbar-width: auto;
+      scrollbar-color: auto;
+    }
+
+    .chat-log::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .chat-log::-webkit-scrollbar-track,
+    .chat-log::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+
+    .chat-log::-webkit-scrollbar-button {
+      display: none;
+    }
+
+    /* Inset in a clear border, so the thumb is a slim rounded line rather
+       than a slab against the edge. */
+    .chat-log::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 9999px;
+      background: var(--chat-scrollbar) padding-box;
+    }
   }
 
   .chat-log > :not(:last-child) {

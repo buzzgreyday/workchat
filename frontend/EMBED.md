@@ -144,6 +144,7 @@ one of these moves that part alone:
 | `--chat-bot-bubble-bg`, `--chat-bot-bubble-text`, `--chat-bot-bubble-border` | The replies | `--chat-panel-alt`, `--chat-text`, `--chat-border` |
 | `--chat-link` | Links in a reply | `--chat-accent` |
 | `--chat-typing` | The dots while a reply is written | `--chat-text-muted` |
+| `--chat-scrollbar` | The transcript's scrollbar: a thin thumb, with no track and no arrows | `--chat-text-muted` |
 | `--chat-input-bg`, `--chat-input-text`, `--chat-input-placeholder`, `--chat-input-border` | The input | `--chat-panel-alt`, `--chat-text`, `--chat-text-muted`, `--chat-border` |
 | `--chat-input-focus` | The input's border and glow on focus | `--chat-accent` |
 | `--chat-send-bg`, `--chat-send-icon` | The send button | `--chat-accent`, `--chat-on-accent` |
