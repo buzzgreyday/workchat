@@ -13,11 +13,8 @@ from app.common.exceptions import (
     InvalidToken,
     QuotaExhausted,
     RetriesExhausted,
-    TokenExpired,
-    TokenRevoked,
 )
 from app.common.models import Grant
-from app.common.models.utc import as_utc
 from app.common.schemas import DatabaseQuestionKey, DatabaseToken
 from app.repositories.base import SpentQuestion, TokenRepository
 from app.repositories.sql._shared import _rowcount
@@ -224,33 +221,14 @@ class SQLTokenRepository(TokenRepository):
     async def _dead_grant(
         self, token_id: uuid.UUID, expected_version: int | None, now: datetime
     ) -> Exception | None:
-        """
-        What is wrong with this grant, whatever its allowance, or None. Order
-        matters: revoked before expired, so the most specific reason wins.
-        """
+        """What is wrong with this grant, whatever its allowance, or None."""
         # Read fresh: the spend's UPDATE deliberately does not touch rows already
         # in the session, and this is the read that has to see what is true.
         existing = await self.db.get(DatabaseToken, token_id, populate_existing=True)
         if existing is None:
             self.logger.warning("Invalid token", extra={"token_id": token_id})
             return InvalidToken()
-        if existing.revoked_at is not None:
-            self.logger.warning("Revoked token", extra={"token_id": token_id})
-            return TokenRevoked()
-        if expected_version is not None and existing.version != expected_version:
-            self.logger.warning(
-                "Token version does not match its grant",
-                extra={
-                    "token_id": token_id,
-                    "expected_version": expected_version,
-                    "version": existing.version,
-                },
-            )
-            return InvalidToken()
-        if as_utc(existing.expires_at) <= now:
-            self.logger.warning("Expired token", extra={"token_id": token_id})
-            return TokenExpired()
-        return None
+        return Grant.model_validate(existing).refusal(now, expected_version)
 
     async def claim_once(self, token_id: uuid.UUID) -> bool:
         # The `claimed_at IS NULL` predicate is the whole mechanism — two

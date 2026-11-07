@@ -66,7 +66,6 @@ from app.common.exceptions import (
     RefreshTokenReplayed,
     SessionRevoked,
     TokenExpired,
-    TokenRevoked,
     UnsupportedTokenVersion,
 )
 from app.common.crypto import hash_token
@@ -278,18 +277,9 @@ class Auth:
         if grant is None:
             logger.warning("Invalid token", extra={"token_id": token_id})
             raise InvalidToken()
-        if grant.revoked_at is not None:
-            logger.warning("Revoked token", extra={"token_id": token_id})
-            raise TokenRevoked()
-        if expected_version is not None and grant.version != expected_version:
-            logger.warning(
-                "Token version does not match its grant",
-                extra={"token_id": token_id, "expected_version": expected_version, "version": grant.version},
-            )
-            raise InvalidToken()
-        if grant.expires_at <= datetime.now(timezone.utc):
-            logger.warning("Expired token", extra={"token_id": token_id})
-            raise TokenExpired()
+        refusal = grant.refusal(datetime.now(timezone.utc), expected_version)
+        if refusal is not None:
+            raise refusal
         return grant
 
     async def claim(
