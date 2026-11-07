@@ -87,6 +87,9 @@ page, so a host can light up something outside the chat while it works —
 | Part | What it is |
 | --- | --- |
 | `composer` | The box the question is typed in: exactly the size of the field, its corners the field's, positioned, so anything drawn in it with `::before` or `::after` sits on the field. |
+| `transcript` | The conversation: the box that scrolls, its padding the margin round the messages. |
+| `bubble` | Every message, a question or a reply. |
+| `user-bubble`, `bot-bubble` | A question and a reply, each also a `bubble`. |
 
 ```css
 workchat-chat::part(composer)::before {
@@ -104,12 +107,21 @@ the field — two colours moving across each other, a light running round it —
 needs to reach the field itself, and a shadow root lets nothing in but its
 parts. The box rather than the field: a textarea takes no `::before` or
 `::after`, and the box is the same size, so whatever is drawn on it is drawn
-on the field. One part, not one per piece of the chat: each one is a promise
-about the markup under it, and this is the one a host has asked for.
+on the field.
 
-The part is the box, not its insides: its size, place and corners are the
-promise, and what it holds may change. Style the box, and leave the field and
-the count in it to the `--chat-*` variables. A host that styles the part
+The others are for what a colour cannot change: a reply set as plain text,
+with no bubble at all — no padding, no border, no shadow; a question raised
+like a card, with a hairline and a light along its top; the margin round the
+conversation, and its scrollbar. Each part is a promise about the markup
+under it, so there are only the ones a host has asked for, not one per piece
+of the chat.
+
+A part is the box, not its insides: its size, place and corners are the
+promise, and what it holds may change. Style the box, and leave what is in it
+— the field and the count, a reply's text and its links — to the `--chat-*`
+variables. `::part()` reaches the box itself and its `::before` and
+`::after`, and no further: not a scrollbar's own pseudo-elements, so a host
+hides one with `scrollbar-width: none` rather than styling it. A host that styles the part
 together with a state — `workchat-chat:state(working)::part(composer)` — draws
 what the chat is doing round the place the visitor is looking.
 
