@@ -141,3 +141,47 @@ async def test_redact_response_identifies_the_conversation(client, issued_token)
     body = resp.json()
     assert body == {"conversation_id": conversation_id, "messages_redacted": 2}
     assert isinstance(body["conversation_id"], str)
+
+
+async def test_issued_grant_is_stamped_in_utc_whatever_the_host_timezone():
+    """
+    `created_at` is UTC like every other timestamp on a grant. It was built from
+    a naive local time, which the domain model then read *as* UTC — right on a
+    UTC host, and off by the host's offset anywhere else.
+    """
+    import time
+    from datetime import datetime, timedelta, timezone
+
+    from app.common.models import Grant, IssueTokenRequest, User
+    from app.services import admin
+    from app.services.auth import Auth
+
+    class Users:
+        async def get_by_name(self, name):
+            return None
+
+        async def add(self, name, email, phone):
+            return User(name=name, email=email, phone=phone)
+
+    class Tokens:
+        async def add(self, grant: Grant) -> Grant:
+            self.grant = grant
+            return grant
+
+    tokens = Tokens()
+    previous_tz = os.environ.get("TZ")
+    os.environ["TZ"] = "Pacific/Kiritimati"  # UTC+14: as far from UTC as a host gets
+    time.tzset()
+    try:
+        await admin.issue_token(
+            IssueTokenRequest(subject="test-hire", company="Acme"),
+            users=Users(), tokens=tokens, auth=Auth(),
+        )
+    finally:
+        if previous_tz is None:
+            del os.environ["TZ"]
+        else:
+            os.environ["TZ"] = previous_tz
+        time.tzset()
+
+    assert abs(tokens.grant.created_at - datetime.now(timezone.utc)) < timedelta(minutes=1)
