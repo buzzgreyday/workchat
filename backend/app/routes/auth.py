@@ -37,7 +37,7 @@ from app.repositories.base import (
     UserRepository,
 )
 from app.services import trial as trial_service
-from app.services.auth import Auth, get_auth
+from app.services.auth import SessionService, get_session_service
 
 router = APIRouter(prefix="/v2/auth", tags=["Auth"])
 
@@ -84,10 +84,10 @@ async def claim(
     response: Response,
     tokens: TokenRepository = Depends(get_token_repository),
     sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
-    auth: Auth = Depends(get_auth),
+    session_service: SessionService = Depends(get_session_service),
 ) -> SessionOut:
     logger.info("Claim token presented")
-    pair = await auth.claim(req.claim_token, tokens=tokens, sessions=sessions)
+    pair = await session_service.claim(req.claim_token, tokens=tokens, sessions=sessions)
     return _set_refresh_cookie(response, pair)
 
 
@@ -112,7 +112,7 @@ async def refresh(
     refresh_cookie: str | None = Cookie(default=None, alias=REFRESH_COOKIE_NAME),
     tokens: TokenRepository = Depends(get_token_repository),
     sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
-    auth: Auth = Depends(get_auth),
+    session_service: SessionService = Depends(get_session_service),
 ) -> SessionOut:
     # Cookie first: that is where a browser keeps it. The body is the escape
     # hatch for callers that have no cookie jar.
@@ -121,7 +121,7 @@ async def refresh(
         raise MissingRefreshToken()
 
     logger.info("Refresh token presented", extra={"via": "cookie" if refresh_cookie else "body"})
-    pair = await auth.refresh(raw, tokens=tokens, sessions=sessions)
+    pair = await session_service.refresh(raw, tokens=tokens, sessions=sessions)
     return _set_refresh_cookie(response, pair)
 
 
@@ -173,7 +173,7 @@ async def trial(
     tokens: TokenRepository = Depends(get_token_repository),
     sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
     trials: TrialRepository = Depends(get_trial_repository),
-    auth: Auth = Depends(get_auth),
+    session_service: SessionService = Depends(get_session_service),
     trial_cookie: str | None = Cookie(default=None, alias=TRIAL_COOKIE_NAME),
 ) -> SessionOut:
     logger.info("Trial requested")
@@ -187,7 +187,7 @@ async def trial(
         tokens=tokens,
         sessions=sessions,
         trials=trials,
-        auth=auth,
+        session_service=session_service,
     )
     # Remember that this browser has had its trial. The same flags as the
     # refresh cookie, and for the same reasons; nothing else ever reads it.

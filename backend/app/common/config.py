@@ -185,7 +185,7 @@ class Settings:
     # until the grant expires. v2 splits that into a claim link the hirer exchanges,
     # a refresh token that survives a closed tab, and an access token short enough
     # that a leaked URL or log line goes stale on its own. Neither derived token can
-    # outlive its grant — Auth clamps both to tokens.expires_at when minting.
+    # outlive its grant — TokenCodec clamps both to tokens.expires_at when minting.
     access_token_ttl_seconds: int
     refresh_token_ttl_seconds: int
     # How long a just-rotated refresh token is still recognised as *this* client

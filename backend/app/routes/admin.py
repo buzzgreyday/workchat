@@ -13,6 +13,7 @@ from app.common.models import (
     ConversationSummary,
     GrantRevoked,
     IssueTokenRequest,
+    TokenVersion,
 )
 from app.helpers.qr_code import get_qr_code
 from app.repositories import (
@@ -28,7 +29,7 @@ from app.repositories.base import (
     UserRepository,
 )
 from app.services import admin
-from app.services.auth import Auth, get_auth, require_admin
+from app.services.auth import TokenCodec, get_token_codec, require_admin
 from app.common.logging import logging
 
 router = APIRouter(prefix="/admin", tags=['Admin'], include_in_schema=False)
@@ -50,16 +51,16 @@ async def issue_token(
     req: IssueTokenRequest,
     users: UserRepository = Depends(get_user_repository),
     tokens: TokenRepository = Depends(get_token_repository),
-    auth: Auth = Depends(get_auth),
+    codec: TokenCodec = Depends(get_token_codec),
 ) -> Response:
     # The issuance is logged by the service, which is the layer that knows what
     # actually happened. Logging the request here too said the same thing twice,
     # in two places that could drift.
-    token = await admin.issue_token(req, users=users, tokens=tokens, auth=auth)
+    token = await admin.issue_token(req, users=users, tokens=tokens, codec=codec)
     # v1 puts the access token straight in the link; v2 puts a claim token there
     # instead, so the query parameter has to change with it. The frontend reads
     # whichever one it finds — ?token= is still what every issued link carries.
-    param = "token" if req.version == 1 else "claim"
+    param = "token" if req.version == TokenVersion.V1 else "claim"
     if req.type == "qr":
         qr = get_qr_code(url=f"{get_settings().base_url}/?{param}={token}")
         return Response(content=bytes(qr), media_type="image/png", status_code=HTTP_200_OK)
@@ -71,7 +72,7 @@ async def issue_token(
     # "token" stays the key for both so an existing caller reading body["token"]
     # is unaffected; "kind" is what says which flow it belongs to.
     return JSONResponse(
-        content={"token": token, "version": req.version, "kind": "access" if req.version == 1 else "claim"},
+        content={"token": token, "version": req.version, "kind": "access" if req.version == TokenVersion.V1 else "claim"},
         media_type="application/json",
         status_code=HTTP_200_OK,
     )

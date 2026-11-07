@@ -150,14 +150,14 @@ async def test_a_history_is_bound_to_its_grant(client, issued_token, openai_mock
 
 # --- reasoning effort, as sent -----------------------------------------------
 
-async def test_the_configured_reasoning_effort_reaches_the_model(client, issued_token, openai_mock, monkeypatch):
+async def test_the_configured_reasoning_effort_reaches_the_model(app, client, issued_token, openai_mock):
     from dataclasses import replace
 
     from app.common.config import get_settings
 
     for effort in ["high", None]:
         changed = replace(get_settings(), openai_reasoning_effort=effort)
-        monkeypatch.setattr("app.services.chat.turn.get_settings", lambda: changed)
+        app.dependency_overrides[get_settings] = lambda: changed
 
         await a_turn(client, issued_token)
 

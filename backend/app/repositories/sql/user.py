@@ -26,8 +26,8 @@ class SQLUserRepository(UserRepository):
         return user
 
     async def add(self, name: str, email: str | None, phone: str | None) -> User:
-        # Lower-cased on the way in and on the way out of get_by_name, so a
-        # lookup and the row it would have matched agree on spelling.
+        # Lower-cased because the column is unique: without it, the same
+        # address in two spellings would be two users.
         email = email.lower() if email else None
         row = DatabaseUser(name=name, email=email, phone=phone)
         self.db.add(row)

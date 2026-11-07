@@ -13,7 +13,7 @@ from dataclasses import replace
 
 from openai import AsyncOpenAI
 
-from app.common.config import get_settings
+from app.common.config import Settings
 from app.common.context import conversation_id_var, current_request_id, token_sub_var
 from app.common.logging.logging import logger
 from app.common.models import ChatRequest, TokenContext, Usage
@@ -33,9 +33,10 @@ from app.services.chat import history as signed_history
 from app.services.chat.prompt import build_messages
 from app.services.chat.recording import record_question, recorded
 from app.services.chat.tooling import ChatTooling
-from app.services.chat.turn import run_turn
+from app.services.chat.turn import ChatModel, run_turn
 
 __all__ = [
+    "ChatModel",
     "ChatTooling",
     "ModelCalled",
     "RoundFinished",
@@ -58,6 +59,7 @@ async def answer(
     token: TokenContext,
     client: AsyncOpenAI,
     tooling: ChatTooling,
+    settings: Settings,
     transcripts: TranscriptRepository | None = None,
     endpoint: str = "/chat/stream",
     question_key: uuid.UUID | None = None,
@@ -69,12 +71,16 @@ async def answer(
     The question is stored before the model is called, which is what guarantees
     it survives whatever happens next. A retry finds it already there, in
     `earlier_conversation`, and stores it only if the earlier attempt could not.
+
+    `settings` is read here and handed down as the values each stage needs, so
+    nothing below this function reaches for configuration of its own.
     """
     yield TurnStarted()
 
     token_sub_var.set(token.sub)
     request_id = current_request_id()
-    key = get_settings().history_signing_secret
+    key = settings.history_signing_secret
+    model = ChatModel(settings.openai_model, settings.openai_reasoning_effort)
 
     # Believed only if the server signed it, for this grant and conversation.
     # Otherwise it is dropped, and with it the conversation it claimed to
@@ -106,18 +112,21 @@ async def answer(
         run_turn(
             client=client,
             tooling=tooling,
-            messages=build_messages(request.message, history),
+            messages=build_messages(request.message, history, settings.system_prompt),
             usage=Usage(
                 used=token.used_queries,
                 remaining=token.remaining_queries,
                 max=token.max_queries,
             ),
+            model=model,
         ),
         transcripts=transcripts,
         token=token,
         conversation_id=conversation_id,
         endpoint=endpoint,
         request_id=request_id,
+        model=model.name,
+        log_content=settings.log_chat_content,
     )
 
     try:

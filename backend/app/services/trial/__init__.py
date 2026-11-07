@@ -38,7 +38,7 @@ from app.common.exceptions import (
     TrialDisabled,
 )
 from app.common.logging.logging import logger
-from app.common.models import Grant, TokenPair
+from app.common.models import Grant, TokenPair, TokenVersion
 from app.repositories.base import (
     RefreshSessionRepository,
     TokenRepository,
@@ -46,7 +46,7 @@ from app.repositories.base import (
     TrialReservation,
     UserRepository,
 )
-from app.services.auth import Auth
+from app.services.auth import SessionService
 from app.services.trial import cookie, keys, pow
 from app.services.trial.pow import Challenge
 
@@ -100,7 +100,7 @@ async def start_trial(
     tokens: TokenRepository,
     sessions: RefreshSessionRepository,
     trials: TrialRepository,
-    auth: Auth,
+    session_service: SessionService,
     now: datetime | None = None,
 ) -> TokenPair:
     """
@@ -157,10 +157,10 @@ async def start_trial(
             token_hash=hash_token(secrets.token_urlsafe(32)),
             max_queries=settings.trial_max_queries,
             expires_at=now + timedelta(seconds=settings.trial_ttl_seconds),
-            version=2,
+            version=TokenVersion.V2,
             kind="trial",
             claimed_at=now,
         )
     )
     logger.info("Trial opened", extra={"token_id": grant.id})
-    return await auth.open_session(grant, sessions)
+    return await session_service.open_session(grant, sessions)

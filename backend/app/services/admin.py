@@ -10,14 +10,14 @@ from app.repositories.base import (
     TokenRepository,
     UserRepository,
 )
-from app.services.auth import Auth
+from app.services.auth import TokenCodec
 
 
 async def issue_token(
         req: IssueTokenRequest,
         users: UserRepository,
         tokens: TokenRepository,
-        auth: Auth,
+        codec: TokenCodec,
 ) -> str:
     """
     Mint the token that goes in the user's link.
@@ -27,7 +27,7 @@ async def issue_token(
     expiry are minted identically either way, because a claim token is a way of
     *reaching* a grant, not a different kind of grant.
 
-    Token construction itself lives on Auth so the claim shape is decided in one
+    Token construction itself lives on TokenCodec so the claim shape is decided in one
     place — this function and the claim/refresh paths must agree on it exactly.
 
     Nothing below names a storage backend, and nothing below says when a write
@@ -38,12 +38,12 @@ async def issue_token(
     Repositories are currently configured in repositories.__init__, this might change.
     """
     now_ts = int(time.time())
-    now_dt = datetime.fromtimestamp(now_ts)
+    now_dt = datetime.fromtimestamp(now_ts, tz=timezone.utc)
     exp_at_ts = now_ts + req.expires_in_seconds
     exp_at_dt = datetime.fromtimestamp(exp_at_ts, tz=timezone.utc)
     token_id = uuid.uuid4()
 
-    raw_token = auth.mint_grant_token(
+    raw_token = codec.mint_grant_token(
         subject=req.subject,
         token_id=token_id,
         issued_at=now_ts,
@@ -84,7 +84,7 @@ async def issue_token(
         )
     )
 
-    # Never the token_hash. It is what `Auth._matches` authenticates a bearer
+    # Never the token_hash. It is what `matches_stored` authenticates a bearer
     # against, so a log holding it holds the verifier for every token on the
     # grant — and logs are the one store here with no retention policy at all.
     logger.info(

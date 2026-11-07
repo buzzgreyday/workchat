@@ -19,7 +19,7 @@ The frontend is Next.js 16 and differs from what you know: read
 before writing frontend code.
 
 Many decisions are recorded in module docstrings rather than the docs —
-`app/services/auth.py` is the example. Read the docstring before changing a
+`app/services/auth/__init__.py` is the example. Read the docstring before changing a
 module whose shape looks odd; it is usually odd on purpose.
 
 ## Git

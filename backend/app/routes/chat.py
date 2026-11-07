@@ -8,7 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from openai import AsyncOpenAI
 from starlette.responses import StreamingResponse
 
-from app.common.config import get_settings
+from app.common.config import Settings, get_settings
 from app.common.logging.logging import logger
 from app.common.models import ChatRequest
 from app.common import sse
@@ -20,7 +20,7 @@ from app.repositories import (
 )
 from app.repositories.base import RefreshSessionRepository, TokenRepository, TranscriptRepository
 from app.services import chat as chat_service
-from app.services.auth import Auth, bearer_scheme, get_auth
+from app.services.auth import Authenticator, bearer_scheme, get_authenticator
 from app.services.chat import (
     ChatTooling,
     ModelCalled,
@@ -96,10 +96,11 @@ async def chat_stream(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     tokens: TokenRepository = Depends(get_token_repository),
     sessions: RefreshSessionRepository = Depends(get_refresh_session_repository),
-    auth: Auth = Depends(get_auth),
+    authenticator: Authenticator = Depends(get_authenticator),
     client: AsyncOpenAI = Depends(get_openai_client),
     tooling: ChatTooling = Depends(get_tooling),
     transcripts: TranscriptRepository = Depends(get_transcript_repository),
+    settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
     """
     The only chat endpoint.
@@ -118,9 +119,10 @@ async def chat_stream(
     client, it would vouch for whatever the client chose to send with it.
     """
     message_hash = hashlib.sha256(req.message.encode()).hexdigest()
-    token, earlier_conversation = await auth.verify_and_consume(
+    paid = await authenticator.verify_and_consume(
         credentials, tokens, sessions, question_key, message_hash
     )
+    token = paid.token
     logger.info(
         "Chat message received from user",
         extra={
@@ -132,7 +134,7 @@ async def chat_stream(
             }
         },
     )
-    if get_settings().log_chat_content:
+    if settings.log_chat_content:
         logger.debug(
             "Chat message content",
             extra={"user_message": req.message, "history": req.history},
@@ -143,9 +145,10 @@ async def chat_stream(
         token=token,
         client=client,
         tooling=tooling,
+        settings=settings,
         transcripts=transcripts,
         endpoint="/chat/stream",
         question_key=question_key,
-        earlier_conversation=earlier_conversation,
+        earlier_conversation=paid.earlier_conversation,
     )
     return StreamingResponse(frames(events), media_type="text/event-stream")

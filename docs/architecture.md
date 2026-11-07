@@ -25,24 +25,33 @@ correlation id survives a streaming response, and CORS sits inside it.
 
 ```
 route handler
-  └─ Depends(verify_and_consume)  /chat/stream  — authenticate, spend one query
-     Depends(verify)              /session      — authenticate, spend nothing
-     Depends(require_admin)       /admin/*      — static header secret
+  └─ verify_and_consume() in body  /chat/stream  — authenticate, spend one query
+     Depends(verify)               /session      — authenticate, spend nothing
+     Depends(require_admin)        /admin/*      — static header secret
         └─ services/  business logic, raising domain errors
              └─ common/exceptions.py    typed, each carrying its own status
                   └─ factory.py handler  the one place an error becomes a response
 ```
 
 Auth is a **dependency, not middleware** — deliberately, and the reasoning is
-recorded in the `app/services/auth.py` module docstring rather than repeated here.
-The short version: middleware has no dependency injection, `verify_and_consume`
-spends a query and so must not run on a preflight, and the three protected
-surfaces need three different checks.
+recorded in the `app/services/auth/__init__.py` docstring rather than repeated
+here. The short version: middleware has no dependency injection,
+`verify_and_consume` spends a query and so must not run on a preflight, and the
+three protected surfaces need three different checks. `/chat/stream` calls it in
+the body rather than by `Depends`, because FastAPI resolves dependencies before
+it reports a body that failed validation, and a spending dependency charged a
+question for a request that was then refused.
 
-Those three are the adapter for `Auth`, which itself takes plain arguments and
-declares no `Depends`. That is what makes `dependency_overrides[get_auth]` reach
-every endpoint at once — and what lets `Auth` be built and called in a test with
-no request in flight.
+The auth package is one class per reason to change: `TokenCodec` holds the
+signing key and mints and decodes, `SessionService` runs the v2 claim and
+refresh flow, and `Authenticator` decides what a request's bearer is worth. The
+admin check is none of them — it is a different secret for a different person —
+and is a plain dependency on `Settings`. The classes take plain arguments and
+declare no `Depends`; their providers (`get_token_codec`, `get_session_service`,
+`get_authenticator`) are built from one another by `Depends`, so overriding
+`get_settings` reaches all of them and overriding one reaches every endpoint
+that uses it. The alternative it replaced, one `Auth` class doing all four,
+was cohesive around the signing key but changed for several unrelated reasons.
 
 ## A chat turn
 
@@ -97,6 +106,15 @@ finds no records stops the server before it binds a port.
 process. Nothing reads the environment at import: `require_env` raising is what
 a missing secret looks like, and it should happen where a server is being
 started rather than where a module is being imported.
+
+Repositories and the chat turn do not call `get_settings()`. The providers in
+`app/repositories/sql/__init__.py` and the chat route take `Settings` by
+`Depends` and hand each piece down as a plain value: the token store gets its
+notification throttle, the session store its rotation grace window, and
+`answer()` gives `run_turn` a `ChatModel` and the system prompt. A store method
+reading global configuration would depend on whatever the environment said, and
+a test could change a window only by changing the environment;
+`dependency_overrides[get_settings]` reaches all of them at once.
 
 Values that consult no environment stay module constants in `app/common/config.py`,
 because they are facts about the application rather than settings — the signing

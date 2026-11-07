@@ -53,14 +53,20 @@ def users(db_session):
     return SQLUserRepository(db=db_session)
 
 
+# The production defaults, stated here rather than read from the environment,
+# so what these tests assert does not move when a .env does.
+NOTIFY_THROTTLE = timedelta(hours=1)
+ROTATION_GRACE = timedelta(seconds=30)
+
+
 @pytest.fixture
 def tokens(db_session):
-    return SQLTokenRepository(db=db_session)
+    return SQLTokenRepository(db=db_session, notify_throttle=NOTIFY_THROTTLE)
 
 
 @pytest.fixture
 def sessions(db_session):
-    return SQLRefreshSessionRepository(db=db_session)
+    return SQLRefreshSessionRepository(db=db_session, rotation_grace=ROTATION_GRACE)
 
 
 @pytest.fixture
@@ -316,6 +322,12 @@ async def test_mark_owner_notified_throttles(tokens, grant):
     assert await tokens.mark_owner_notified(grant.id) is False
 
 
+async def test_the_notify_throttle_is_the_one_the_repository_was_built_with(db_session, grant):
+    unthrottled = SQLTokenRepository(db=db_session, notify_throttle=timedelta(0))
+    assert await unthrottled.mark_owner_notified(grant.id) is True
+    assert await unthrottled.mark_owner_notified(grant.id) is True
+
+
 # --- refresh sessions ----------------------------------------------------
 
 
@@ -375,6 +387,16 @@ async def test_replay_after_the_grace_window_cuts_every_session(
     cut = await sessions.get(successor.id)
     assert cut is not None
     assert cut.revoked_at is not None, "the live successor must be cut too"
+
+
+async def test_the_grace_window_is_the_one_the_repository_was_built_with(db_session, grant):
+    """With no grace at all, even an immediate re-presentation is a replay."""
+    graceless = SQLRefreshSessionRepository(db=db_session, rotation_grace=timedelta(0))
+    original = await graceless.add(make_session(grant.id))
+    await graceless.rotate(original.id, make_session(grant.id))
+
+    with pytest.raises(RefreshTokenReplayed):
+        await graceless.rotate(original.id, make_session(grant.id))
 
 
 async def test_rotate_raises_for_an_unknown_session(sessions, grant):
@@ -563,7 +585,8 @@ async def test_issue_token_runs_without_a_database():
     """
     from app.common.models import IssueTokenRequest
     from app.services.admin import issue_token
-    from app.services.auth import Auth
+    from app.common.config import get_settings
+    from app.services.auth import TokenCodec
 
     users = FakeUserRepository()
     tokens = FakeTokenRepository()
@@ -572,7 +595,7 @@ async def test_issue_token_runs_without_a_database():
         IssueTokenRequest(subject="Ada", company="Acme", max_queries=3),
         users=users,
         tokens=tokens,
-        auth=Auth(),
+        codec=TokenCodec.from_settings(get_settings()),
     )
 
     assert raw.count(".") == 2  # a JWT
@@ -588,15 +611,16 @@ async def test_issue_token_reuses_an_existing_user():
     """
     from app.common.models import IssueTokenRequest
     from app.services.admin import issue_token
-    from app.services.auth import Auth
+    from app.common.config import get_settings
+    from app.services.auth import TokenCodec
 
     users = FakeUserRepository()
     tokens = FakeTokenRepository()
     req = IssueTokenRequest(subject="Ada", company="Acme", max_queries=3)
-    auth = Auth()
+    codec = TokenCodec.from_settings(get_settings())
 
-    await issue_token(req, users=users, tokens=tokens, auth=auth)
-    await issue_token(req, users=users, tokens=tokens, auth=auth)
+    await issue_token(req, users=users, tokens=tokens, codec=codec)
+    await issue_token(req, users=users, tokens=tokens, codec=codec)
 
     assert len(users.rows) == 1, "the second issue must not create a second user"
     assert len(tokens.rows) == 2

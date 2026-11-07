@@ -706,7 +706,7 @@ access tokens, logs and backups.
 
 Possible future enhancements include:
 
-* AuthHandler — done: `Auth` in `app/services/auth.py`
+* AuthHandler — done: the `app/services/auth/` package (`TokenCodec`, `SessionService`, `Authenticator`)
 * ~~Refresh token (via claim/invite id/token)~~ — done, see [Token flow](#token-flow)
 * Token persistence
 * ~~Handle max queries reached, invalid/expired token, etc. in frontend~~ — done;
