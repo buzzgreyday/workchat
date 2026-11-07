@@ -450,12 +450,13 @@ test("a reply arrives under its question without moving the view, and a button g
 
   const toEnd = page.getByRole("button", { name: "Go to the latest" });
 
+  await expect(toEnd).toBeVisible();
   await toEnd.click();
 
   await expect
     .poll(() => transcriptGap(page))
     .toBeLessThanOrEqual(24);
-  await expect(toEnd).toHaveCount(0);
+  await expect(toEnd).toBeHidden();
 
   // A new question goes to the top in its turn, however far down the
   // transcript was.
@@ -491,5 +492,5 @@ test("a short reply's question goes to the top too, with no button", async ({
     .toBeLessThan(40);
   await expect(
     page.getByRole("button", { name: "Go to the latest" }),
-  ).toHaveCount(0);
+  ).toBeHidden();
 });
