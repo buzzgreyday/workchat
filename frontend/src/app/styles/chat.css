@@ -107,6 +107,22 @@
      they are put back to auto. Not left to the host's `scrollbar-color`,
      which does cross the shadow root by inheritance: in Chrome that alone
      brings back the arrows. */
+  /* `scrollbar="none"` (EMBED.md): no scrollbar at all. Both ways, for the
+     same reason as above: the standard property, and ::-webkit-scrollbar for
+     the WebKit and Chromium builds that predate it — Safari before 18.2, and
+     the web views apps such as DuckDuckGo are built on, which a host's
+     `scrollbar-width: none` on the transcript part did not reach. Only the
+     element can name its own scrollbar's pseudo-element; `::part()` stops
+     short of it. In the document of the standalone site there is no host,
+     and these match nothing. */
+  :host([scrollbar="none"]) .chat-log {
+    scrollbar-width: none;
+  }
+
+  :host([scrollbar="none"]) .chat-log::-webkit-scrollbar {
+    display: none;
+  }
+
   /* The transcript's place in the column, and what the button to its end
      sits in, over its foot, so it does not scroll with the messages. */
   .chat-log-frame {
