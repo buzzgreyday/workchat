@@ -6,6 +6,8 @@ import jwt
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StrictInt
 
 from app.common.config import MAX_MESSAGE_CHARS
+from app.common.models.conversation import MessageRole, MessageStatus
+from app.common.models.token import TokenVersion
 
 class Usage(BaseModel):
     used: int
@@ -49,20 +51,20 @@ class IssueTokenRequest(BaseModel):
     phone: str | None = Field(default=None, max_length=64)
     job_title: str | None = Field(default=None, max_length=255)
     type: Literal["token", "qr"] = "token"
-    # 1 mints the ?token= access JWT as before; 2 mints a ?claim= link the hirer
-    # exchanges for a refresh/access pair. Defaults to 1 so an existing caller
-    # that never heard of versions keeps getting exactly what it got before.
-    version: Literal[1, 2] = 1
+    # V1 mints the ?token= access JWT as before; V2 mints a ?claim= link the
+    # hirer exchanges for a refresh/access pair. Defaults to V1 so an existing
+    # caller that never heard of versions keeps getting exactly what it got before.
+    version: TokenVersion = TokenVersion.V1
 
 class ChatMessageOut(BaseModel):
     id: uuid.UUID
     request_id: str
-    role: str
+    role: MessageRole
     content: str | None = None
     content_chars: int | None = None
     truncated: int = 0
     endpoint: str
-    status: str
+    status: MessageStatus
     finish_reason: str | None = None
     tool_calls_count: int = 0
     tool_names: str | None = None
@@ -119,10 +121,10 @@ class TokenContext(BaseModel):
     max_queries: int
     used_queries: int
     remaining_queries: int
-    # Which token flow the caller arrived on. 1 = the long-lived ?token= JWT,
-    # 2 = an access token minted from a claim. Carried so handlers and logs can
-    # tell the two apart; the chat path deliberately treats them identically.
-    version: int = 1
+    # Which token flow the caller arrived on: the long-lived ?token= JWT, or an
+    # access token minted from a claim. Carried so handlers and logs can tell
+    # the two apart; the chat path deliberately treats them identically.
+    version: TokenVersion = TokenVersion.V1
     # v2 only: the refresh-token row the access token was minted from, i.e. which
     # of the hirer's devices this request came from.
     session_id: str | None = None
@@ -238,7 +240,7 @@ class SessionInfo(BaseModel):
     as a side effect of asking one. Reading it spends nothing.
     """
     subject: str
-    version: int
+    version: TokenVersion
     usage: Usage
     expires_at: datetime
     session_id: str | None = None

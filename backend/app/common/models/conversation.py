@@ -1,9 +1,16 @@
 import uuid
 from datetime import datetime, timezone
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.common.models.utc import UTCDateTime
+
+MessageRole = Literal["user", "assistant"]
+# How a reply ended: the recorder writes one of these whatever happened.
+ReplyStatus = Literal["completed", "aborted", "failed"]
+# A question is stored as "received" before the model is called.
+MessageStatus = Literal["received", ReplyStatus]
 
 
 class ChatMessage(BaseModel):
@@ -21,12 +28,12 @@ class ChatMessage(BaseModel):
     conversation_id: uuid.UUID
     token_id: uuid.UUID
     request_id: str
-    role: str  # "user" | "assistant"
+    role: MessageRole
     content: str | None = None
     content_chars: int | None = None
     truncated: int = 0
     endpoint: str
-    status: str  # "received" | "completed" | "aborted" | "failed"
+    status: MessageStatus
     finish_reason: str | None = None
     tool_calls_count: int = 0
     tool_names: str | None = None

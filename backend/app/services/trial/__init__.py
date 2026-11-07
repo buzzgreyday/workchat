@@ -38,7 +38,7 @@ from app.common.exceptions import (
     TrialDisabled,
 )
 from app.common.logging.logging import logger
-from app.common.models import Grant, TokenPair
+from app.common.models import Grant, TokenPair, TokenVersion
 from app.repositories.base import (
     RefreshSessionRepository,
     TokenRepository,
@@ -157,7 +157,7 @@ async def start_trial(
             token_hash=hash_token(secrets.token_urlsafe(32)),
             max_queries=settings.trial_max_queries,
             expires_at=now + timedelta(seconds=settings.trial_ttl_seconds),
-            version=2,
+            version=TokenVersion.V2,
             kind="trial",
             claimed_at=now,
         )

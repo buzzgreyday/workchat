@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from enum import IntEnum
 
 from typing import Literal
 
@@ -8,6 +9,20 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.common.exceptions import AppError, InvalidToken, TokenExpired, TokenRevoked
 from app.common.logging.logging import logger
 from app.common.models.utc import UTCDateTime
+
+
+class TokenVersion(IntEnum):
+    """
+    Which token flow a grant was issued for.
+
+    V1 is the long-lived JWT delivered as `?token=`, which is the grant itself;
+    V2 is a `?claim=` link exchanged for refresh and access tokens. An int enum
+    because the number is what the column, the JSON and the `ver` claim carry,
+    and it still goes out as that number.
+    """
+
+    V1 = 1
+    V2 = 2
 
 
 class Grant(BaseModel):
@@ -34,13 +49,13 @@ class Grant(BaseModel):
     revoked_at: UTCDateTime | None = None
     claimed_at: UTCDateTime | None = None
     owner_notified_at: UTCDateTime | None = None
-    version: int = 1
+    version: TokenVersion = TokenVersion.V1
     # "link" for a grant issued to someone, "trial" for one a visitor opened
     # for themselves (see the tokens.kind column).
     kind: Literal["link", "trial"] = "link"
     created_at: UTCDateTime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
-    def refusal(self, now: datetime, expected_version: int | None = None) -> AppError | None:
+    def refusal(self, now: datetime, expected_version: TokenVersion | None = None) -> AppError | None:
         """
         Why this grant cannot be used, or None if it can.
 

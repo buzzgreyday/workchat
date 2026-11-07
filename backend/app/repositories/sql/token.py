@@ -14,7 +14,7 @@ from app.common.exceptions import (
     QuotaExhausted,
     RetriesExhausted,
 )
-from app.common.models import Grant
+from app.common.models import Grant, TokenVersion
 from app.common.schemas import DatabaseQuestionKey, DatabaseToken
 from app.repositories.base import SpentQuestion, TokenRepository
 from app.repositories.sql._shared import _rowcount
@@ -78,7 +78,7 @@ class SQLTokenRepository(TokenRepository):
         token_id: uuid.UUID,
         key: uuid.UUID,
         message_hash: str,
-        expected_version: int | None = None,
+        expected_version: TokenVersion | None = None,
     ) -> SpentQuestion:
         self.logger.debug(
             "Updating token used query count",
@@ -172,7 +172,7 @@ class SQLTokenRepository(TokenRepository):
         token_id: uuid.UUID,
         key: uuid.UUID,
         message_hash: str,
-        expected_version: int | None,
+        expected_version: TokenVersion | None,
     ) -> SpentQuestion:
         """
         Another attempt at a question already paid for. Spends nothing.
@@ -214,7 +214,7 @@ class SQLTokenRepository(TokenRepository):
         return SpentQuestion(grant=grant, conversation_id=taken.conversation_id)
 
     async def _explain_failed_spend(
-        self, token_id: uuid.UUID, expected_version: int | None, now: datetime
+        self, token_id: uuid.UUID, expected_version: TokenVersion | None, now: datetime
     ) -> Exception:
         """
         Which of the spend's conditions was the one that failed.
@@ -225,7 +225,7 @@ class SQLTokenRepository(TokenRepository):
         return await self._dead_grant(token_id, expected_version, now) or QuotaExhausted()
 
     async def _dead_grant(
-        self, token_id: uuid.UUID, expected_version: int | None, now: datetime
+        self, token_id: uuid.UUID, expected_version: TokenVersion | None, now: datetime
     ) -> Exception | None:
         """What is wrong with this grant, whatever its allowance, or None."""
         # Read fresh: the spend's UPDATE deliberately does not touch rows already

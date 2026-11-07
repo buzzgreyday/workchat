@@ -18,7 +18,7 @@ from dataclasses import replace
 
 from app.common.context import conversation_id_var
 from app.common.logging.logging import logger
-from app.common.models import TokenContext
+from app.common.models import ReplyStatus, TokenContext
 from app.repositories.base import ReplyOutcome, TranscriptRepository
 from app.services.chat.events import (
     RoundFinished,
@@ -88,7 +88,7 @@ async def recorded(
     reply = ""
     tool_names: list[str] = []
     finish_reason: str | None = None
-    status = "completed"
+    status: ReplyStatus = "completed"
     error: str | None = None
     started_at = asyncio.get_running_loop().time()
 

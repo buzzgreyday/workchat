@@ -36,6 +36,8 @@ from app.common.models import (
     ConversationPreview,
     Grant,
     RefreshSession,
+    ReplyStatus,
+    TokenVersion,
     User,
 )
 
@@ -51,7 +53,7 @@ class ReplyOutcome:
     and none of it changes what is stored, only what is recorded about it.
     """
 
-    status: str  # "completed" | "aborted" | "failed"
+    status: ReplyStatus
     finish_reason: str | None = None
     tool_names: list[str] = field(default_factory=list)
     tool_calls_count: int = 0
@@ -135,7 +137,7 @@ class TokenRepository(RepositoryBase):
         token_id: uuid.UUID,
         key: uuid.UUID,
         message_hash: str,
-        expected_version: int | None = None,
+        expected_version: TokenVersion | None = None,
     ) -> SpentQuestion:
         """
         Pay for the question this key names, once, and return the grant as it now

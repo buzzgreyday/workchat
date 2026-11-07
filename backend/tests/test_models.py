@@ -153,3 +153,57 @@ def test_a_version_mismatch_is_an_invalid_token():
 
 def test_no_expected_version_checks_none():
     assert _grant(version=2).refusal(_now()) is None
+
+
+# --- token versions and message states, as types ---------------------------
+
+def test_a_grant_read_from_storage_carries_a_token_version():
+    from app.common.models import TokenVersion
+
+    assert _grant(version=2).version is TokenVersion.V2
+
+
+def test_an_unknown_grant_version_will_not_parse():
+    with pytest.raises(ValidationError):
+        _grant(version=3)
+
+
+def test_issue_token_request_refuses_an_unknown_version():
+    with pytest.raises(ValidationError):
+        IssueTokenRequest(subject="s", company="c", version=3)
+
+
+def test_a_token_version_goes_over_the_wire_as_a_number():
+    """The JSON and the JWT claim are ints, as they were before the type."""
+    from app.common.models import TokenVersion
+
+    request = IssueTokenRequest(subject="s", company="c", version=TokenVersion.V2)
+    assert request.model_dump(mode="json")["version"] == 2
+
+
+def _message(**overrides):
+    import uuid
+
+    from app.common.models import ChatMessage
+
+    fields = dict(
+        conversation_id=uuid.uuid4(), token_id=uuid.uuid4(), request_id="r",
+        role="assistant", endpoint="/chat/stream", status="completed",
+    )
+    fields.update(overrides)
+    return ChatMessage(**fields)
+
+
+def test_a_message_states_every_status_the_recorder_writes():
+    for status in ("received", "completed", "aborted", "failed"):
+        assert _message(status=status).status == status
+
+
+def test_a_message_refuses_a_status_nothing_writes():
+    with pytest.raises(ValidationError):
+        _message(status="streaming")
+
+
+def test_a_message_refuses_a_role_nothing_writes():
+    with pytest.raises(ValidationError):
+        _message(role="tool")
