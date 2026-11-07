@@ -58,7 +58,8 @@ Infrastructure: Docker Compose, Caddy reverse proxy with automatic HTTPS.
   fixed status codes ("thinking", "searching the CV"), which the frontend turns
   into words. What the model searched for never reaches the browser.
 - **Embeddable by contract.** The frontend also ships as a `<workchat-chat>` web
-  component that mringdal.com loads at runtime. Its attributes, event and CSS
+  component that mringdal.com loads at runtime. Its attributes, event, custom
+  state (on while it works, for the host to style), shadow parts and CSS
   variables are a documented public API, and a contract test runs the website's
   own end-to-end suite against the freshly built component to catch drift.
 - **Measured quality.** An eval suite drives the live chat with real questions
