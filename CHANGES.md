@@ -7,6 +7,34 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.15.0] - 2026-11-07
+
+### Changed
+
+- **The view holds still while a reply arrives.** Asking a question scrolls
+  once — the question to the top, with room under it — and then nothing
+  moves while the reply streams in. It used to follow the reply down a line
+  at a time while the reader was at the bottom, and the paragraph being read
+  moved out from under the reader once per token. Once a reply runs past the
+  foot of the transcript, a round button there, "Go to the latest", goes to
+  the end.
+- Almost all of it is CSS. A browser does not move the view when content
+  grows below it, so holding still needs nothing; the room under a question
+  is a minimum height on the newest reply, in the transcript's container
+  units; and the button shows and hides itself from the scroll position, a
+  scroll-driven animation. Script only scrolls to a new question and answers
+  the button. A first version measured all of it in script, on every token,
+  and the CSS replaced it. Firefox has no scroll-driven animations yet: there
+  the button stays hidden, and the transcript scrolls by hand.
+
+### Added
+
+- `scrollbar="none"` hides the transcript's scrollbar in every browser. The
+  WebKit builds and app web views — the DuckDuckGo browser — did not honour a
+  host's `scrollbar-width: none` on the transcript part, and only the element
+  can name its own `::-webkit-scrollbar`.
+- A part, `jump`: the button to the end, for a host to style.
+
 ## [0.14.0] - 2026-11-07
 
 ### Added

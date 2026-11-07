@@ -28,6 +28,7 @@ part or a variable is safe. Renaming or removing one breaks every page that embe
 | `claim` | A claim token, when the visitor followed a link. |
 | `owner-name` | Whose CV this is. Defaults to the name in `lib/owner-defaults.ts`. |
 | `header` | `none` hides the chat's header — its title and the questions-left badge. Anything else, or nothing, shows it. |
+| `scrollbar` | `none` hides the conversation's scrollbar, in every browser, old WebKit included. It still scrolls, by wheel, touch and keys. Anything else, or nothing, shows its thin one. |
 | `frame` | `page` drops the card — its border, corners, shadow and height cap — for a host that gives the chat a band of its own. Anything else, or nothing, keeps the card. |
 
 The app reads the owner from the environment during its server render. An
@@ -91,6 +92,7 @@ page, so a host can light up something outside the chat while it works —
 | `bubble` | Every message, a question or a reply. |
 | `user-bubble`, `bot-bubble` | A question and a reply, each also a `bubble`. |
 | `send` | The send button: square, as tall as a one-line field. Its colours are `--chat-send-bg` and `--chat-send-icon`; the part is for its shape. |
+| `jump` | The button to the end of the conversation, shown while there is more below than fits: round, in the raised surface, centred over the conversation's foot. |
 
 ```css
 workchat-chat::part(composer)::before {
