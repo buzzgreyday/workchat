@@ -16,8 +16,8 @@ pin, so a release here reaches every embedding page on its next load.
 ## The API
 
 Versioned like an API, because it is one — and unlike a package, nobody can
-stay behind on an old version. Adding an attribute, an event or a variable is
-safe. Renaming or removing one breaks every page that embeds this.
+stay behind on an old version. Adding an attribute, an event, a state or a
+variable is safe. Renaming or removing one breaks every page that embeds this.
 
 **Attributes**
 
@@ -59,6 +59,28 @@ host's header has room.
 
 There is no close event. Running in the host's document, Escape reaches their
 `<dialog>` on its own — forwarding it was something only a frame needed.
+
+**States** (custom states, so select them in CSS)
+
+| State | Meaning |
+| --- | --- |
+| `working` | The chat is busy, and showing it with its typing dots: while it opens its session, and from the moment a question is sent until its reply has finished, or broken off. |
+
+```css
+workchat-chat:state(working) {
+  /* the chat at work */
+}
+```
+
+It follows the typing dots, not only replies, so a host's look for "working"
+appears whenever the chat itself looks busy: the moment after it loads, while
+its session opens, as well as while it answers. A state rather than an event,
+because what a host does with "the chat is at work" is a look, and a look belongs in the host's CSS: it can select the state
+without a line of script, and the state is there when the stylesheet is, with
+nothing to miss by listening too late. `:has()` reaches it from anywhere on the
+page, so a host can light up something outside the chat while it works —
+`body:has(workchat-chat:state(working)) .glow`. A browser without custom states
+(before 2024) shows no state, and the chat works as it always has.
 
 **CSS variables** — the palette is the `--chat-*` set declared at the top of
 `src/app/globals.css`: `--chat-bg`, `--chat-panel`, `--chat-border`, and the
@@ -170,9 +192,9 @@ WEBSITE_DIR=/path/to/site npm run test:contract
 ```
 
 Builds the element and runs the site's Playwright tests against that exact
-file. Rename an attribute, an event or a `--chat-*` variable and it goes red
-here, in this repo, before the change is deployed to a site that cannot pin a
-version of it. It needs a checkout of the site with its dependencies
+file. Rename an attribute, an event, a state or a `--chat-*` variable and it
+goes red here, in this repo, before the change is deployed to a site that
+cannot pin a version of it. It needs a checkout of the site with its dependencies
 installed, and nothing else — no database, no key, no stack. The backend stays
 mocked, because what is being checked is this element's surface.
 
