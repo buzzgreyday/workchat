@@ -17,9 +17,12 @@ dependencies there, and the route asking for a repository is unaffected either
 way.
 """
 
+from datetime import timedelta
+
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.common.config import Settings, get_settings
 from app.common.db import get_db, get_session_factory
 from app.repositories.base import (
     ConversationRepository,
@@ -60,18 +63,26 @@ def provide_user_repository(db: AsyncSession = Depends(get_db)) -> UserRepositor
     return SQLUserRepository(db=db)
 
 
-def provide_token_repository(db: AsyncSession = Depends(get_db)) -> TokenRepository:
+def provide_token_repository(
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> TokenRepository:
     # FastAPI caches `Depends(get_db)` for the life of a request, so every
     # repository below is handed the *same* session, and therefore the same
     # transaction. That is what keeps issuing a token atomic without anything
     # above this package knowing a transaction exists.
-    return SQLTokenRepository(db=db)
+    return SQLTokenRepository(
+        db=db, notify_throttle=timedelta(seconds=settings.owner_notify_throttle_seconds)
+    )
 
 
 def provide_refresh_session_repository(
     db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> RefreshSessionRepository:
-    return SQLRefreshSessionRepository(db=db)
+    return SQLRefreshSessionRepository(
+        db=db, rotation_grace=timedelta(seconds=settings.refresh_rotation_grace_seconds)
+    )
 
 
 def provide_transcript_repository(

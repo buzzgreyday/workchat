@@ -7,7 +7,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.config import MAX_QUESTION_ATTEMPTS, get_settings
+from app.common.config import MAX_QUESTION_ATTEMPTS
 from app.common.exceptions import (
     IdempotencyKeyReused,
     InvalidToken,
@@ -21,11 +21,17 @@ from app.repositories.sql._shared import _rowcount
 
 
 class SQLTokenRepository(TokenRepository):
-    """The tokens table, behind TokenRepository."""
+    """
+    The tokens table, behind TokenRepository.
 
-    def __init__(self, db: AsyncSession) -> None:
+    `notify_throttle` is how long after one operator notification for a grant
+    the next may go out (`mark_owner_notified`).
+    """
+
+    def __init__(self, db: AsyncSession, notify_throttle: timedelta) -> None:
         super().__init__()
         self.db = db
+        self.notify_throttle = notify_throttle
 
     async def add(self, grant: Grant) -> Grant:
         self.logger.debug(
@@ -248,7 +254,7 @@ class SQLTokenRepository(TokenRepository):
         # hit in a loop must produce one message, not one per request. The
         # window predicate lives in SQL so concurrent requests cannot both win.
         now = datetime.now(timezone.utc)
-        cutoff = now - timedelta(seconds=get_settings().owner_notify_throttle_seconds)
+        cutoff = now - self.notify_throttle
         result = await self.db.execute(
             update(DatabaseToken)
             .where(

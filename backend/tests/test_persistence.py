@@ -7,6 +7,7 @@ asked, so these assert against the rows themselves rather than the response body
 import asyncio
 import json
 import uuid
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -274,7 +275,7 @@ async def test_a_hang_up_mid_reply_can_be_retried_for_nothing(
     from app.services.chat.tooling import get_tooling
 
     token_row = (await db_session.execute(select(DatabaseToken))).scalars().first()
-    tokens = SQLTokenRepository(db_session)
+    tokens = SQLTokenRepository(db_session, notify_throttle=timedelta(hours=1))
     key = uuid.uuid4()
 
     spent = await tokens.spend_question(token_row.id, key, "a-hash")

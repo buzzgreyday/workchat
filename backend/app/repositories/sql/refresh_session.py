@@ -1,12 +1,11 @@
 """The refresh_tokens table — one row per session within a grant."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.config import get_settings
 from app.common.exceptions import (
     InvalidRefreshToken,
     RefreshTokenExpired,
@@ -22,11 +21,17 @@ from app.repositories.sql._shared import _rowcount
 
 
 class SQLRefreshSessionRepository(RefreshSessionRepository):
-    """The refresh_tokens table, behind RefreshSessionRepository."""
+    """
+    The refresh_tokens table, behind RefreshSessionRepository.
 
-    def __init__(self, db: AsyncSession) -> None:
+    `rotation_grace` is how long a just-rotated token is still read as its own
+    client retrying rather than a replay (`rotate`).
+    """
+
+    def __init__(self, db: AsyncSession, rotation_grace: timedelta) -> None:
         super().__init__()
         self.db = db
+        self.rotation_grace = rotation_grace
 
     async def get(self, session_id: uuid.UUID) -> RefreshSession | None:
         row = await self.db.get(DatabaseRefreshToken, session_id)
@@ -123,8 +128,8 @@ class SQLRefreshSessionRepository(RefreshSessionRepository):
             )
             return SessionRevoked()
 
-        rotated_ago = (now - (as_utc(stale.revoked_at) or now)).total_seconds()
-        if rotated_ago <= get_settings().refresh_rotation_grace_seconds:
+        rotated_ago = now - (as_utc(stale.revoked_at) or now)
+        if rotated_ago <= self.rotation_grace:
             # This client racing itself, not an attacker: parallel requests that
             # all expired at once, or a retry after a network flake. Rejecting
             # without cutting keeps the winner's session — cutting here would
@@ -132,7 +137,7 @@ class SQLRefreshSessionRepository(RefreshSessionRepository):
             # own tab.
             self.logger.info(
                 "Refresh token re-presented inside the rotation grace window",
-                extra={"refresh_id": session_id, "rotated_ago_s": round(rotated_ago, 3)},
+                extra={"refresh_id": session_id, "rotated_ago_s": round(rotated_ago.total_seconds(), 3)},
             )
             return RotationInProgress()
 
@@ -141,7 +146,7 @@ class SQLRefreshSessionRepository(RefreshSessionRepository):
             extra={
                 "refresh_id": session_id,
                 "token_id": stale.token_id,
-                "rotated_ago_s": round(rotated_ago, 3),
+                "rotated_ago_s": round(rotated_ago.total_seconds(), 3),
             },
         )
         token_id = stale.token_id
