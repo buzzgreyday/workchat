@@ -39,7 +39,9 @@
   --chat-panel-alt: #2b3d4f;
   --chat-border: oklch(1 0 0 / 10%);
   --chat-text: #eae0cf;
-  --chat-text-muted: #86898f;
+  /* Sage: a grey tinted green, at the old grey's lightness. The tint pulls it
+     off the navy enough to pass 4.5:1 there; docs/design.md has the numbers. */
+  --chat-text-muted: #809e85;
   /* Only tints your own questions (mixed into the navy) and colours links in
      replies; nothing on the page is painted with it. */
   --chat-accent: #94b4c1;
@@ -67,6 +69,7 @@
 
   /* The dots while a reply is being written. */
   --chat-typing: var(--chat-text-muted);
+  --chat-scrollbar: var(--chat-text-muted);
 
   /* The input */
   --chat-input-bg: var(--chat-panel-alt);

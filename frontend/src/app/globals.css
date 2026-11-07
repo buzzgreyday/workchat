@@ -50,6 +50,8 @@
 
   /* The dots while a reply is being written. */
   --chat-typing: var(--chat-text-muted);
+  /* The transcript's scrollbar: its thumb, on no track. */
+  --chat-scrollbar: var(--chat-text-muted);
 
   --chat-input-bg: var(--chat-panel-alt);
   --chat-input-text: var(--chat-text);
@@ -326,6 +328,15 @@ html {
   font-family: var(--chat-font-message);
   font-weight: var(--chat-font-message-weight);
   font-size: var(--chat-font-message-size, 1rem);
+}
+
+/* A gap between a reply's blocks — paragraphs, lists, code — of most of a
+   line, in the message's own size: the reset takes every margin away, and a
+   two-paragraph answer ran together as one. Between siblings only, so a
+   bubble's first and last lines sit on its padding, and a reply set as
+   plain text (a host's `bot-bubble`, EMBED.md) starts on its line. */
+.chat-message > * + * {
+  margin-block-start: 0.75em;
 }
 
 .chat-message a {

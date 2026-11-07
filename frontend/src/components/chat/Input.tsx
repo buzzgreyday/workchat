@@ -68,7 +68,11 @@ export default function ChatInput() {
 
   return (
     <div className="composer">
-      <div className="composer-box">
+      {/* A part (EMBED.md): the box the question is typed in, exactly the
+          field's size, for a host page to draw on — a ring, a glow — with
+          CSS of its own. The box rather than the field, because a textarea
+          takes no ::before or ::after to draw with. */}
+      <div className="composer-box" part="composer">
         <textarea
           // A textarea rather than an input: a question worth asking a CV often
           // runs to two sentences, and there was no way to break a line — Enter
@@ -139,6 +143,9 @@ export default function ChatInput() {
         disabled={shut}
         aria-label="Send question"
         className="button button-send"
+        // A part (EMBED.md): the send button, for a host to shape — a
+        // circle, say — where its colours are already variables.
+        part="send"
       >
         <Send size={18} />
       </button>

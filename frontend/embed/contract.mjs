@@ -13,9 +13,9 @@ import { resolve } from "node:path";
  * there: the site cannot break the contract, and this repo can.
  *
  * The backend stays mocked. What is being checked is the element's surface —
- * the attributes, the event, the shadow root, the `--chat-*` variables — and a
- * live backend would only add a database and a key to a question that does not
- * involve either.
+ * the attributes, the event, the state, the parts, the shadow root, the `--chat-*`
+ * variables — and a live backend would only add a database and a key to a
+ * question that does not involve either.
  *
  *   npm run test:contract
  *   WEBSITE_DIR=../elsewhere npm run test:contract

@@ -18,7 +18,7 @@ the page readable at a glance.
 | **Surface** — navy | `#1b2e42` | The page and everything on it: the top bar, the chat band, the footer, cards. One colour, no frame of another around it. |
 | **Raised surface** | `#2b3d4f` | Things on the surface: reply bubbles, the input, pills. The navy lifted with 8% white. |
 | **Text** — cream | `#eae0cf` | All body text. |
-| **Muted text** | `#86898f` | Placeholders, footer links, secondary labels. |
+| **Muted text** — sage | `#809e85` | Placeholders, footer links, secondary labels. A grey tinted green. |
 | **Accent** — blue-grey | `#94b4c1` | Links in text. Tints the visitor's own messages (`#4e6778`, 45% accent into navy). |
 | **Identity** — pale gold | `#e0cea1` | The WORKCHAT title, status text such as "questions left". Who this is and where you are. |
 | **Action** — coral | `#e0876a` | The one thing to press: the send button. Nothing else. |
@@ -54,9 +54,16 @@ Measured contrast. 4.5:1 is the guideline for body text, 3:1 for large text
 | Coral button against navy | 5.2:1 |
 | Navy icon on coral | 5.2:1 |
 | Pale gold title on navy | 8.9:1 |
+| Sage muted text on navy | 4.7:1 |
+| Sage muted text on raised surface | 3.8:1 |
 
-Muted text on navy (the footer links, the trial notice) is 4.0:1: fine
-for small print, not for anything someone has to read to use the page.
+The muted text was a neutral grey (`#86898f`), at 3.95:1 on navy and 3.2:1
+on the raised surface: excused as small print, and below the guideline for
+anything read. Sage is the same lightness tinted green, and the tint alone
+moves it far enough from the navy to pass 4.5:1 there. A dark green was
+tried first and rejected: at 1.8:1 it cannot be read.
+On the raised surface it is still below 4.5:1, so placeholders and the pill's
+count stay short labels, not sentences.
 
 ## Type
 
@@ -117,7 +124,7 @@ reference, rather than a copy here that could drift from them:
 | `app/styles/tokens.css` | The colours, faces, radii and motion, on `:root` |
 | `app/styles/base.css` | `html` and `body`: the navy, the cream and the body type |
 | `app/styles/buttons.css` | `.button`, the one kind of button |
-| `app/styles/chat.css` | The `--chat-*` variables, on the `workchat-chat` element |
+| `app/styles/chat.css` | The `--chat-*` variables, on the `workchat-chat` element, and the chat window: its bar, its ring, and what it draws on the element's parts |
 
 One thing it does differently from chat.mringdal.com, on purpose: **body text
 is Nunito at 600**, not 400, and bold needs 800 to read as bold. Its body text
@@ -131,6 +138,53 @@ palette is handed over on the element rather than `:root`, because the element
 declares its own defaults on `:host` and an inherited value loses to those. The
 chat window draws its own bar, so the chat is told `header="none"`. `EMBED.md`
 lists every `--chat-*` variable the element reads.
+
+### The chat window
+
+A window over the homepage, in the corner on a wide screen and the whole
+screen on a phone. What it does differently from chat.mringdal.com, through
+the element's `--chat-*` variables, its parts and its `working` state
+(`EMBED.md`):
+
+| | |
+| --- | --- |
+| The window | Solid navy, with no box or card of the chat's own in it. |
+| A question | Raised: the raised surface at 80%, a hairline round it and a faint light along its top, with half a line more room above and below than between messages. |
+| A reply | Plain text, no bubble — the page's reading, not a message in a box. Its paragraphs a gap apart. |
+| The margins | One line down the left, 1rem in: the questions left, the replies, the box to type in. |
+| The scrollbar | None. The conversation still scrolls, by wheel, touch and keys. |
+| Questions left | Plain sage text at the start of the bar, opposite the way out. |
+| Send | Round, coral, the 3D press: the one thing in the window to press. |
+| Close | Round, flat, the raised surface with a sage ×: the quietest way out. |
+| The ring | Round the box to type in, a hairline of two colours drifting over each other with a glint of light. Listening, the sage, slowly. Working — opening its session, writing a reply — a violet and a magenta, fast. One fades into the other over a second. |
+
+Violet `oklch(0.72 0.13 300)` and magenta `oklch(0.74 0.13 350)` are the
+window's own, and say only "the chat is at work". Listening takes no colour of
+its own: it is the sage the window already uses for its quiet marks, so
+waiting is the window at rest rather than a signal.
+
+| Pair | Contrast |
+| --- | --- |
+| Sage × on the raised surface | 3.8:1 — an icon, against 3:1 |
+| Navy icon on coral | 5.2:1 |
+
+Tried and taken out, so they are not tried again for the same reasons:
+
+- **Glass.** The window and the chat in it see-through, the page frosted
+  behind. Over the homepage the coral and the gold came through as muddy
+  smears, and on a phone, with the page hidden behind the chat, it was navy
+  over navy.
+- **A glow for the state.** Under the window, then a band along its foot, in
+  lemon, green-blue, aqua and sky blue. Behind the navy a lemon went olive;
+  on the glass the band sat mostly behind the box to type in; and saying the
+  state by pace more than by colour, it did not read as a state at all. The
+  ring is on the box, where the visitor looks.
+- **A bright listening ring**, aqua and sky blue: a light always on.
+- **Two coral buttons.** Two "press me"s in one small window, and the way out
+  pulled the eye as hard as the thing it was there for. A sage close button
+  came after it, and was one colour too many beside send.
+- **The count as a pill** in the pale gold: one more raised thing in the bar,
+  saying "look here" about a number that only needs to be findable.
 
 ## Trying changes
 

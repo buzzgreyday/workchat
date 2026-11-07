@@ -25,6 +25,9 @@ export default function MessageList() {
       role="log"
       aria-label="Conversation"
       className="chat-log"
+      // A part (EMBED.md): the scrolling conversation, so a host can set its
+      // margins and its scrollbar.
+      part="transcript"
     >
       {messages.map((message) => (
         <MessageBubble
