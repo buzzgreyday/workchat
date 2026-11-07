@@ -31,9 +31,12 @@ from app.common.models.conversation import (
     ChatMessage,
     Conversation,
     ConversationPreview,
+    MessageRole,
+    MessageStatus,
+    ReplyStatus,
 )
 from app.common.models.session import RefreshSession
-from app.common.models.token import Grant
+from app.common.models.token import Grant, TokenVersion
 from app.common.models.user import User
 
 __all__ = [
@@ -51,14 +54,18 @@ __all__ = [
     "ConversationSummary",
     "GrantRevoked",
     "IssueTokenRequest",
+    "MessageRole",
+    "MessageStatus",
     "Record",
     "RefreshSession",
     "RefreshRequest",
+    "ReplyStatus",
     "SessionInfo",
     "SessionOut",
     "TokenClaims",
     "TokenContext",
     "TokenPair",
+    "TokenVersion",
     "Usage",
     "User",
 ]

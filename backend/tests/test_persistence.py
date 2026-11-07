@@ -7,11 +7,13 @@ asked, so these assert against the rows themselves rather than the response body
 import asyncio
 import json
 import uuid
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy import select
 
+from app.common.config import get_settings
 from app.common.schemas import DatabaseChatMessage, DatabaseConversation, DatabaseToken
 from app.repositories.sql import SQLTranscriptRepository
 from tests.conftest import ask, done_frame, sse_frames, stream_of
@@ -108,6 +110,7 @@ async def test_chat_stream_persists_on_client_abort(
         token=token,
         client=openai_mock,
         tooling=get_tooling(),
+        settings=get_settings(),
         transcripts=SQLTranscriptRepository(session_maker),
         endpoint="/chat/stream",
     )
@@ -274,7 +277,7 @@ async def test_a_hang_up_mid_reply_can_be_retried_for_nothing(
     from app.services.chat.tooling import get_tooling
 
     token_row = (await db_session.execute(select(DatabaseToken))).scalars().first()
-    tokens = SQLTokenRepository(db_session)
+    tokens = SQLTokenRepository(db_session, notify_throttle=timedelta(hours=1))
     key = uuid.uuid4()
 
     spent = await tokens.spend_question(token_row.id, key, "a-hash")
@@ -294,6 +297,7 @@ async def test_a_hang_up_mid_reply_can_be_retried_for_nothing(
         ),
         client=openai_mock,
         tooling=get_tooling(),
+        settings=get_settings(),
         transcripts=SQLTranscriptRepository(session_maker),
         question_key=key,
     )
@@ -333,6 +337,7 @@ async def test_a_hang_up_as_the_stream_opens_leaves_the_question_to_the_retry(
         token=token,
         client=openai_mock,
         tooling=get_tooling(),
+        settings=get_settings(),
         transcripts=SQLTranscriptRepository(session_maker),
     )
     assert isinstance(await events.__anext__(), TurnStarted)

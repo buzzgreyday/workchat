@@ -66,12 +66,11 @@ from app.common.exceptions import (
     RefreshTokenReplayed,
     SessionRevoked,
     TokenExpired,
-    TokenRevoked,
     UnsupportedTokenVersion,
 )
 from app.common.crypto import hash_token
 from app.common.logging.logging import logger
-from app.common.models import JWT, Grant, RefreshSession, TokenClaims, TokenContext, TokenPair
+from app.common.models import JWT, Grant, RefreshSession, TokenClaims, TokenContext, TokenPair, TokenVersion
 from app.repositories import get_refresh_session_repository, get_token_repository
 from app.repositories.base import RefreshSessionRepository, TokenRepository
 from app.services.notify import Notifier, notifier as default_notifier
@@ -183,7 +182,7 @@ class Auth:
             issued_at: int,
             expires_at: int,
             max_queries: int,
-            version: int = 1,
+            version: TokenVersion = TokenVersion.V1,
     ) -> str:
         """
         The token that goes in the link the hirer receives.
@@ -198,7 +197,7 @@ class Auth:
         inboxes and on printed QR codes, and a token minted today has to be
         claim-for-claim what one minted last year was.
         """
-        if version == 1:
+        if version == TokenVersion.V1:
             return JWT(
                 sub=subject,
                 iat=issued_at,
@@ -213,7 +212,7 @@ class Auth:
             exp=expires_at,
             jti=str(uuid.uuid4()),
             max_queries=None,
-            ver=2,
+            ver=TokenVersion.V2,
             typ="claim",
             tid=str(token_id),
         ).generate(self.secret_key, self.algorithm)
@@ -227,7 +226,7 @@ class Auth:
             exp=exp_ts,
             jti=str(uuid.uuid4()),
             max_queries=grant.max_queries,
-            ver=2,
+            ver=TokenVersion.V2,
             typ="access",
             tid=str(grant.id),
             sid=str(session_id),
@@ -248,7 +247,7 @@ class Auth:
             # row from the token without a second lookup by hash.
             jti=str(session_id),
             max_queries=None,
-            ver=2,
+            ver=TokenVersion.V2,
             typ="refresh",
             tid=str(grant.id),
         ).generate(self.secret_key, self.algorithm)
@@ -260,7 +259,7 @@ class Auth:
             self,
             tokens: TokenRepository,
             token_id: uuid.UUID,
-            expected_version: int | None = None,
+            expected_version: TokenVersion | None = None,
     ) -> Grant:
         """
         The grant behind a claim, refresh or access token, if it is still usable.
@@ -278,18 +277,9 @@ class Auth:
         if grant is None:
             logger.warning("Invalid token", extra={"token_id": token_id})
             raise InvalidToken()
-        if grant.revoked_at is not None:
-            logger.warning("Revoked token", extra={"token_id": token_id})
-            raise TokenRevoked()
-        if expected_version is not None and grant.version != expected_version:
-            logger.warning(
-                "Token version does not match its grant",
-                extra={"token_id": token_id, "expected_version": expected_version, "version": grant.version},
-            )
-            raise InvalidToken()
-        if grant.expires_at <= datetime.now(timezone.utc):
-            logger.warning("Expired token", extra={"token_id": token_id})
-            raise TokenExpired()
+        refusal = grant.refusal(datetime.now(timezone.utc), expected_version)
+        if refusal is not None:
+            raise refusal
         return grant
 
     async def claim(
@@ -311,14 +301,14 @@ class Auth:
         Costs no quota; questions are what quota is for.
         """
         claims = self.decode(raw_claim)
-        if claims.version != 2 or claims.typ != "claim":
+        if claims.version != TokenVersion.V2 or claims.typ != "claim":
             logger.warning("Non-claim token presented at claim", extra={"typ": claims.typ})
             raise NotAClaimToken()
 
         grant_id = self._uuid(claims.tid, "tid")
         grant = await self._active_grant(tokens, grant_id)
 
-        if grant.version != 2 or not self._matches(raw_claim, grant.token_hash):
+        if grant.version != TokenVersion.V2 or not self._matches(raw_claim, grant.token_hash):
             logger.warning("Claim token does not match its grant", extra={"token_id": grant_id})
             raise InvalidToken()
 
@@ -377,7 +367,7 @@ class Auth:
         costs no quota.
         """
         claims = self.decode(raw_refresh)
-        if claims.version != 2 or claims.typ != "refresh":
+        if claims.version != TokenVersion.V2 or claims.typ != "refresh":
             logger.warning("Non-refresh token presented at refresh", extra={"typ": claims.typ})
             raise NotARefreshToken()
 
@@ -462,7 +452,7 @@ class Auth:
             self,
             credentials: HTTPAuthorizationCredentials | None,
             sessions: RefreshSessionRepository,
-    ) -> tuple[uuid.UUID, int, uuid.UUID | None]:
+    ) -> tuple[uuid.UUID, TokenVersion, uuid.UUID | None]:
         """
         Everything both dependencies do before they diverge: prove the bearer,
         work out which grant it names, and for v2 prove the session is still
@@ -477,12 +467,11 @@ class Auth:
 
         raw_token = credentials.credentials  # already stripped of "Bearer " prefix
         claims = self.decode(raw_token)
-        version = claims.version
 
-        if version == 1:
-            return self._uuid(claims.jti, "jti"), version, None
+        if claims.version == TokenVersion.V1:
+            return self._uuid(claims.jti, "jti"), TokenVersion.V1, None
 
-        if version == 2:
+        if claims.version == TokenVersion.V2:
             # A claim or refresh token is validly signed and would otherwise sail
             # through: only typ="access" may buy a message.
             if claims.typ != "access":
@@ -495,13 +484,13 @@ class Auth:
             # cost is one extra read per v2 request; the alternative is honouring
             # a stolen access token for the rest of its lifetime.
             await self._require_live_session(session_id, grant_id, sessions)
-            return grant_id, version, session_id
+            return grant_id, TokenVersion.V2, session_id
 
         logger.warning("Unknown token version", extra={"ver": claims.ver})
         raise UnsupportedTokenVersion()
 
     @staticmethod
-    def _context(grant: Grant, version: int, session_id: uuid.UUID | None) -> TokenContext:
+    def _context(grant: Grant, version: TokenVersion, session_id: uuid.UUID | None) -> TokenContext:
         return TokenContext(
             sub=grant.subject,
             jti=str(grant.id),

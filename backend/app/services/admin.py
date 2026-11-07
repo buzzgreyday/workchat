@@ -38,7 +38,7 @@ async def issue_token(
     Repositories are currently configured in repositories.__init__, this might change.
     """
     now_ts = int(time.time())
-    now_dt = datetime.fromtimestamp(now_ts)
+    now_dt = datetime.fromtimestamp(now_ts, tz=timezone.utc)
     exp_at_ts = now_ts + req.expires_in_seconds
     exp_at_dt = datetime.fromtimestamp(exp_at_ts, tz=timezone.utc)
     token_id = uuid.uuid4()

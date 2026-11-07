@@ -53,14 +53,20 @@ def users(db_session):
     return SQLUserRepository(db=db_session)
 
 
+# The production defaults, stated here rather than read from the environment,
+# so what these tests assert does not move when a .env does.
+NOTIFY_THROTTLE = timedelta(hours=1)
+ROTATION_GRACE = timedelta(seconds=30)
+
+
 @pytest.fixture
 def tokens(db_session):
-    return SQLTokenRepository(db=db_session)
+    return SQLTokenRepository(db=db_session, notify_throttle=NOTIFY_THROTTLE)
 
 
 @pytest.fixture
 def sessions(db_session):
-    return SQLRefreshSessionRepository(db=db_session)
+    return SQLRefreshSessionRepository(db=db_session, rotation_grace=ROTATION_GRACE)
 
 
 @pytest.fixture
@@ -316,6 +322,12 @@ async def test_mark_owner_notified_throttles(tokens, grant):
     assert await tokens.mark_owner_notified(grant.id) is False
 
 
+async def test_the_notify_throttle_is_the_one_the_repository_was_built_with(db_session, grant):
+    unthrottled = SQLTokenRepository(db=db_session, notify_throttle=timedelta(0))
+    assert await unthrottled.mark_owner_notified(grant.id) is True
+    assert await unthrottled.mark_owner_notified(grant.id) is True
+
+
 # --- refresh sessions ----------------------------------------------------
 
 
@@ -375,6 +387,16 @@ async def test_replay_after_the_grace_window_cuts_every_session(
     cut = await sessions.get(successor.id)
     assert cut is not None
     assert cut.revoked_at is not None, "the live successor must be cut too"
+
+
+async def test_the_grace_window_is_the_one_the_repository_was_built_with(db_session, grant):
+    """With no grace at all, even an immediate re-presentation is a replay."""
+    graceless = SQLRefreshSessionRepository(db=db_session, rotation_grace=timedelta(0))
+    original = await graceless.add(make_session(grant.id))
+    await graceless.rotate(original.id, make_session(grant.id))
+
+    with pytest.raises(RefreshTokenReplayed):
+        await graceless.rotate(original.id, make_session(grant.id))
 
 
 async def test_rotate_raises_for_an_unknown_session(sessions, grant):

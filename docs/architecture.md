@@ -98,6 +98,15 @@ process. Nothing reads the environment at import: `require_env` raising is what
 a missing secret looks like, and it should happen where a server is being
 started rather than where a module is being imported.
 
+Repositories and the chat turn do not call `get_settings()`. The providers in
+`app/repositories/sql/__init__.py` and the chat route take `Settings` by
+`Depends` and hand each piece down as a plain value: the token store gets its
+notification throttle, the session store its rotation grace window, and
+`answer()` gives `run_turn` a `ChatModel` and the system prompt. A store method
+reading global configuration would depend on whatever the environment said, and
+a test could change a window only by changing the environment;
+`dependency_overrides[get_settings]` reaches all of them at once.
+
 Values that consult no environment stay module constants in `app/common/config.py`,
 because they are facts about the application rather than settings — the signing
 algorithm, the tool-round cap, the cookie path. `REFRESH_COOKIE_NAME` is there

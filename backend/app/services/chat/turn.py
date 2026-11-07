@@ -11,8 +11,8 @@ Everything a turn accumulates lives in locals. There is no instance, so a second
 call cannot inherit the first one's tool counts, reply or messages.
 """
 
-import uuid
 from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
 from typing import Any, cast
 
 from openai import AsyncOpenAI
@@ -23,7 +23,7 @@ from openai.types.chat import (
 )
 from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 
-from app.common.config import MAX_TOOL_ROUNDS, get_settings
+from app.common.config import MAX_TOOL_ROUNDS
 from app.common.logging.logging import logger
 from app.common.models import Usage
 from app.services.chat.events import (
@@ -39,11 +39,34 @@ from app.services.chat.prompt import strip_system
 from app.services.chat.tooling import ChatTooling, ToolCall, ToolCallFunction
 
 
+@dataclass(frozen=True, slots=True)
+class ChatModel:
+    """Which model a turn calls, and how hard it is asked to think. Every call
+    in a turn uses the same one."""
+
+    name: str
+    reasoning_effort: str | None = None
+
+    def call_options(self) -> dict[str, Any]:
+        """
+        What every chat call sends about the model.
+
+        `reasoning_effort` only when one is set: a model that does not reason
+        rejects the parameter, so it is left out rather than sent empty.
+        """
+        options: dict[str, Any] = {"model": self.name}
+        if self.reasoning_effort:
+            options["reasoning_effort"] = self.reasoning_effort
+        return options
+
+
 async def run_turn(
     client: AsyncOpenAI,
     tooling: ChatTooling,
     messages: list[ChatCompletionMessageParam],
     usage: Usage,
+    *,
+    model: ChatModel,
     max_rounds: int = MAX_TOOL_ROUNDS,
 ) -> AsyncIterator[TurnEvent]:
     """
@@ -54,85 +77,81 @@ async def run_turn(
     terminal event with the system prompt stripped.
     """
     reply = ""
-    finish_reason: str | None = None
 
     for _ in range(max_rounds):
-        content = ""
-        pending: dict[int, dict[str, Any]] = {}
+        round_ = _Round()
+        async for event in round_.run(client, tooling, model, messages):
+            yield event
+        reply += round_.content
 
-        yield ModelCalled()
-        response = await client.chat.completions.create(
-            model=get_settings().openai_model,
-            messages=messages,
-            **_reasoning(),
-            tools=await tooling.schemas(),
-            stream=True,
-        )
-        async for chunk in response:
-            choice = chunk.choices[0]
-            if choice.finish_reason:
-                finish_reason = choice.finish_reason
-            if choice.delta.content:
-                content += choice.delta.content
-                reply += choice.delta.content
-                yield TokenProduced(text=choice.delta.content)
-            _accumulate_tool_calls(choice.delta.tool_calls, pending)
-
-        yield RoundFinished(finish_reason=finish_reason)
-
-        if finish_reason != "tool_calls":
-            _append_assistant(messages, content)
+        if round_.finish_reason != "tool_calls":
+            _append_assistant(messages, round_.content)
             break
 
-        calls = _assemble(pending)
-        messages.append(_assistant_tool_call_message(content, calls))
+        calls = _assemble(round_.pending)
+        messages.append(_assistant_tool_call_message(round_.content, calls))
         async for event in _run_tools(tooling, calls, messages):
             yield event
     else:
-        # The budget ran out with the model still asking for tools. It used to
-        # end on whatever had been streamed — usually nothing, since a model
-        # still calling tools has not written prose yet, so the hirer got an
-        # empty bubble. One more round with tools switched off turns the cap
-        # into a thinner answer built from what was already fetched.
+        # The budget ran out with the model still asking for tools. Ending
+        # here would end on whatever had streamed — usually nothing, since a
+        # model still calling tools has not written prose yet. One more round
+        # with tools switched off turns the cap into a thinner answer built
+        # from what was already fetched.
         logger.warning("Tool-call rounds exhausted without a final reply", extra={"max_rounds": max_rounds})
-        content = ""
-        yield ModelCalled()
-        response = await client.chat.completions.create(
-            model=get_settings().openai_model,
-            messages=messages,
-            **_reasoning(),
-            tools=await tooling.schemas(),
-            tool_choice="none",
-            stream=True,
-        )
-        async for chunk in response:
-            choice = chunk.choices[0]
-            if choice.finish_reason:
-                finish_reason = choice.finish_reason
-            if choice.delta.content:
-                content += choice.delta.content
-                reply += choice.delta.content
-                yield TokenProduced(text=choice.delta.content)
-        yield RoundFinished(finish_reason=finish_reason)
-        _append_assistant(messages, content)
+        round_ = _Round()
+        async for event in round_.run(client, tooling, model, messages, tool_choice="none"):
+            yield event
+        reply += round_.content
+        _append_assistant(messages, round_.content)
 
     yield TurnFinished(
         reply=reply,
         history=cast(list[dict[str, Any]], strip_system(messages)),
         usage=usage,
-        finish_reason=finish_reason,
+        finish_reason=round_.finish_reason,
     )
 
 
-def _reasoning() -> dict[str, Any]:
+@dataclass(slots=True)
+class _Round:
     """
-    `reasoning_effort` for the chat call, when one is configured, and nothing
-    otherwise — a model that does not reason rejects the parameter, so it is
-    left out rather than sent empty. Set centrally (OPENAI_REASONING_EFFORT,
-    Settings.openai_reasoning_effort); every call in a turn uses the same.
+    One model call, and what it said.
+
+    Its events go out as they happen; what the turn needs afterwards — the
+    text, why the model stopped, the tool calls it assembled — stays here to
+    be read once the stream is done, which an async generator cannot return.
     """
-    effort = get_settings().openai_reasoning_effort
-    return {"reasoning_effort": effort} if effort else {}
+
+    content: str = ""
+    finish_reason: str | None = None
+    pending: dict[int, dict[str, Any]] = field(default_factory=dict)
+
+    async def run(
+        self,
+        client: AsyncOpenAI,
+        tooling: ChatTooling,
+        model: ChatModel,
+        messages: list[ChatCompletionMessageParam],
+        **options: Any,
+    ) -> AsyncIterator[TurnEvent]:
+        yield ModelCalled()
+        response = await client.chat.completions.create(
+            **model.call_options(),
+            messages=messages,
+            tools=await tooling.schemas(),
+            stream=True,
+            **options,
+        )
+        async for chunk in response:
+            choice = chunk.choices[0]
+            if choice.finish_reason:
+                self.finish_reason = choice.finish_reason
+            if choice.delta.content:
+                self.content += choice.delta.content
+                yield TokenProduced(text=choice.delta.content)
+            _accumulate_tool_calls(choice.delta.tool_calls, self.pending)
+        yield RoundFinished(finish_reason=self.finish_reason)
 
 
 def _accumulate_tool_calls(

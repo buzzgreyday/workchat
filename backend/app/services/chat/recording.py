@@ -16,10 +16,9 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import replace
 
-from app.common.config import get_settings
 from app.common.context import conversation_id_var
 from app.common.logging.logging import logger
-from app.common.models import TokenContext
+from app.common.models import ReplyStatus, TokenContext
 from app.repositories.base import ReplyOutcome, TranscriptRepository
 from app.services.chat.events import (
     RoundFinished,
@@ -72,9 +71,14 @@ async def recorded(
     conversation_id: uuid.UUID | None,
     endpoint: str,
     request_id: str,
+    model: str,
+    log_content: bool,
 ) -> AsyncIterator[TurnEvent]:
     """
     Pass events through, then record the reply however the turn ended.
+
+    `model` is recorded against the reply, and `log_content` says whether its
+    text may go to the log as well as the database (LOG_CHAT_CONTENT).
 
     The finally block may await but must never yield: yielding from a generator
     being closed raises "async generator ignored GeneratorExit". Awaiting there
@@ -84,7 +88,7 @@ async def recorded(
     reply = ""
     tool_names: list[str] = []
     finish_reason: str | None = None
-    status = "completed"
+    status: ReplyStatus = "completed"
     error: str | None = None
     started_at = asyncio.get_running_loop().time()
 
@@ -100,7 +104,7 @@ async def recorded(
                 # The loop does not know where its transcript lives, so the id
                 # is attached on the way past.
                 event = replace(event, conversation_id=conversation_id)
-                _log_completion(event)
+                _log_completion(event, log_content)
             yield event
     except BaseException as exc:  # noqa: BLE001 - re-raised below
         # GeneratorExit/CancelledError arrive here when the client goes away
@@ -123,7 +127,7 @@ async def recorded(
                         finish_reason=finish_reason,
                         tool_names=tool_names,
                         tool_calls_count=len(tool_names),
-                        model=get_settings().openai_model,
+                        model=model,
                         latency_ms=int((asyncio.get_running_loop().time() - started_at) * 1000),
                         error=error,
                     ),
@@ -132,7 +136,7 @@ async def recorded(
                 logger.exception("Failed to record assistant message", extra={"request_id": request_id})
 
 
-def _log_completion(event: TurnFinished) -> None:
+def _log_completion(event: TurnFinished, log_content: bool) -> None:
     """
     The one place a finished turn is announced.
 
@@ -140,5 +144,5 @@ def _log_completion(event: TurnFinished) -> None:
     see an event named "done", once by the JSON path in its own words.
     """
     logger.info("Chat message sent to user", extra={"usage": event.usage.model_dump()})
-    if get_settings().log_chat_content:
+    if log_content:
         logger.debug("Chat message content sent to user", extra={"reply": event.reply})

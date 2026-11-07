@@ -13,6 +13,7 @@ from app.common.models import (
     ConversationSummary,
     GrantRevoked,
     IssueTokenRequest,
+    TokenVersion,
 )
 from app.helpers.qr_code import get_qr_code
 from app.repositories import (
@@ -59,7 +60,7 @@ async def issue_token(
     # v1 puts the access token straight in the link; v2 puts a claim token there
     # instead, so the query parameter has to change with it. The frontend reads
     # whichever one it finds — ?token= is still what every issued link carries.
-    param = "token" if req.version == 1 else "claim"
+    param = "token" if req.version == TokenVersion.V1 else "claim"
     if req.type == "qr":
         qr = get_qr_code(url=f"{get_settings().base_url}/?{param}={token}")
         return Response(content=bytes(qr), media_type="image/png", status_code=HTTP_200_OK)
@@ -71,7 +72,7 @@ async def issue_token(
     # "token" stays the key for both so an existing caller reading body["token"]
     # is unaffected; "kind" is what says which flow it belongs to.
     return JSONResponse(
-        content={"token": token, "version": req.version, "kind": "access" if req.version == 1 else "claim"},
+        content={"token": token, "version": req.version, "kind": "access" if req.version == TokenVersion.V1 else "claim"},
         media_type="application/json",
         status_code=HTTP_200_OK,
     )

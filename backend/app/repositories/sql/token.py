@@ -7,28 +7,31 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.config import MAX_QUESTION_ATTEMPTS, get_settings
+from app.common.config import MAX_QUESTION_ATTEMPTS
 from app.common.exceptions import (
     IdempotencyKeyReused,
     InvalidToken,
     QuotaExhausted,
     RetriesExhausted,
-    TokenExpired,
-    TokenRevoked,
 )
-from app.common.models import Grant
-from app.common.models.utc import as_utc
+from app.common.models import Grant, TokenVersion
 from app.common.schemas import DatabaseQuestionKey, DatabaseToken
 from app.repositories.base import SpentQuestion, TokenRepository
 from app.repositories.sql._shared import _rowcount
 
 
 class SQLTokenRepository(TokenRepository):
-    """The tokens table, behind TokenRepository."""
+    """
+    The tokens table, behind TokenRepository.
 
-    def __init__(self, db: AsyncSession) -> None:
+    `notify_throttle` is how long after one operator notification for a grant
+    the next may go out (`mark_owner_notified`).
+    """
+
+    def __init__(self, db: AsyncSession, notify_throttle: timedelta) -> None:
         super().__init__()
         self.db = db
+        self.notify_throttle = notify_throttle
 
     async def add(self, grant: Grant) -> Grant:
         self.logger.debug(
@@ -75,7 +78,7 @@ class SQLTokenRepository(TokenRepository):
         token_id: uuid.UUID,
         key: uuid.UUID,
         message_hash: str,
-        expected_version: int | None = None,
+        expected_version: TokenVersion | None = None,
     ) -> SpentQuestion:
         self.logger.debug(
             "Updating token used query count",
@@ -169,7 +172,7 @@ class SQLTokenRepository(TokenRepository):
         token_id: uuid.UUID,
         key: uuid.UUID,
         message_hash: str,
-        expected_version: int | None,
+        expected_version: TokenVersion | None,
     ) -> SpentQuestion:
         """
         Another attempt at a question already paid for. Spends nothing.
@@ -211,7 +214,7 @@ class SQLTokenRepository(TokenRepository):
         return SpentQuestion(grant=grant, conversation_id=taken.conversation_id)
 
     async def _explain_failed_spend(
-        self, token_id: uuid.UUID, expected_version: int | None, now: datetime
+        self, token_id: uuid.UUID, expected_version: TokenVersion | None, now: datetime
     ) -> Exception:
         """
         Which of the spend's conditions was the one that failed.
@@ -222,35 +225,16 @@ class SQLTokenRepository(TokenRepository):
         return await self._dead_grant(token_id, expected_version, now) or QuotaExhausted()
 
     async def _dead_grant(
-        self, token_id: uuid.UUID, expected_version: int | None, now: datetime
+        self, token_id: uuid.UUID, expected_version: TokenVersion | None, now: datetime
     ) -> Exception | None:
-        """
-        What is wrong with this grant, whatever its allowance, or None. Order
-        matters: revoked before expired, so the most specific reason wins.
-        """
+        """What is wrong with this grant, whatever its allowance, or None."""
         # Read fresh: the spend's UPDATE deliberately does not touch rows already
         # in the session, and this is the read that has to see what is true.
         existing = await self.db.get(DatabaseToken, token_id, populate_existing=True)
         if existing is None:
             self.logger.warning("Invalid token", extra={"token_id": token_id})
             return InvalidToken()
-        if existing.revoked_at is not None:
-            self.logger.warning("Revoked token", extra={"token_id": token_id})
-            return TokenRevoked()
-        if expected_version is not None and existing.version != expected_version:
-            self.logger.warning(
-                "Token version does not match its grant",
-                extra={
-                    "token_id": token_id,
-                    "expected_version": expected_version,
-                    "version": existing.version,
-                },
-            )
-            return InvalidToken()
-        if as_utc(existing.expires_at) <= now:
-            self.logger.warning("Expired token", extra={"token_id": token_id})
-            return TokenExpired()
-        return None
+        return Grant.model_validate(existing).refusal(now, expected_version)
 
     async def claim_once(self, token_id: uuid.UUID) -> bool:
         # The `claimed_at IS NULL` predicate is the whole mechanism — two
@@ -270,7 +254,7 @@ class SQLTokenRepository(TokenRepository):
         # hit in a loop must produce one message, not one per request. The
         # window predicate lives in SQL so concurrent requests cannot both win.
         now = datetime.now(timezone.utc)
-        cutoff = now - timedelta(seconds=get_settings().owner_notify_throttle_seconds)
+        cutoff = now - self.notify_throttle
         result = await self.db.execute(
             update(DatabaseToken)
             .where(
