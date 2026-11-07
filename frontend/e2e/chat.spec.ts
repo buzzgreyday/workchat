@@ -403,16 +403,31 @@ async function transcriptGap(
     );
 }
 
+/** Where the newest question sits, from the top of the transcript's view. */
+async function questionFromTop(page: import("@playwright/test").Page) {
+  return page
+    .getByRole("log", { name: "Conversation" })
+    .evaluate((el) => {
+      const questions = el.querySelectorAll(".message-user");
+      const question = questions[questions.length - 1]!;
+
+      return (
+        question.getBoundingClientRect().top -
+        el.getBoundingClientRect().top
+      );
+    });
+}
+
 /**
- * Two ways the transcript used to be left behind.
+ * A reply arrives under its question, and the view holds still.
  *
- * A reply taller than the follow threshold, arriving in one chunk, was read as
- * the reader having scrolled away — measured after it had landed, the reader
- * was suddenly a long way from the bottom — so following stopped with nobody
- * having touched anything. And a question asked while scrolled up stayed
- * scrolled up, sending the question and its answer below the fold.
+ * Asking scrolls once — the question to the top of the transcript — and then
+ * nothing moves while the reply streams in. It used to follow the reply down
+ * a line at a time, and the paragraph being read moved out from under the
+ * reader once per token. A reply longer than the view runs past its foot, and
+ * a button there goes to the end when the reader wants it.
  */
-test("the transcript follows a long reply, and comes back down for a new question", async ({
+test("a reply arrives under its question without moving the view, and a button goes to its end", async ({
   page,
 }) => {
   await mockBackend(page, {
@@ -428,34 +443,53 @@ test("the transcript follows a long reply, and comes back down for a new questio
     page.getByText("backends in Python").first(),
   ).toBeVisible();
 
+  // The question is at the top, where asking put it, with the reply under it
+  // running past the foot — not scrolled to the reply's last line.
+  expect(await questionFromTop(page)).toBeLessThan(40);
+  expect(await transcriptGap(page)).toBeGreaterThan(200);
+
+  const toEnd = page.getByRole("button", { name: "Go to the latest" });
+
+  await toEnd.click();
+
   await expect
     .poll(() => transcriptGap(page))
-    .toBeLessThanOrEqual(1);
+    .toBeLessThanOrEqual(24);
+  await expect(toEnd).toHaveCount(0);
 
-  // Scroll away to re-read, and give the scroll event its frame to land —
-  // it is dispatched on the next animation frame, not synchronously.
-  await page
-    .getByRole("log", { name: "Conversation" })
-    .evaluate(async (el) => {
-      el.scrollTop = 0;
-
-      await new Promise((resolve) =>
-        requestAnimationFrame(() =>
-          requestAnimationFrame(resolve),
-        ),
-      );
-    });
-
-  expect(await transcriptGap(page)).toBeGreaterThan(120);
-
+  // A new question goes to the top in its turn, however far down the
+  // transcript was.
   await ask(page, "And before that?");
 
-  // Not `toBeInViewport()` on the question itself. The mock answers every
-  // question with the same reply, and one this long lands underneath it and
-  // pushes it back off the top — which is the transcript following its newest
-  // line, the very thing being asserted. That it came back down at all is what
-  // the fault was about, and the gap below is what says so.
   await expect
-    .poll(() => transcriptGap(page))
-    .toBeLessThanOrEqual(1);
+    .poll(() => questionFromTop(page))
+    .toBeLessThan(40);
+});
+
+/**
+ * A short reply has room under its question to be scrolled up into, so the
+ * question still reaches the top — and with nothing below the view, there is
+ * no button.
+ */
+test("a short reply's question goes to the top too, with no button", async ({
+  page,
+}) => {
+  await mockBackend(page, {
+    stream: replyWith("Backend work, in Python."),
+  });
+
+  await openChat(page);
+  await ask(page, "What does he do?");
+  await expect(page.getByText("Backend work, in Python.")).toBeVisible();
+  await ask(page, "And before that?");
+  await expect(
+    page.getByText("Backend work, in Python.").nth(1),
+  ).toBeVisible();
+
+  await expect
+    .poll(() => questionFromTop(page))
+    .toBeLessThan(40);
+  await expect(
+    page.getByRole("button", { name: "Go to the latest" }),
+  ).toHaveCount(0);
 });

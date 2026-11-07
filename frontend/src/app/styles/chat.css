@@ -107,7 +107,20 @@
      they are put back to auto. Not left to the host's `scrollbar-color`,
      which does cross the shadow root by inheritance: in Chrome that alone
      brings back the arrows. */
+  /* The transcript's place in the column, and what the button to its end
+     sits in, over its foot, so it does not scroll with the messages. */
+  .chat-log-frame {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  /* Positioned so a message's `offsetTop` is measured from it: where
+     useAutoScroll scrolls to put a new question at the top. */
   .chat-log {
+    position: relative;
     flex: 1;
     min-height: 0;
     padding: var(--gutter-lg);
@@ -147,6 +160,36 @@
 
   .chat-log > :not(:last-child) {
     margin-block-end: 1rem;
+  }
+
+  /* Sized by useAutoScroll: the room under the newest question. */
+  .chat-log-spacer {
+    flex-shrink: 0;
+  }
+
+  /* To the end of the transcript, while there is more below than shows:
+     round, raised, centred over its foot. Quiet, in the raised surface and
+     the text colour, because it is a way to move, not the thing to press. */
+  .chat-jump {
+    position: absolute;
+    bottom: var(--gutter-sm);
+    left: 50%;
+    translate: -50% 0;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 1px solid var(--chat-border);
+    border-radius: 9999px;
+    background: var(--chat-panel-alt);
+    color: var(--chat-text);
+    box-shadow: var(--shadow-small);
+    cursor: pointer;
+  }
+
+  .chat-jump:focus-visible {
+    outline: 2px solid var(--chat-input-focus);
+    outline-offset: 2px;
   }
 
   .message {

@@ -275,14 +275,13 @@ test("the composer shrinks back after a multi-line question is sent", async ({
  * one API here that cannot promise that; writing `scrollTop` can only ever
  * move the element it is written to.
  *
- * The reply is deliberately short. The mock delivers a whole answer in a
- * single chunk, and the old guard — "is the transcript near its bottom, now
- * that the new content has landed?" — bails out on a long one without
- * scrolling at all, so a long reply would watch for a call that never comes
- * for the wrong reason. Short, it stays near the bottom, the guard passes, and
- * the old code reaches `scrollIntoView` exactly as it did on a phone.
+ * The transcript no longer follows a reply at all (useAutoScroll): it scrolls
+ * once, to put a new question at the top, and holds still while the reply
+ * arrives. That one scroll, and the reply's arrival, are what is watched here
+ * — anything the chat moves, it moves by writing the transcript's own
+ * `scrollTop`.
  */
-test("a streamed reply is followed without reaching outside the transcript", async ({
+test("a question and its reply move nothing outside the transcript", async ({
   page,
 }) => {
   await page.addInitScript(() => {
