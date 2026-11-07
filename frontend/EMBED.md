@@ -64,7 +64,7 @@ There is no close event. Running in the host's document, Escape reaches their
 
 | State | Meaning |
 | --- | --- |
-| `working` | A reply is being written: from the moment a question is sent until its reply has finished, or broken off. |
+| `working` | The chat is busy, and showing it with its typing dots: while it opens its session, and from the moment a question is sent until its reply has finished, or broken off. |
 
 ```css
 workchat-chat:state(working) {
@@ -72,8 +72,10 @@ workchat-chat:state(working) {
 }
 ```
 
-A state rather than an event, because what a host does with "the chat is at
-work" is a look, and a look belongs in the host's CSS: it can select the state
+It follows the typing dots, not only replies, so a host's look for "working"
+appears whenever the chat itself looks busy: the moment after it loads, while
+its session opens, as well as while it answers. A state rather than an event,
+because what a host does with "the chat is at work" is a look, and a look belongs in the host's CSS: it can select the state
 without a line of script, and the state is there when the stylesheet is, with
 nothing to miss by listening too late. `:has()` reaches it from anywhere on the
 page, so a host can light up something outside the chat while it works —

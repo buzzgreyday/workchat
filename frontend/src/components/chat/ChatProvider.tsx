@@ -121,9 +121,9 @@ export function ChatProvider({
    */
   onUsageChange?: (usage: Usage) => void;
   /**
-   * Told when a reply starts being written and when it is done, for a host
-   * that shows the chat at work in a look of its own: the embed's page,
-   * through its `working` state.
+   * Told when the chat becomes busy and when it is done — opening its session,
+   * or writing a reply — for a host that shows the chat at work in a look of
+   * its own: the embed's page, through its `working` state.
    */
   onWorkingChange?: (working: boolean) => void;
   /**
@@ -177,9 +177,11 @@ export function ChatProvider({
     }
   }, [usage]);
 
-  // The same, for whether a reply is being written: a change, not a render.
-  // `loading` is derived from the last message, so this is true from the
-  // moment a question is sent until its reply has finished or broken.
+  // The same, for whether the chat is busy: a change, not a render. `loading`
+  // is derived from the last message, so this is true whenever the typing
+  // dots show — while the session opens, the greeting is an empty streaming
+  // message — and from the moment a question is sent until its reply has
+  // finished or broken.
   const notifyWorking = useRef(onWorkingChange);
 
   useEffect(() => {

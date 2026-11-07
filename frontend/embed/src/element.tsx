@@ -17,7 +17,8 @@ import chatCss from "./embed.css";
  *
  *   Attributes   api-url, about, claim, owner-name, header, frame
  *   Events       workchat-usage (detail: { used, remaining, max })
- *   States       working, while a reply is being written: the host styles
+ *   States       working, while the chat is busy — opening its session, or
+ *                writing a reply — as its typing dots show: the host styles
  *                it as `workchat-chat:state(working)`
  *   CSS          the --chat-* palette and fonts, set on the element by the
  *                host page

@@ -32,8 +32,8 @@ export default function Chat({
   // a host showing the allowance in its own header: the embed's page, and the
   // standalone site's top bar.
   onUsageChange?: (usage: Usage) => void;
-  // Passed straight through as well: whether a reply is being written, for
-  // the embed's `working` state.
+  // Passed straight through as well: whether the chat is busy, for the
+  // embed's `working` state.
   onWorkingChange?: (working: boolean) => void;
   // False when this is a component of another page. Only the embed says so;
   // see `embed/src/element.tsx`.
