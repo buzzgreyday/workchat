@@ -90,6 +90,7 @@ page, so a host can light up something outside the chat while it works —
 | `transcript` | The conversation: the box that scrolls, its padding the margin round the messages. |
 | `bubble` | Every message, a question or a reply. |
 | `user-bubble`, `bot-bubble` | A question and a reply, each also a `bubble`. |
+| `send` | The send button: square, as tall as a one-line field. Its colours are `--chat-send-bg` and `--chat-send-icon`; the part is for its shape. |
 
 ```css
 workchat-chat::part(composer)::before {
@@ -112,7 +113,7 @@ on the field.
 The others are for what a colour cannot change: a reply set as plain text,
 with no bubble at all — no padding, no border, no shadow; a question raised
 like a card, with a hairline and a light along its top; the margin round the
-conversation, and its scrollbar. Each part is a promise about the markup
+conversation, and its scrollbar; a round send button. Each part is a promise about the markup
 under it, so there are only the ones a host has asked for, not one per piece
 of the chat.
 

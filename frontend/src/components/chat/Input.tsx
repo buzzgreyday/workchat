@@ -143,6 +143,9 @@ export default function ChatInput() {
         disabled={shut}
         aria-label="Send question"
         className="button button-send"
+        // A part (EMBED.md): the send button, for a host to shape — a
+        // circle, say — where its colours are already variables.
+        part="send"
       >
         <Send size={18} />
       </button>
