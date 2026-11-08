@@ -87,11 +87,11 @@ page, so a host can light up something outside the chat while it works —
 
 | Part | What it is |
 | --- | --- |
-| `composer` | The box the question is typed in: exactly the size of the field, its corners the field's, positioned, so anything drawn in it with `::before` or `::after` sits on the field. |
-| `transcript` | The conversation: the box that scrolls, its padding the margin round the messages. |
+| `composer` | The box the question is typed in: exactly the size of the field, its corners the field's, positioned, so anything drawn in it with `::before` or `::after` sits on the field. The send button is inside it, at its end. |
+| `transcript` | The conversation: the box that scrolls, with the box to type in held at its foot, its padding the margin round both. |
 | `bubble` | Every message, a question or a reply. |
 | `user-bubble`, `bot-bubble` | A question and a reply, each also a `bubble`. |
-| `send` | The send button: square, as tall as a one-line field. Its colours are `--chat-send-bg` and `--chat-send-icon`; the part is for its shape. |
+| `send` | The send button, inside the box at its end, centred in a one-line field's height. Its colours are `--chat-send-bg` and `--chat-send-icon`; the part is for its shape. |
 | `jump` | The button to the end of the conversation, shown while there is more below than fits: round, in the raised surface, centred over the conversation's foot. |
 
 ```css
@@ -160,6 +160,7 @@ one of these moves that part alone:
 | `--chat-link` | Links in a reply | `--chat-accent` |
 | `--chat-typing` | The dots while a reply is written | `--chat-text-muted` |
 | `--chat-scrollbar` | The transcript's scrollbar: a thin thumb, with no track and no arrows | `--chat-text-muted` |
+| `--chat-fade` | What the conversation fades into as it scrolls behind the box to type in: the colour round the box | `--chat-panel` |
 | `--chat-input-bg`, `--chat-input-text`, `--chat-input-placeholder`, `--chat-input-border` | The input | `--chat-panel-alt`, `--chat-text`, `--chat-text-muted`, `--chat-border` |
 | `--chat-input-focus` | The input's border and glow on focus | `--chat-accent` |
 | `--chat-send-bg`, `--chat-send-icon` | The send button | `--chat-accent`, `--chat-on-accent` |
