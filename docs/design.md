@@ -157,7 +157,7 @@ the element's `--chat-*` variables, its parts and its `working` state
 | Questions left | Plain sage text at the start of the bar, opposite the way out. |
 | Send | Round, coral, inside the box to type in at its end: the one thing in the window to press. An arrow up, paired with the arrow down to the latest. |
 | Close | Round, the raised surface with a sage ×: the quietest way out. |
-| Round buttons | Send, close and the button to the latest share one 3D, so slight it is almost not there: a faint light high on the circle, a little shade low on it, a soft shadow under it. The site's full press is for its large buttons. |
+| Round buttons | Send, close and the button to the latest are flat: a plain circle in one colour, as a chat app draws them. The site's 3D press is for its large buttons; on a small circle, even a slight one read as a bump. |
 | The ring | Round the box to type in, a hairline of two colours drifting over each other with a glint of light. Listening, the sage, slowly. Working — opening its session, writing a reply — a violet and a magenta, fast. One fades into the other over a second. |
 
 Violet `oklch(0.72 0.13 300)` and magenta `oklch(0.74 0.13 350)` are the
