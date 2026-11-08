@@ -197,6 +197,44 @@ test("a failure clears the line, and a retry starts it again", async ({
   await expect(page.getByText("Sending…")).toBeVisible();
 });
 
+// The error frame comes before the stream closes. Try again must not show in
+// between: the turn is still in flight there, and a tap on it did nothing.
+test("a retry is offered only once the failed turn is over", async ({
+  page,
+}) => {
+  const stream = await controlStream(page);
+
+  await mockBackend(page);
+  await openChat(page);
+  await ask(page, "What does he do?");
+  await stream.started();
+
+  await stream.push({ type: "error", message: "It broke." });
+  await expect(page.getByText("It broke.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Try again/ })).toHaveCount(0);
+
+  await stream.end();
+
+  // In view and on top, not under the box to type in at the foot.
+  const retry = page.getByRole("button", { name: /Try again/ });
+
+  await expect(retry).toBeInViewport({ ratio: 1 });
+  expect(
+    await retry.evaluate((button) => {
+      const box = button.getBoundingClientRect();
+
+      return (
+        document.elementFromPoint(box.x + box.width / 2, box.bottom - 4) ===
+        button
+      );
+    }),
+  ).toBe(true);
+
+  await retry.click();
+
+  await expect(page.getByText("Sending…")).toBeVisible();
+});
+
 test("a finished reply reloads with no line left on it", async ({ page }) => {
   const stream = await controlStream(page);
 
@@ -211,6 +249,15 @@ test("a finished reply reloads with no line left on it", async ({ page }) => {
   await stream.end();
 
   await expect(page.getByLabel("Your question")).toBeEnabled();
+
+  // The row is held a view tall for the room under the question; the
+  // bubble in it stays the height of its one line.
+  const bubble = await page
+    .locator(".message-bot .message-bubble")
+    .last()
+    .boundingBox();
+
+  expect(bubble?.height).toBeLessThan(100);
 
   await page.reload();
 

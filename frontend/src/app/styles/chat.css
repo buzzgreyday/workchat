@@ -207,10 +207,22 @@
      on every token. The greeting, with no question before it, keeps its
      own height. */
   .message-user ~ .message-bot:nth-last-child(1 of .message-bot) {
-    min-height: calc(
+    --room: calc(
       100cqh - 5rem - var(--gutter-lg) - var(--control-height) -
         2 * var(--gutter-sm)
     );
+
+    min-height: var(--room);
+  }
+
+  /* After a failure, Try again comes under the reply, so the room leaves
+     space for it — two lines of it, as on a phone, and its gap. Without
+     this it sat half under the box to type in, and a tap on its lower half
+     went to the box. */
+  .chat-messages:has(> .button-retry)
+    .message-user
+    ~ .message-bot:nth-last-child(1 of .message-bot) {
+    min-height: calc(var(--room) - 5.5rem);
   }
 
   /* Smooth to the end, for the button; still for anyone who asks for less
@@ -275,8 +287,12 @@
     outline-offset: 2px;
   }
 
+  /* Top-aligned, not stretched: the newest reply's row is held a view
+     tall for the room under its question, and a stretched bubble filled all
+     of it, an empty box the height of the screen. */
   .message {
     display: flex;
+    align-items: flex-start;
   }
 
   .message-user {
