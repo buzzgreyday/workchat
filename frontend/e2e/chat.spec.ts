@@ -394,7 +394,7 @@ async function transcriptGap(
   page: import("@playwright/test").Page,
 ): Promise<number> {
   return page
-    .getByRole("log", { name: "Conversation" })
+    .locator('[part~="transcript"]')
     .evaluate(
       (el) =>
         el.scrollHeight -
@@ -406,7 +406,7 @@ async function transcriptGap(
 /** Where the newest question sits, from the top of the transcript's view. */
 async function questionFromTop(page: import("@playwright/test").Page) {
   return page
-    .getByRole("log", { name: "Conversation" })
+    .locator('[part~="transcript"]')
     .evaluate((el) => {
       const questions = el.querySelectorAll(".message-user");
       const question = questions[questions.length - 1]!;

@@ -28,39 +28,26 @@ function lastAskedId(
 }
 
 /**
- * Show each question at the top of the transcript, and then hold still.
+ * Show each new question at the top of the transcript, and then hold still.
  *
- * Asking a question scrolls once: the question to the top, with the room
- * under it for the reply to arrive into. Then nothing moves while the reply
- * streams in. It grows down the page, under the reader's eyes; once it runs
- * past the foot of the transcript a button offers the end, and the reader
- * decides when to go there.
+ * The rest is CSS (styles/chat.css): a browser does not move the view when
+ * content grows below it, so the reply streams in under the question with
+ * nothing moving; the room under the question is a minimum height on the
+ * newest reply; and the button to the end shows and hides itself from the
+ * scroll position. What CSS cannot do is notice a question was just asked,
+ * and go to the end on a press without a link, which would put a `#` in the
+ * host page's address. That is this.
  *
- * Almost all of that is CSS (styles/chat.css), and this is what is left. A
- * browser does not move the view when content grows below it, so holding
- * still needs nothing at all. The room under the question is a minimum
- * height on the newest reply, in the transcript's own container units. The
- * button shows and hides itself from the scroll position, a scroll-driven
- * animation. What CSS cannot do is notice that a question was just asked, and
- * scroll to it; and it cannot be told to go to the end on a press without a
- * link, which would put a `#` in the host page's address.
- *
- * It used to follow the reply down, a line at a time, as long as the reader
- * was at the bottom: the paragraph being read moved out from under the
- * reader once per token. A first version of this one measured the room and
- * the end in script, on every token and every resize, and was replaced by the
- * CSS that does the same without it.
+ * It used to follow a reply down a line at a time, and the paragraph being
+ * read moved out from under the reader once per token.
  *
  * The scroll is written to the transcript itself, never done with
- * `scrollIntoView()`. `scrollIntoView` is not scoped to the nearest scroller:
- * it scrolls *every* ancestor that can move, the document included — and
- * `overflow: hidden` on `html` only stops the user scrolling it, not script.
- * On a phone that walked the whole page up the screen and left it there,
- * where nobody could scroll it back. To the question it is instant — its
- * reply begins to arrive at once — and to the end, as the transcript's
- * `scroll-behavior` says: smooth, unless the reader asks for less motion.
+ * `scrollIntoView()`, which scrolls *every* ancestor that can move, the
+ * document included: on a phone that walked the whole page up the screen and
+ * left it there. To the question it is instant — its reply begins to arrive
+ * at once — and to the end, as the transcript's `scroll-behavior` says.
  */
-export function useAutoScroll(messages: Message[]) {
+export function useScrollToQuestion(messages: Message[]) {
   const containerRef =
     useRef<HTMLDivElement>(null);
 

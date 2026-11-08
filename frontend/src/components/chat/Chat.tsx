@@ -68,9 +68,7 @@ export default function Chat({
         >
           {showHeader && <ChatHeader />}
 
-          <MessageList />
-
-          <ChatInput />
+          <MessageList footer={<ChatInput />} />
         </div>
       </div>
     </ChatProvider>

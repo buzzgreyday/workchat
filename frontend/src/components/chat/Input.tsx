@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { Send } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 
 import { useControls } from "./ChatProvider";
 import { useAutoResize } from "@/hooks/useAutoResize";
@@ -69,9 +69,10 @@ export default function ChatInput() {
   return (
     <div className="composer">
       {/* A part (EMBED.md): the box the question is typed in, exactly the
-          field's size, for a host page to draw on — a ring, a glow — with
-          CSS of its own. The box rather than the field, because a textarea
-          takes no ::before or ::after to draw with. */}
+          field's size, with the send button inside it, for a host page to
+          draw on — a ring, a glow — with CSS of its own. The box rather than
+          the field, because a textarea takes no ::before or ::after to draw
+          with. */}
       <div className="composer-box" part="composer">
         <textarea
           // A textarea rather than an input: a question worth asking a CV often
@@ -128,27 +129,30 @@ export default function ChatInput() {
             {input.length} / {MAX_MESSAGE_CHARS}
           </span>
         )}
-      </div>
 
-      <button
-        type="button"
-        // Pressing the button must not take focus from the field. On a phone
-        // that blur lowers the keyboard and brings the footer back, the
-        // composer moves up under the finger, and the tap lands beside the
-        // button — so the first tap did nothing and only a second one sent.
-        // Keeping focus keeps the layout still, and leaves the keyboard up
-        // for the next question. Keyboard activation is unaffected.
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => sendMessage()}
-        disabled={shut}
-        aria-label="Send question"
-        className="button button-send"
-        // A part (EMBED.md): the send button, for a host to shape — a
-        // circle, say — where its colours are already variables.
-        part="send"
-      >
-        <Send size={18} />
-      </button>
+        <button
+          type="button"
+          // Pressing the button must not take focus from the field. On a phone
+          // that blur lowers the keyboard and brings the footer back, the
+          // composer moves up under the finger, and the tap lands beside the
+          // button — so the first tap did nothing and only a second one sent.
+          // Keeping focus keeps the layout still, and leaves the keyboard up
+          // for the next question. Keyboard activation is unaffected.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => sendMessage()}
+          disabled={shut}
+          aria-label="Send question"
+          className="button button-send"
+          // A part (EMBED.md): the send button, for a host to shape — a
+          // circle, say — where its colours are already variables.
+          part="send"
+        >
+          {/* Up, into the conversation, as the button to its end points down
+              to the latest: one pair. A paper plane was first, the most
+              familiar send there is, and the least of a set with anything. */}
+          <ArrowUp size={18} strokeWidth={2.5} aria-hidden="true" />
+        </button>
+      </div>
     </div>
   );
 }
