@@ -136,6 +136,12 @@ export function useChat({
     inFlight.current = true;
     setFailed(null);
 
+    // Whether this attempt can be tried again. Offered only once the turn is
+    // over, in `finally`: the error frame arrives before the stream closes,
+    // and a Try again shown in that gap was a button that did nothing, since
+    // a second turn is refused while the first is still in flight.
+    let retryable = false;
+
     try {
       await chatService.stream(
         authFetch,
@@ -200,7 +206,7 @@ export function useChat({
                 GENERIC_FAILURE_MESSAGE,
             });
 
-            setFailed({ text, key });
+            retryable = true;
 
             // The question was already paid for — quota is spent before the
             // model is called — but usage only rides a `done` frame, so the
@@ -228,13 +234,17 @@ export function useChat({
       });
 
       if (isRetryable(error)) {
-        setFailed({ text, key });
+        retryable = true;
 
         // Paid for or not depends on how far it got, and only the server knows.
         void refreshUsage();
       }
     } finally {
       inFlight.current = false;
+
+      if (retryable) {
+        setFailed({ text, key });
+      }
     }
   };
 
