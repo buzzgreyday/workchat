@@ -7,6 +7,22 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.16.1] - 2026-11-08
+
+### Fixed
+
+- **Try again works the moment it shows.** It appeared on the error frame,
+  before the stream had closed, while a second turn is still refused, so a
+  quick tap on it did nothing. It now shows once the failed turn is over.
+- **Try again is clear of the box to type in.** It came after the room held
+  under the newest question, half under the box, and a tap on its lower half
+  went to the box. The room leaves space for it.
+- **A short reply's bubble is its own height.** The room under a question is
+  a minimum height on the reply's row, and since 0.15.0 it stretched the
+  bubble in it to an empty box the height of the screen. The rows are
+  top-aligned. mringdal.com draws replies without a bubble, so it never
+  showed there.
+
 ## [0.16.0] - 2026-11-08
 
 ### Changed
