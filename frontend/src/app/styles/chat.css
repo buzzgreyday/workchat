@@ -326,8 +326,16 @@
 
   /* The `composer` part (EMBED.md): positioned and rounded like the field
      in it, so what a host draws on the box with ::before or ::after, at
-     `inset: 0` and `border-radius: inherit`, lies exactly on the field. */
+     `inset: 0` and `border-radius: inherit`, lies exactly on the field.
+
+     The send button sits inside it, at its end: smaller than a one-line
+     field and centred in its height, the same space round it below and to
+     the side. Held to the bottom corner, so a question that grows to more
+     lines grows away from it. Beside the field, as tall as it, it was the
+     heaviest thing in the window. */
   .composer-box {
+    --send-size: 2.25rem;
+    --send-inset: calc((var(--control-height) - var(--send-size)) / 2);
     position: relative;
     display: flex;
     flex: 1;
@@ -340,7 +348,8 @@
     flex: 1;
     min-height: var(--control-height);
     max-height: var(--composer-max);
-    padding: 0.75rem 1rem;
+    /* The right side keeps clear of the send button inside the box. */
+    padding: 0.75rem var(--control-height) 0.75rem 1rem;
     resize: none;
     border: 1px solid var(--chat-input-border);
     border-radius: var(--radius-control);
@@ -355,14 +364,14 @@
     color: var(--chat-input-placeholder);
   }
 
-  /* Room for the count, once there is one. */
+  /* Room for the count, once there is one, left of the send button. */
   .composer-field[data-counting] {
-    padding-right: 4rem;
+    padding-right: calc(var(--control-height) + 4rem);
   }
 
   .composer-count {
     position: absolute;
-    right: 0.75rem;
+    right: var(--control-height);
     bottom: 0.5rem;
     color: var(--chat-input-placeholder);
     font-size: 0.875rem;
@@ -444,8 +453,15 @@
   }
 
   .button-send {
-    width: var(--control-height);
-    height: var(--control-height);
+    position: absolute;
+    right: var(--send-inset);
+    bottom: var(--send-inset);
+    width: var(--send-size);
+    height: var(--send-size);
+    padding: 0;
+    /* The field's corner, less the space round the button: the two curves
+       run alongside each other. */
+    border-radius: calc(var(--radius-control) - var(--send-inset));
   }
 
   .button-wide {

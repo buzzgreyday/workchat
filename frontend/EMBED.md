@@ -87,11 +87,11 @@ page, so a host can light up something outside the chat while it works —
 
 | Part | What it is |
 | --- | --- |
-| `composer` | The box the question is typed in: exactly the size of the field, its corners the field's, positioned, so anything drawn in it with `::before` or `::after` sits on the field. |
+| `composer` | The box the question is typed in: exactly the size of the field, its corners the field's, positioned, so anything drawn in it with `::before` or `::after` sits on the field. The send button is inside it, at its end. |
 | `transcript` | The conversation: the box that scrolls, its padding the margin round the messages. |
 | `bubble` | Every message, a question or a reply. |
 | `user-bubble`, `bot-bubble` | A question and a reply, each also a `bubble`. |
-| `send` | The send button: square, as tall as a one-line field. Its colours are `--chat-send-bg` and `--chat-send-icon`; the part is for its shape. |
+| `send` | The send button, inside the box at its end, centred in a one-line field's height. Its colours are `--chat-send-bg` and `--chat-send-icon`; the part is for its shape. |
 | `jump` | The button to the end of the conversation, shown while there is more below than fits: round, in the raised surface, centred over the conversation's foot. |
 
 ```css
