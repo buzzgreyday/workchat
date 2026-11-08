@@ -148,7 +148,7 @@ the element's `--chat-*` variables, its parts and its `working` state
 
 | | |
 | --- | --- |
-| The window | Navy, lifting slightly toward the raised surface at its foot, round the box to type in, with no box or card of the chat's own in it. |
+| The window | Navy, with no box or card of the chat's own in it. The conversation runs on behind the box to type in to the bottom of the window, fading slightly into the navy under it. |
 | A question | Raised: the raised surface at 80%, a hairline round it and a faint light along its top, with half a line more room above and below than between messages. |
 | A reply | Plain text, no bubble — the page's reading, not a message in a box. Its paragraphs a gap apart. |
 | The margins | One line down the left, 1rem in: the questions left, the replies, the box to type in. |
@@ -157,7 +157,7 @@ the element's `--chat-*` variables, its parts and its `working` state
 | Questions left | Plain sage text at the start of the bar, opposite the way out. |
 | Send | Round, coral, inside the box to type in at its end: the one thing in the window to press. An arrow up, paired with the arrow down to the latest. |
 | Close | Round, the raised surface with a sage ×: the quietest way out. |
-| Round buttons | Send, close and the button to the latest are flat: a plain circle in one colour, as a chat app draws them. The site's 3D press is for its large buttons; on a small circle, even a slight one read as a bump. |
+| Round buttons | Send, close and the button to the latest are flat: a plain circle in one colour, as a chat app draws them. The site's 3D press is for its large buttons; on a small circle, even a slight one read as a bump. Everything in the raised surface — the questions, close, the button to the latest — has the same faint hairline. |
 | The ring | Round the box to type in, a hairline of two colours drifting over each other with a glint of light. Listening, the sage, slowly. Working — opening its session, writing a reply — a violet and a magenta, fast. One fades into the other over a second. |
 
 Violet `oklch(0.72 0.13 300)` and magenta `oklch(0.74 0.13 350)` are the

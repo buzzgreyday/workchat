@@ -93,19 +93,6 @@
     box-shadow: var(--shadow-small);
   }
 
-  /* The transcript's place in the column, and what the button to its end
-     sits in, over its foot, so it does not scroll with the messages. The
-     transcript's scroll position is named here, so the button can follow it
-     (below). */
-  .chat-log-frame {
-    timeline-scope: --transcript;
-    position: relative;
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-height: 0;
-  }
-
   /* `min-height`, because a flex item's automatic minimum size is its content:
      without it this box refuses to shrink below the whole transcript.
      `overscroll-behavior` keeps a flick at either end from chaining out into
@@ -113,6 +100,12 @@
      measured from it (useScrollToQuestion); a size container, so the newest
      reply can be sized from its height; and its scroll a timeline, for the
      button to its end (below).
+
+     A column of the messages and, held to its foot, the box to type in
+     (`.chat-dock`): the conversation runs on behind the box to the bottom
+     of the chat and fades out under it, where it used to stop at a hard
+     line above it. No padding at the foot, for the dock to sit on the edge;
+     its sides are the box's too.
 
      The scrollbar is a thin thumb on nothing — no track, no arrows — in
      `--chat-scrollbar`. Two ways, because no one way reaches every browser:
@@ -124,9 +117,11 @@
     position: relative;
     container-type: size;
     scroll-timeline: --transcript y;
+    display: flex;
     flex: 1;
+    flex-direction: column;
     min-height: 0;
-    padding: var(--gutter-lg);
+    padding: var(--gutter-lg) var(--gutter-lg) 0;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
@@ -174,18 +169,48 @@
     display: none;
   }
 
-  .chat-log > :not(:last-child) {
+  /* Growing to fill what is left, so a short conversation still has the
+     box at the foot of the chat. */
+  .chat-messages {
+    flex: 1 0 auto;
+  }
+
+  .chat-messages > :not(:last-child) {
     margin-block-end: 1rem;
+  }
+
+  /* The box to type in, held to the foot of what scrolls, over a slight
+     fade: from `--chat-fade`, not quite solid, at the bottom to nothing a
+     little above the box. The conversation passing behind goes out softly
+     rather than at an edge, and still shows faintly to the bottom.
+     The box's own sides are the transcript's (above). */
+  .chat-dock {
+    position: sticky;
+    bottom: 0;
+    padding-block-start: var(--gutter-lg);
+    background: linear-gradient(
+      to top,
+      color-mix(in oklab, var(--chat-fade) 85%, transparent),
+      transparent
+    );
+  }
+
+  .chat-dock .composer {
+    padding-inline: 0;
   }
 
   /* The room under the newest question, so it can be scrolled to the top
      however short its reply: the reply after it is at least a view tall,
-     less about a question's height. Approximate — a question of three lines
+     less about a question's height and the box to type in at the foot.
+     Approximate — a question of three lines
      stops a little short of the top — where exact meant measuring in script
      on every token. The greeting, with no question before it, keeps its
      own height. */
   .message-user ~ .message-bot:nth-last-child(1 of .message-bot) {
-    min-height: calc(100cqh - 5rem);
+    min-height: calc(
+      100cqh - 5rem - var(--gutter-lg) - var(--control-height) -
+        2 * var(--gutter-sm)
+    );
   }
 
   /* Smooth to the end, for the button; still for anyone who asks for less
@@ -197,7 +222,7 @@
   }
 
   /* To the end of the transcript, while there is more below than shows:
-     round, raised, centred over its foot. Quiet, in the raised surface and
+     round, raised, centred just above the box to type in. Quiet, in the raised surface and
      the text colour, because it is a way to move, not the thing to press.
 
      Hidden, and shown by the scroll position alone, a scroll-driven
@@ -210,7 +235,7 @@
      transcript scrolls by hand. */
   .chat-jump {
     position: absolute;
-    bottom: var(--gutter-sm);
+    bottom: 100%;
     left: 50%;
     translate: -50% 0;
     display: grid;
