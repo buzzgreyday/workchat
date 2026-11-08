@@ -148,7 +148,7 @@ the element's `--chat-*` variables, its parts and its `working` state
 
 | | |
 | --- | --- |
-| The window | Solid navy, with no box or card of the chat's own in it. |
+| The window | Navy, lifting slightly toward the raised surface at its foot, with no box or card of the chat's own in it. The box to type in has no fill: it is its ring on the window. |
 | A question | Raised: the raised surface at 80%, a hairline round it and a faint light along its top, with half a line more room above and below than between messages. |
 | A reply | Plain text, no bubble — the page's reading, not a message in a box. Its paragraphs a gap apart. |
 | The margins | One line down the left, 1rem in: the questions left, the replies, the box to type in. |
