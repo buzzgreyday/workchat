@@ -7,6 +7,26 @@ covering both frontend and backend together. `backend/pyproject.toml` and
 `frontend/package.json` version fields are bumped to match on release, not
 tracked independently._
 
+## [0.16.0] - 2026-11-08
+
+### Changed
+
+- **The conversation runs on behind the box to type in.** The box is held at
+  the foot of what scrolls, and the conversation passes behind it to the
+  bottom of the chat, fading out under it, where it used to stop at a hard
+  line above the box. At the end, the last message stops just above it. The
+  colour it fades into is `--chat-fade`.
+- **Send is an arrow up, inside the box** at its end, centred in a one-line
+  field and held in the corner as a question grows. It pairs with the arrow
+  down to the latest, and both are 18px at a stroke of 2.5. The paper plane
+  was the most familiar send there is, and the least of a set with anything.
+- The button to the latest sits with the box, just above it.
+
+### Added
+
+- `--chat-fade`, what the conversation fades into under the box. Defaults to
+  `--chat-panel`.
+
 ## [0.15.0] - 2026-11-07
 
 ### Changed
