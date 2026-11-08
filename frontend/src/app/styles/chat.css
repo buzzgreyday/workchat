@@ -452,6 +452,13 @@
     box-shadow: none;
   }
 
+  /* The arrow at the size and weight of the arrow to the end (MessageList),
+     so the two are one pair: 18px, a stroke of 2.5. */
+  .button-send svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
   .button-send {
     position: absolute;
     right: var(--send-inset);

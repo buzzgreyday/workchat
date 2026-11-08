@@ -63,7 +63,7 @@ export default function MessageList() {
         className="chat-jump"
         part="jump"
       >
-        <ArrowDown size={18} aria-hidden="true" />
+        <ArrowDown size={18} strokeWidth={2.5} aria-hidden="true" />
       </button>
     </div>
   );

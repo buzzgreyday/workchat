@@ -150,7 +150,7 @@ export default function ChatInput() {
           {/* Up, into the conversation, as the button to its end points down
               to the latest: one pair. A paper plane was first, the most
               familiar send there is, and the least of a set with anything. */}
-          <ArrowUp size={18} aria-hidden="true" />
+          <ArrowUp size={18} strokeWidth={2.5} aria-hidden="true" />
         </button>
       </div>
     </div>
